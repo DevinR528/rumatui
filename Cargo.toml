@@ -1,0 +1,27 @@
+[package]
+name = "rumatui"
+version = "0.1.0"
+authors = ["Devin R <devin.ragotzy@gmail.com>"]
+license = "MIT/Apache-2.0"
+description = "Command line todo in Rust."
+repository = "https://github.com/DevinR528/forget"
+keywords = ["todo", "cli", "productivity", "console", "terminal"]
+categories = ["development-tools"]
+edition = "2018"
+readme = "README.md"
+exclude = [ "resources" ]
+
+[dependencies]
+chrono = "0.4"
+failure = "0.1.7"
+futures-core = "0.3.4"
+futures-util = "0.3.4"
+matrix-sdk = { git = "https://github.com/matrix-org/matrix-rust-sdk" }
+ruma-api = "0.14.0"
+ruma-events = "0.17.0"
+serde = { version = "1.0.105", features = ["derive"] }
+serde_json = "1.0.48"
+termion = "1.5.5"
+tokio = { version = "0.2.13", features = ["macros"] }
+tui = "0.8.0"
+url = "2.1.1"
