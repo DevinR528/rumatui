@@ -4,8 +4,8 @@ use std::thread;
 use std::time::Duration;
 
 use termion::event::{Event as TermEvent, Key, MouseEvent};
-use termion::input::TermRead;
 use termion::input::MouseTerminal;
+use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 
 pub enum Event<I> {

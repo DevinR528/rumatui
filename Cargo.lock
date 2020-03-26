@@ -579,7 +579,6 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 [[package]]
 name = "matrix-sdk"
 version = "0.1.0"
-source = "git+https://github.com/matrix-org/matrix-rust-sdk#aa1e69e98bb70277d9e8f013a09d6bddfdf2cfd6"
 dependencies = [
  "async-std",
  "futures",
@@ -1046,7 +1045,9 @@ dependencies = [
  "futures-util",
  "matrix-sdk",
  "ruma-api",
+ "ruma-client-api",
  "ruma-events",
+ "ruma-identifiers",
  "serde",
  "serde_json",
  "termion",
