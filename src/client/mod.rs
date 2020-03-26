@@ -20,19 +20,43 @@ use matrix_sdk::{
 };
 use ruma_api::{Endpoint, Outgoing};
 use ruma_client_api::r0::{
+    directory::get_public_rooms_filtered,
     filter::RoomEventFilter,
     message::create_message_event,
     search::search_events::{self, Categories, Criteria},
     sync::sync_events,
 };
-use ruma_identifiers::RoomId;
+use ruma_identifiers::{RoomAliasId, RoomId, UserId};
 use url::Url;
 
+#[derive(Clone, Debug)]
+pub struct RoomInfo {
+    pub name: Option<String>,
+    pub alias: Option<RoomAliasId>,
+    pub user: UserId,
+}
+impl RoomInfo {
+    pub(crate) fn from_name(user: UserId, name: &str) -> Self {
+        Self {
+            name: Some(name.to_string()),
+            user,
+            alias: None,
+        }
+    }
+    pub(crate) fn from_alias(user: UserId, alias: RoomAliasId) -> Self {
+        Self {
+            name: None,
+            user,
+            alias: Some(alias),
+        }
+    }
+}
 #[derive(Clone)]
 pub struct MatrixClient {
     inner: AsyncClient,
     homeserver: String,
     room_ids: Vec<RoomId>,
+    pub rooms: HashMap<RoomId, RoomInfo>,
     curr_sync: Option<String>,
     user: String,
 }
@@ -55,6 +79,7 @@ impl MatrixClient {
             homeserver: homeserver.into(),
             user: String::default(),
             room_ids: Vec::default(),
+            rooms: HashMap::new(),
             curr_sync: None,
         };
 
@@ -72,15 +97,13 @@ impl MatrixClient {
         let res = self.inner.login(username, password, None).await?;
         println!("{:?}", res);
         println!();
-        
-        let response = self.inner.sync(SyncSettings::new()).await?;
+
+        let response = self
+            .inner
+            .sync(SyncSettings::new().full_state(true))
+            .await?;
 
         self.process_response(response).await?;
-        let room_ids = self.room_ids.clone();
-        for room_id in room_ids.iter() {
-            self.ping_room(room_id).await?;
-        }
-        panic!();
 
         Ok(())
     }
@@ -101,51 +124,81 @@ impl MatrixClient {
         // next batch token keeps track of sync up to this point
         self.curr_sync = Some(response.next_batch.clone());
         // joined rooms, left or banned (leave), invited (invite)
+
         self.room_ids = response.rooms.join.keys().cloned().collect::<Vec<RoomId>>();
-        println!("ROOM IDS LEN {}", self.room_ids.len());
-
-        // let joined = response
-        //     .rooms
-        //     .join
-        //     .iter()
-        //     .map(|(id, room)| id)
-        //     .collect::<Vec<RoomId>>();
-        // vec of events
-        // let names = response
-        //     .presence
-        //     .events
-        //     .iter()
-        //     .flat_map(|res| res.clone().into_result().ok())
-        //     .flat_map(|ev| ev.content.displayname)
-        //     .collect::<Vec<_>>();
-
+        println!("ROOM IDS {}", self.room_ids.len());
         // let _to_device = response.to_device;
         // let key_map = response.device_one_time_keys_count;
-        // println!("{:?}", next_tkn);
-        // println!(
-        //     "{:?}",
-        //     room_ids
-        //         .iter()
-        //         .map(|id| format!("!{}:{}", id.hostname(), id.localpart()))
-        //         .collect::<Vec<_>>()
-        // );
-        // println!("{:?}", names);
 
-        if let Some(id) = self.room_ids
-            .iter()
-            .map(|id| format!("!{}:{}", id.localpart(), id.hostname(),))
-            .find(|id| id.starts_with("!TFAjFxMDQqAluONEko"))
-        {
-            // let res = send_message(&mut client, &id, MessageEventContent::Text(TextMessageEventContent {
-            //     body: "From RumaTui".into(),
-            //     format: None,
-            //     formatted_body: None,
-            //     relates_to: None,
-            // })).await?;
-            // println!("{:?}", res);
-            let res = self.ping_room(&RoomId::try_from(id.as_str()).unwrap()).await?;
+        // map the room_ids to room names and aliases
+        for room in response.rooms.join.values() {
+            for ev in room
+                .state
+                .events
+                .iter()
+                .flat_map(|res| res.clone().into_result().ok())
+            {
+                match ev {
+                    StateEvent::RoomName(e) => {
+                        if let Some(name) = e.content.name() {
+                            self.map_rooms(name, &e.sender).await?;
+                        }
+                    }
+                    StateEvent::RoomCanonicalAlias(e) => {
+                        if let Some(alias) = e.content.alias {
+                            self.map_rooms(&alias.to_string(), &e.sender).await?;
+                        }
+                    }
+                    StateEvent::RoomAliases(e) => {
+                        if let Some(alias) = e.content.aliases.first() {
+                            self.map_rooms(&alias.to_string(), &e.sender).await?;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub(crate) async fn map_rooms(
+        &mut self,
+        name: &str,
+        user: &UserId,
+    ) -> Result<(), matrix_sdk::Error> {
+        let data = get_public_rooms_filtered::Request {
+            server: None,
+            limit: None,
+            since: None,
+            filter: Some(get_public_rooms_filtered::Filter {
+                generic_search_term: Some(name.to_string()),
+            }),
         };
-
+        let res = self.inner.send(data).await?;
+        // if res.chunk.len() > 1 {
+        //     panic!("more than one PublicRoomChunk");
+        // } else
+        if !res.chunk.is_empty() {
+            let rooms = &res.chunk;
+            for room in rooms {
+                self.rooms.entry(room.room_id.clone()).or_insert_with(|| {
+                    if let Some(name) = &room.name {
+                        RoomInfo::from_name(user.clone(), name)
+                    } else if let Some(alias) = &room.canonical_alias {
+                        RoomInfo::from_alias(user.clone(), RoomAliasId::try_from(alias.as_str()).unwrap())
+                    } else if let Some(alias) = &room.aliases {
+                        if let Some(alias) = alias.first() {
+                            RoomInfo::from_alias(user.clone(), alias.clone())
+                        } else {
+                            panic!("no aliases in AliasEvent")
+                        }
+                    } else {
+                        panic!("No canonical alias or room name")
+                    }
+                });
+            }
+        }
         Ok(())
     }
 
@@ -163,8 +216,12 @@ impl MatrixClient {
                         not_rooms: Vec::default(),
                         limit: None,
                         rooms: Some(vec![room_id.clone()]),
-                        types: Some(vec!["m.room.canonical_alias".into(), "m.room.aliases".into(), "m.room.name".into()]),
-                        .. Default::default()
+                        types: Some(vec![
+                            "m.room.canonical_alias".into(),
+                            "m.room.aliases".into(),
+                            "m.room.name".into(),
+                        ]),
+                        ..Default::default()
                     }),
                     groupings: None,
                     include_state: None,

@@ -68,6 +68,26 @@ async fn main() -> Result<(), failure::Error> {
                 app.on_tick();
             }
         }
+        if let Some(c) = &app.client {
+            if !c.rooms.is_empty() {
+                terminal.clear()?;
+                println!(
+                    "{:?}",
+                    app.client.as_ref().unwrap().rooms.values().map(|r| r
+                        .name
+                        .as_ref()
+                        .map(|s| s.clone())
+                        .unwrap_or(
+                            r.alias
+                                .as_ref()
+                                .map(|a| a.alias().to_string())
+                                .unwrap_or(String::default())
+                        ))
+                        .collect::<Vec<_>>()
+                );
+                panic!();
+            }
+        }
         if app.should_quit {
             terminal.clear()?;
             break;

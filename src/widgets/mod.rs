@@ -121,11 +121,7 @@ impl AppWidget {
     async fn add_char(&mut self, c: char) {
         // TODO add homeserver_url sign in??
         if !self.login_w.logged_in {
-            self.client = Some(
-                MatrixClient::new("http://matrix.org/!aiEopERlyAFggXzslS:matrix.org")
-                    .await
-                    .unwrap(),
-            );
+            self.client = Some(MatrixClient::new("http://matrix.org").await.unwrap());
             if c == '\n' {
                 if let LoginSelect::Password = self.login_w.login.selected {
                     if !self.login_w.login.password.is_empty()
@@ -145,9 +141,9 @@ impl AppWidget {
                         if res.is_ok() {
                             self.login_w.logged_in = true;
                             println!("SIGNED IN");
+                        } else {
+                            panic!("{:?}", res);
                         }
-
-                        self.login_w.logged_in = true;
                     }
                 }
             }
