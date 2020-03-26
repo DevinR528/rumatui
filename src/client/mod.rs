@@ -4,6 +4,8 @@ use std::fmt;
 use std::io::{self, Write};
 use std::sync::{Arc, RwLock};
 
+use failure::Fail;
+use anyhow::{Result, Context};
 use matrix_sdk::{
     self,
     events::{
@@ -70,7 +72,7 @@ impl fmt::Debug for MatrixClient {
 }
 
 impl MatrixClient {
-    pub async fn new(homeserver: &str) -> Result<Self, failure::Error> {
+    pub fn new(homeserver: &str) -> Result<Self, failure::Error> {
         let client_config = AsyncClientConfig::default();
         let homeserver_url = Url::parse(&homeserver)?;
 
@@ -90,13 +92,11 @@ impl MatrixClient {
         &mut self,
         username: String,
         password: String,
-    ) -> Result<(), matrix_sdk::Error> {
+    ) -> Result<()> {
         self.inner.add_event_callback(room_create);
         self.inner.add_event_callback(room_name);
 
         let res = self.inner.login(username, password, None).await?;
-        println!("{:?}", res);
-        println!();
 
         let response = self
             .inner
@@ -113,20 +113,19 @@ impl MatrixClient {
         client: &mut AsyncClient,
         id: &str,
         msg: MessageEventContent,
-    ) -> Result<create_message_event::Response, matrix_sdk::Error> {
-        client.room_send(&id, msg).await
+    ) -> Result<create_message_event::Response> {
+        client.room_send(&id, msg).await.context("Message failed to send")
     }
 
     async fn process_response(
         &mut self,
         response: sync_events::IncomingResponse,
-    ) -> Result<(), matrix_sdk::Error> {
+    ) -> Result<()> {
         // next batch token keeps track of sync up to this point
         self.curr_sync = Some(response.next_batch.clone());
         // joined rooms, left or banned (leave), invited (invite)
 
         self.room_ids = response.rooms.join.keys().cloned().collect::<Vec<RoomId>>();
-        println!("ROOM IDS {}", self.room_ids.len());
         // let _to_device = response.to_device;
         // let key_map = response.device_one_time_keys_count;
 
@@ -158,15 +157,45 @@ impl MatrixClient {
                 }
             }
         }
+        // map using timeline incase we missed any in the state
+        for room in response.rooms.join.values() {
+            for ev in room
+                .timeline
+                .events
+                .iter()
+                .flat_map(|res| res.clone().into_result().ok())
+            {
+                match ev {
+                    RoomEvent::RoomName(e) => {
+                        if let Some(name) = e.content.name() {
+                            self.map_rooms(name, &e.sender).await?;
+                        }
+                    }
+                    RoomEvent::RoomCanonicalAlias(e) => {
+                        if let Some(alias) = e.content.alias {
+                            self.map_rooms(&alias.to_string(), &e.sender).await?;
+                        }
+                    }
+                    RoomEvent::RoomAliases(e) => {
+                        if let Some(alias) = e.content.aliases.first() {
+                            self.map_rooms(&alias.to_string(), &e.sender).await?;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
 
         Ok(())
     }
 
+    /// After finding the state event that contains the name or alias for the room we then
+    /// have to make a search room request to obtain the room_id connected to a m.room.name
     pub(crate) async fn map_rooms(
         &mut self,
         name: &str,
         user: &UserId,
-    ) -> Result<(), matrix_sdk::Error> {
+    ) -> Result<()> {
         let data = get_public_rooms_filtered::Request {
             server: None,
             limit: None,
@@ -176,28 +205,27 @@ impl MatrixClient {
             }),
         };
         let res = self.inner.send(data).await?;
-        // if res.chunk.len() > 1 {
-        //     panic!("more than one PublicRoomChunk");
-        // } else
-        if !res.chunk.is_empty() {
-            let rooms = &res.chunk;
-            for room in rooms {
-                self.rooms.entry(room.room_id.clone()).or_insert_with(|| {
-                    if let Some(name) = &room.name {
-                        RoomInfo::from_name(user.clone(), name)
-                    } else if let Some(alias) = &room.canonical_alias {
-                        RoomInfo::from_alias(user.clone(), RoomAliasId::try_from(alias.as_str()).unwrap())
-                    } else if let Some(alias) = &room.aliases {
-                        if let Some(alias) = alias.first() {
-                            RoomInfo::from_alias(user.clone(), alias.clone())
-                        } else {
-                            panic!("no aliases in AliasEvent")
-                        }
+
+        let rooms = &res.chunk;
+        for room in rooms {
+            self.rooms.entry(room.room_id.clone()).or_insert_with(|| {
+                if let Some(name) = &room.name {
+                    RoomInfo::from_name(user.clone(), name)
+                } else if let Some(alias) = &room.canonical_alias {
+                    RoomInfo::from_alias(
+                        user.clone(),
+                        RoomAliasId::try_from(alias.as_str()).unwrap(),
+                    )
+                } else if let Some(alias) = &room.aliases {
+                    if let Some(alias) = alias.first() {
+                        RoomInfo::from_alias(user.clone(), alias.clone())
                     } else {
-                        panic!("No canonical alias or room name")
+                        panic!("no aliases in AliasEvent")
                     }
-                });
-            }
+                } else {
+                    panic!("No canonical alias or room name")
+                }
+            });
         }
         Ok(())
     }
@@ -205,7 +233,7 @@ impl MatrixClient {
     pub(crate) async fn ping_room(
         &mut self,
         room_id: &RoomId,
-    ) -> Result<search_events::IncomingResponse, matrix_sdk::Error> {
+    ) -> Result<search_events::IncomingResponse> {
         let data = search_events::Request {
             next_batch: None,
             search_categories: Categories {

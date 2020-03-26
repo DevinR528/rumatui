@@ -8,6 +8,37 @@ use tui::{Frame, Terminal};
 
 use crate::widgets::RenderWidget;
 
+#[derive(Clone, Copy, Debug)]
+pub struct Loading {
+    pub count: usize,
+    pub add: bool,
+}
+
+impl Default for Loading {
+    fn default() -> Self {
+        Self {
+            count: 1,
+            add: true,
+        }
+    }
+}
+
+impl Loading {
+    pub fn tick(&mut self) {
+        if self.count > 10 {
+            self.add = false;
+        }
+        if self.count == 1 {
+            self.add = true;
+        }
+
+        if self.add {
+            self.count += 1;
+        } else {
+            self.count -= 1;
+        }
+    }
+}
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LoginSelect {
@@ -29,10 +60,18 @@ pub struct Login {
 #[derive(Clone, Debug, Default)]
 pub struct LoginWidget {
     pub login: Login,
+    pub logging_in: bool,
     pub logged_in: bool,
+    pub waiting: Loading,
 }
 
-impl LoginWidget {}
+impl LoginWidget {
+    pub(crate) fn try_login(&self) -> bool {
+        LoginSelect::Password == self.login.selected
+            && !self.login.password.is_empty()
+            && !self.login.username.is_empty()
+    }
+}
 
 impl RenderWidget for LoginWidget {
     fn render<B>(&mut self, f: &mut Frame<B>, area: Rect)
@@ -81,53 +120,72 @@ impl RenderWidget for LoginWidget {
             )
             .split(height_chunk[1]);
 
-        let (high_user, high_pass) = if self.login.selected == LoginSelect::Username {
-            (
-                Block::default()
-                    .title("User Name")
-                    .border_style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD))
-                    .borders(Borders::ALL),
-                Block::default().title("Password").borders(Borders::ALL),
+        if self.logging_in {
+            self.waiting.tick();
+            let blk = Block::default()
+                .title("Loading")
+                .border_style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD))
+                .borders(Borders::ALL);
+
+            Paragraph::new(
+                [Text::styled(
+                    &format!("{}", ".".repeat(self.waiting.count)),
+                    Style::default().fg(Color::Magenta),
+                )]
+                .iter(),
             )
+            .block(blk)
+            .render(f, width_chunk1[1]);
+            
         } else {
-            (
-                Block::default().title("User Name").borders(Borders::ALL),
-                Block::default()
-                    .title("Password")
-                    .border_style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD))
-                    .borders(Borders::ALL),
+            let (high_user, high_pass) = if self.login.selected == LoginSelect::Username {
+                (
+                    Block::default()
+                        .title("User Name")
+                        .border_style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD))
+                        .borders(Borders::ALL),
+                    Block::default().title("Password").borders(Borders::ALL),
+                )
+            } else {
+                (
+                    Block::default().title("User Name").borders(Borders::ALL),
+                    Block::default()
+                        .title("Password")
+                        .border_style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD))
+                        .borders(Borders::ALL),
+                )
+            };
+            Paragraph::new(
+                [Text::styled(
+                    &self.login.username,
+                    Style::default().fg(Color::Cyan),
+                )]
+                .iter(),
             )
-        };
-        Paragraph::new(
-            [Text::styled(
-                &self.login.username,
-                Style::default().fg(Color::Cyan),
-            )]
-            .iter(),
-        )
-        .block(high_user)
-        .render(f, width_chunk1[1]);
-
-        let width_chunk2 = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(
-                [
-                    Constraint::Percentage(25),
-                    Constraint::Percentage(50),
-                    Constraint::Percentage(25),
-                ]
-                .as_ref(),
+            .block(high_user)
+            .render(f, width_chunk1[1]);
+    
+            let width_chunk2 = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints(
+                    [
+                        Constraint::Percentage(25),
+                        Constraint::Percentage(50),
+                        Constraint::Percentage(25),
+                    ]
+                    .as_ref(),
+                )
+                .split(height_chunk[2]);
+    
+            Paragraph::new(
+                [Text::styled(
+                    &self.login.password,
+                    Style::default().fg(Color::Cyan),
+                )]
+                .iter(),
             )
-            .split(height_chunk[2]);
-
-        Paragraph::new(
-            [Text::styled(
-                &self.login.password,
-                Style::default().fg(Color::Cyan),
-            )]
-            .iter(),
-        )
-        .block(high_pass)
-        .render(f, width_chunk2[1])
+            .block(high_pass)
+            .render(f, width_chunk2[1])
+        }
     }
 }

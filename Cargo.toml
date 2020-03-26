@@ -12,10 +12,12 @@ readme = "README.md"
 exclude = [ "resources" ]
 
 [dependencies]
+anyhow = "1.0.7"
 chrono = "0.4"
 failure = "0.1.7"
 futures-core = "0.3.4"
 futures-util = "0.3.4"
+lazy_static = "1.4.0"
 matrix-sdk = { path = "./matrix-rust-sdk" }
 ruma-api = "0.14.0"
 ruma-client-api = { version = "0.6.0", git = "https://github.com/matrix-org/ruma-client-api/" }
@@ -24,6 +26,8 @@ ruma-identifiers = "0.14.1"
 serde = { version = "1.0.105", features = ["derive"] }
 serde_json = "1.0.48"
 termion = "1.5.5"
-tokio = { version = "0.2.13", features = ["macros"] }
+tokio = { version = "0.2.13", features = ["macros", "rt-threaded"] }
 tui = "0.8.0"
 url = "2.1.1"
+
+crossbeam-channel = "0.4.2"

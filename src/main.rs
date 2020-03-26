@@ -9,90 +9,80 @@ use std::time::Duration;
 use termion::event::{Event as TermEvent, Key, MouseEvent};
 use termion::input::MouseTerminal;
 use termion::raw::IntoRawMode;
+use tokio::sync::mpsc;
+use tokio::runtime::Runtime;
 use tui::backend::TermionBackend;
 use tui::widgets::Widget;
 use tui::Terminal;
 
 mod client;
-mod ev_loop;
+mod ui_loop;
+mod client_loop;
 mod widgets;
 
-use ev_loop::{Config, Event, EventHandle};
+use widgets::error::ErrorWidget;
+use ui_loop::{Config, Event, UiEventHandle};
 use widgets::{AppWidget, DrawWidget, RenderWidget};
 
-#[tokio::main]
-async fn main() -> Result<(), failure::Error> {
-    let mut args = std::env::args();
-    let tick_rate = if let Some(tick) = args.find(|arg| arg.parse::<u64>().is_ok()) {
-        tick.parse()?
-    } else {
-        250
-    };
+fn main() -> Result<(), failure::Error> {
+    let mut runtime = tokio::runtime::Builder::new()
+        .basic_scheduler()
+        .threaded_scheduler()
+        .enable_all()
+        .build()
+        .unwrap();
 
-    let mut app = AppWidget::new().await.expect("error from `forget`");
+    let executor = runtime.handle().clone();
 
-    let events = EventHandle::with_config(Config {
-        tick_rate: Duration::from_millis(tick_rate),
-        exit_key: termion::event::Key::Ctrl('q'),
-    });
+    runtime.block_on(async {
+        let mut app = AppWidget::new(executor);
+        let events = UiEventHandle::with_config(Config {
+            tick_rate: Duration::from_millis(60),
+            exit_key: termion::event::Key::Ctrl('q'),
+        });
+        let stdout = io::stdout().into_raw_mode()?;
+        let stdout = MouseTerminal::from(stdout);
+        let backend = TermionBackend::new(stdout);
+        let mut terminal = Terminal::new(backend)?;
+        terminal.clear()?;
+        loop {
+            app.draw(&mut terminal)?;
 
-    let stdout = io::stdout().into_raw_mode()?;
-    let stdout = MouseTerminal::from(stdout);
-    let backend = TermionBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    terminal.clear()?;
-    loop {
-        app.draw(&mut terminal);
-        match events.next()? {
-            Event::Input(event) => match event {
-                TermEvent::Key(key) => match key {
-                    Key::Ctrl(c) if c == 'q' => app.should_quit = true,
-                    Key::Up => app.on_up(),
-                    Key::Down => app.on_down(),
-                    Key::Backspace => app.on_backspace(),
-                    Key::Char(c) => app.on_key(c).await,
-                    Key::Esc => app.should_quit = true,
-                    _ => {}
-                },
-                TermEvent::Mouse(m) => match m {
-                    MouseEvent::Press(_button, x, y) => {
-                        terminal.set_cursor(x, y).unwrap();
-                    }
-                    MouseEvent::Release(_, _) => {}
-                    MouseEvent::Hold(_, _) => {}
-                },
-                TermEvent::Unsupported(_) => {}
-            },
-            Event::Tick => {
-                app.on_tick();
+            if let Some(er) = app.error.take() {
+                println!("SOME ERROR {:?}", er);
+                while let Event::Tick = events.next()? {}
             }
-        }
-        if let Some(c) = &app.client {
-            if !c.rooms.is_empty() {
+
+            match events.next()? {
+                Event::Input(event) => match event {
+                    TermEvent::Key(key) => match key {
+                        Key::Ctrl(c) if c == 'q' => app.should_quit = true,
+                        Key::Up => app.on_up(),
+                        Key::Down => app.on_down(),
+                        Key::Backspace => app.on_backspace(),
+                        Key::Char(c) => app.on_key(c).await,
+                        Key::Esc => app.should_quit = true,
+                        _ => {}
+                    },
+                    TermEvent::Mouse(m) => match m {
+                        MouseEvent::Press(_button, x, y) => {
+                            terminal.set_cursor(x, y).unwrap();
+                        }
+                        MouseEvent::Release(_, _) => {}
+                        MouseEvent::Hold(_, _) => {}
+                    },
+                    TermEvent::Unsupported(_) => {}
+                },
+                Event::Tick => {
+                    app.on_tick();
+                }
+            }
+
+            if app.should_quit {
                 terminal.clear()?;
-                println!(
-                    "{:?}",
-                    app.client.as_ref().unwrap().rooms.values().map(|r| r
-                        .name
-                        .as_ref()
-                        .map(|s| s.clone())
-                        .unwrap_or(
-                            r.alias
-                                .as_ref()
-                                .map(|a| a.alias().to_string())
-                                .unwrap_or(String::default())
-                        ))
-                        .collect::<Vec<_>>()
-                );
-                panic!();
+                break;
             }
         }
-        if app.should_quit {
-            terminal.clear()?;
-            break;
-        }
-    }
-
-    Ok(())
+        Ok(())
+    })
 }

@@ -15,7 +15,7 @@ pub enum Event<I> {
 
 /// A small event handler that wrap termion input and tick events. Each event
 /// type is handled in its own thread and returned to a common `Receiver`
-pub struct EventHandle {
+pub struct UiEventHandle {
     recv: mpsc::Receiver<Event<TermEvent>>,
     input_handle: thread::JoinHandle<()>,
     tick_handle: thread::JoinHandle<()>,
@@ -27,7 +27,7 @@ pub struct Config {
     pub tick_rate: Duration,
 }
 
-impl EventHandle {
+impl UiEventHandle {
     pub fn with_config(cfg: Config) -> Self {
         let (send, recv) = mpsc::channel();
 
@@ -60,7 +60,7 @@ impl EventHandle {
             })
         };
 
-        EventHandle {
+        UiEventHandle {
             recv,
             input_handle,
             tick_handle,

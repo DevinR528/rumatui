@@ -1,24 +1,31 @@
 use std::cell::RefCell;
 use std::io;
-use std::ops::{Index, IndexMut};
 use std::process::{Child, Command, Stdio};
-use std::thread;
 
+use anyhow::{Result, Context, Error};
 use chrono::{offset::TimeZone, DateTime, Local};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Runtime, Handle};
+use tokio::task::JoinHandle;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{Sender, Receiver};
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, Tabs, Text, Widget};
 use tui::{Frame, Terminal};
 
+mod chat;
 mod login;
-mod messages;
+mod msgs;
+mod rooms;
+pub mod error;
 
 use crate::client::MatrixClient;
+use crate::client_loop::{MatrixEventHandle, UserRequest, RequestResult};
+use chat::ChatWidget;
 use login::{Login, LoginSelect, LoginWidget};
-use messages::MessageWidget;
+use error::ErrorWidget;
 
 pub trait RenderWidget {
     fn render<B>(&mut self, f: &mut Frame<B>, area: Rect)
@@ -30,57 +37,46 @@ pub trait DrawWidget {
     fn draw<B>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()>
     where
         B: Backend;
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct TabsState {
-    pub titles: Vec<String>,
-    pub index: usize,
-}
-
-impl TabsState {
-    pub fn new(titles: Vec<String>) -> TabsState {
-        TabsState { titles, index: 0 }
-    }
-    pub fn next(&mut self) {
-        self.index = (self.index + 1) % self.titles.len();
-    }
-
-    pub fn previous(&mut self) {
-        if !self.titles.is_empty() {
-            if self.index > 0 {
-                self.index -= 1;
-            } else {
-                self.index = self.titles.len() - 1;
-            }
-        }
+    fn draw_with<B>(&mut self, terminal: &mut Terminal<B>, area: Rect) -> io::Result<()>
+    where
+        B: Backend
+    {
+        Ok(())
     }
 }
 
-#[derive(Debug)]
 pub struct AppWidget {
+    /// Title of the app "RumaTui".
     pub title: String,
-    pub tabs: TabsState,
+    /// When user quits this is true,
     pub should_quit: bool,
+    /// The login element. This knows how to render and also holds the state of logging in.
     pub login_w: LoginWidget,
-    pub messages: MessageWidget,
-    pub client: Option<MatrixClient>,
-    pub cmd_handle: RefCell<Vec<thread::JoinHandle<Result<Child, io::Error>>>>,
-    pub cmd_err: String,
+    /// The main screen. Holds the state once a user is logged in.
+    pub chat: ChatWidget,
+    /// the event loop for MatrixClient tasks to run on.
+    pub ev_loop: MatrixEventHandle,
+    /// Send MatrixClient jobs to the event handler
+    pub send_jobs: mpsc::Sender<UserRequest>,
+    /// The result of any MatrixClient job.
+    pub client_jobs: mpsc::Receiver<RequestResult>,
+    pub error: Option<anyhow::Error>,
 }
 
 impl AppWidget {
-    pub async fn new() -> Result<Self, failure::Error> {
-        Ok(Self {
+    pub fn new(rt: Handle) -> Self {
+        let (send, recv) = mpsc::channel(1024);
+        let (ev_loop, send_jobs) = MatrixEventHandle::new(send, rt);
+        Self {
             title: "RumaTui".to_string(),
-            tabs: TabsState::default(),
             should_quit: false,
             login_w: LoginWidget::default(),
-            messages: MessageWidget::default(),
-            client: None,
-            cmd_handle: Default::default(),
-            cmd_err: String::default(),
-        })
+            chat: ChatWidget::default(),
+            ev_loop,
+            send_jobs,
+            client_jobs: recv,
+            error: None,
+        }
     }
 
     pub fn on_up(&mut self) {
@@ -102,48 +98,23 @@ impl AppWidget {
             }
         }
     }
-    /// TODO should any addition be reset here?
-    pub fn on_right(&mut self) {
-        self.reset_addition();
-        self.tabs.next();
-    }
 
-    /// TODO should any addition be reset here?
-    pub fn on_left(&mut self) {
-        self.reset_addition();
-        self.tabs.previous();
-    }
+    pub fn on_right(&mut self) { }
 
-    fn reset_addition(&mut self) {}
-
-    fn run_cmd(&self, cmd: String) {}
+    pub fn on_left(&mut self) { }
 
     async fn add_char(&mut self, c: char) {
-        // TODO add homeserver_url sign in??
+        // TODO add homeserver_url sign in in client??
         if !self.login_w.logged_in {
-            self.client = Some(MatrixClient::new("http://matrix.org").await.unwrap());
             if c == '\n' {
-                if let LoginSelect::Password = self.login_w.login.selected {
-                    if !self.login_w.login.password.is_empty()
-                        && !self.login_w.login.username.is_empty()
-                    {
-                        let Login {
-                            username, password, ..
-                        } = &self.login_w.login;
-
-                        let res = self
-                            .client
-                            .as_mut()
-                            .unwrap()
-                            .login(username.into(), password.into())
-                            .await;
-
-                        if res.is_ok() {
-                            self.login_w.logged_in = true;
-                            println!("SIGNED IN");
-                        } else {
-                            panic!("{:?}", res);
-                        }
+                if self.login_w.try_login() {
+                    let Login {
+                        username, password, ..
+                    } = &self.login_w.login;
+                    self.login_w.logging_in = true;
+                    if let Err(e) = self.send_jobs.send(UserRequest::Login(username.into(), password.into())).await {
+                        println!("CHANNEL ERROR");
+                        self.set_error(Error::from(e));
                     }
                 }
             }
@@ -171,8 +142,26 @@ impl AppWidget {
 
     pub fn on_delete(&mut self) {}
 
+    fn set_error(&mut self, e: anyhow::Error) {
+        self.error = Some(e);
+    }
+
+    /// This checks once then continues returns to continue the ui loop.
     pub fn on_tick(&mut self) {
-        // self.cmd_handle
+        match self.client_jobs.try_recv() {
+            Ok(res) => match res {
+                RequestResult::Login(Ok(_)) => {
+                    self.login_w.logged_in = true;
+                    self.login_w.logging_in = false;
+                },
+                RequestResult::Login(Err(e)) => {
+                    println!("ERRORRRRRRRR");
+                    self.login_w.logging_in = false;
+                    self.set_error(e)
+                },
+            }
+            _ => {},
+        }
     }
 }
 
@@ -183,27 +172,24 @@ impl DrawWidget for AppWidget {
                 .constraints([Constraint::Length(2), Constraint::Min(0)].as_ref())
                 .split(f.size());
 
-            Tabs::default()
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title(&self.title)
-                        .title_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD)),
-                )
-                .titles(&self.tabs.titles)
-                .style(Style::default().fg(Color::Blue))
-                .highlight_style(Style::default().fg(Color::Blue).modifier(Modifier::ITALIC))
-                .select(self.tabs.index)
+            Block::default()
+                .borders(Borders::ALL)
+                .title(&self.title)
+                .title_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
                 .render(&mut f, chunks[0]);
 
             let chunks2 = Layout::default()
                 .constraints([Constraint::Percentage(100)].as_ref())
                 .split(chunks[1]);
 
-            if !self.login_w.logged_in {
-                self.login_w.render(&mut f, chunks2[0]);
+            if let Some(err) = self.error.as_ref() {
+                ErrorWidget::new(err).render(&mut f, chunks2[0])
             } else {
-                self.messages.render(&mut f, chunks2[0]);
+                if !self.login_w.logged_in {
+                    self.login_w.render(&mut f, chunks2[0])
+                } else {
+                    self.chat.render(&mut f, chunks2[0])
+                }
             }
         })
     }
