@@ -7,41 +7,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "013a6e0a2cbe3d20f9c60b65458f7a7f7a5e636c5d0f45a5a6aee5d4b1f01785"
 
 [[package]]
-name = "async-std"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "538ecb01eb64eecd772087e5b6f7540cbc917f047727339a472dafed2185b267"
-dependencies = [
- "async-task",
- "crossbeam-channel",
- "crossbeam-deque",
- "crossbeam-utils",
- "futures-core",
- "futures-io",
- "futures-timer",
- "kv-log-macro",
- "log",
- "memchr",
- "mio",
- "mio-uds",
- "num_cpus",
- "once_cell",
- "pin-project-lite",
- "pin-utils",
- "slab",
-]
-
-[[package]]
-name = "async-task"
-version = "1.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ac2c016b079e771204030951c366db398864f5026f84a44dafb0ff20f02085d"
-dependencies = [
- "libc",
- "winapi 0.3.8",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -146,32 +111,6 @@ checksum = "cced8691919c02aac3cb0a1bc2e9b73d89e832bf9a06fc579d4e71b68a2da061"
 dependencies = [
  "crossbeam-utils",
  "maybe-uninit",
-]
-
-[[package]]
-name = "crossbeam-deque"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f02af974daeee82218205558e51ec8768b48cf524bd01d550abe5573a608285"
-dependencies = [
- "crossbeam-epoch",
- "crossbeam-utils",
- "maybe-uninit",
-]
-
-[[package]]
-name = "crossbeam-epoch"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "058ed274caafc1f60c4997b5fc07bf7dc7cca454af7c6e81edffe5f33f70dace"
-dependencies = [
- "autocfg",
- "cfg-if",
- "crossbeam-utils",
- "lazy_static",
- "maybe-uninit",
- "memoffset",
- "scopeguard",
 ]
 
 [[package]]
@@ -338,12 +277,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b0a34e53cf6cdcd0178aa573aed466b646eb3db769570841fda0c7ede375a27"
 
 [[package]]
-name = "futures-timer"
-version = "2.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1de7508b218029b0f01662ed8f61b1c964b3ae99d6f25462d0f55a595109df6"
-
-[[package]]
 name = "futures-util"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -412,9 +345,9 @@ dependencies = [
 
 [[package]]
 name = "http"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b708cc7f06493459026f53b9a61a7a121a5d1ec6238dee58ea4941132b30156b"
+checksum = "28d569972648b2c512421b5f2a405ad6ac9666547189d0c5477a3f200f3e02f9"
 dependencies = [
  "bytes",
  "fnv",
@@ -547,15 +480,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kv-log-macro"
-version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c54d9f465d530a752e6ebdc217e081a7a614b48cb200f6f0aee21ba6bc9aabb"
-dependencies = [
- "log",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -585,18 +509,20 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 [[package]]
 name = "matrix-sdk"
 version = "0.1.0"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk/?branch=event-emitter#c3bded873a9942e83ac4f36048978b848c056c93"
 dependencies = [
- "async-std",
  "futures",
  "http",
  "js_int",
- "log",
  "reqwest",
- "ruma-api",
+ "ruma-api 0.15.0",
  "ruma-client-api",
- "ruma-events",
+ "ruma-events 0.17.0 (git+https://github.com/matrix-org/ruma-events)",
  "ruma-identifiers",
+ "thiserror",
  "tokio",
+ "tracing",
+ "tracing-futures",
  "url",
 ]
 
@@ -611,15 +537,6 @@ name = "memchr"
 version = "2.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
-
-[[package]]
-name = "memoffset"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4fc2c02a7e374099d4ee95a193111f72d2110197fe200272371758f6c3643d8"
-dependencies = [
- "autocfg",
-]
 
 [[package]]
 name = "mime"
@@ -654,17 +571,6 @@ dependencies = [
  "net2",
  "slab",
  "winapi 0.2.8",
-]
-
-[[package]]
-name = "mio-uds"
-version = "0.6.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "966257a94e196b11bb43aca423754d87429960a768de9414f3691d6957abf125"
-dependencies = [
- "iovec",
- "libc",
- "mio",
 ]
 
 [[package]]
@@ -742,12 +648,6 @@ name = "numtoa"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8f8bdf33df195859076e54ab11ee78a1b208382d3a26ec40d142ffc1ecc49ef"
-
-[[package]]
-name = "once_cell"
-version = "1.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c601810575c99596d4afc46f78a678c80105117c379eb3650cf99b8a21ce5b"
 
 [[package]]
 name = "openssl"
@@ -970,12 +870,29 @@ checksum = "3652d110c06f4ca71815d043c7aee3d9d90de5b4b687c037a27563d266fccd5b"
 dependencies = [
  "http",
  "percent-encoding",
- "ruma-api-macros",
+ "ruma-api-macros 0.11.0",
  "ruma-identifiers",
  "serde",
  "serde_json",
  "serde_urlencoded",
- "strum",
+ "strum 0.17.1",
+ "url",
+]
+
+[[package]]
+name = "ruma-api"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "120f0cd8625b842423ef3a63cabb8c309ca35a02de87cc4b377fb2cdd43f1fe5"
+dependencies = [
+ "http",
+ "percent-encoding",
+ "ruma-api-macros 0.12.0",
+ "ruma-identifiers",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "strum 0.18.0",
  "url",
 ]
 
@@ -991,19 +908,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruma-api-macros"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfc523efc9c1ba7033ff17888551c1d378e12eae087cfbe4fcee938ff516759e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "ruma-client-api"
 version = "0.6.0"
 source = "git+https://github.com/matrix-org/ruma-client-api/#b7b83df9ef3140466e5da84513fa16f7327ed3b3"
 dependencies = [
  "http",
  "js_int",
- "ruma-api",
- "ruma-events",
+ "ruma-api 0.14.0",
+ "ruma-events 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ruma-identifiers",
  "serde",
  "serde_json",
- "strum",
+ "strum 0.17.1",
  "url",
+]
+
+[[package]]
+name = "ruma-events"
+version = "0.17.0"
+source = "git+https://github.com/matrix-org/ruma-events#bca29711e6b7c386cc25064013a26d27ad4088e7"
+dependencies = [
+ "js_int",
+ "ruma-events-macros 0.2.0 (git+https://github.com/matrix-org/ruma-events)",
+ "ruma-identifiers",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1013,10 +953,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11951235b25c72a82eb988aabf5af23cae883562665e0cb73954ffe4ae81f11c"
 dependencies = [
  "js_int",
- "ruma-events-macros",
+ "ruma-events-macros 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ruma-identifiers",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "ruma-events-macros"
+version = "0.2.0"
+source = "git+https://github.com/matrix-org/ruma-events#bca29711e6b7c386cc25064013a26d27ad4088e7"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1053,10 +1003,6 @@ dependencies = [
  "futures-util",
  "lazy_static",
  "matrix-sdk",
- "ruma-api",
- "ruma-client-api",
- "ruma-events",
- "ruma-identifiers",
  "serde",
  "serde_json",
  "termion",
@@ -1086,12 +1032,6 @@ dependencies = [
  "lazy_static",
  "winapi 0.3.8",
 ]
-
-[[package]]
-name = "scopeguard"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
 name = "security-framework"
@@ -1180,6 +1120,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "strum"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57bd81eb48f4c437cadc685403cad539345bf703d78e63707418431cecd4522b"
+
+[[package]]
 name = "strum_macros"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1238,6 +1184,26 @@ dependencies = [
  "numtoa",
  "redox_syscall",
  "redox_termios",
+]
+
+[[package]]
+name = "thiserror"
+version = "1.0.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3711fd1c4e75b3eff12ba5c40dba762b6b65c5476e8174c1a664772060c49bf"
+dependencies = [
+ "thiserror-impl",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae2b85ba4c9aa32dd3343bd80eb8d22e9b54b7688c17ea3907f236885353b233"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1309,6 +1275,46 @@ name = "tower-service"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e987b6bf443f4b5b3b6f38704195592cca41c5bb7aedd3c3693c7081f8289860"
+
+[[package]]
+name = "tracing"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1721cc8cf7d770cc4257872507180f35a4797272f5962f24c806af9e7faf52ab"
+dependencies = [
+ "cfg-if",
+ "tracing-attributes",
+ "tracing-core",
+]
+
+[[package]]
+name = "tracing-attributes"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fbad39da2f9af1cae3016339ad7f2c7a9e870f12e8fd04c4fd7ef35b30c0d2b"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "tracing-core"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0aa83a9a47081cd522c09c81b31aec2c9273424976f922ad61c053b58350b715"
+dependencies = [
+ "lazy_static",
+]
+
+[[package]]
+name = "tracing-futures"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58b0b7fd92dc7b71f29623cc6836dd7200f32161a2313dd78be233a8405694f6"
+dependencies = [
+ "pin-project",
+ "tracing",
+]
 
 [[package]]
 name = "try-lock"

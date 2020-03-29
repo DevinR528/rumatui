@@ -6,8 +6,16 @@ use std::sync::{Arc, RwLock};
 
 use failure::Fail;
 use anyhow::{Result, Context};
+
 use matrix_sdk::{
     self,
+    api::r0::{
+        directory::get_public_rooms_filtered,
+        filter::RoomEventFilter,
+        message::create_message_event,
+        search::search_events::{self, Categories, Criteria},
+        sync::sync_events,
+    },
     events::{
         collections::all::{RoomEvent, StateEvent},
         room::aliases::AliasesEvent,
@@ -18,17 +26,11 @@ use matrix_sdk::{
         room::name::{NameEvent, NameEventContent},
         EventResult, EventType,
     },
+    identifiers::{},
+    ruma_traits::{Endpoint, Outgoing},
     AsyncClient, AsyncClientConfig, Room, SyncSettings,
 };
-use ruma_api::{Endpoint, Outgoing};
-use ruma_client_api::r0::{
-    directory::get_public_rooms_filtered,
-    filter::RoomEventFilter,
-    message::create_message_event,
-    search::search_events::{self, Categories, Criteria},
-    sync::sync_events,
-};
-use ruma_identifiers::{RoomAliasId, RoomId, UserId};
+
 use url::Url;
 
 #[derive(Clone, Debug)]
