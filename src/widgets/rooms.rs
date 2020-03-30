@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 use std::io;
 use std::ops::{Index, IndexMut};
+use std::sync::{Arc, RwLock};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use ruma_identifiers::{RoomAliasId, RoomId, UserId};
+use matrix_sdk::identifiers::{RoomAliasId, RoomId, UserId};
+use matrix_sdk::Room;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
@@ -79,12 +81,12 @@ impl<I> IndexMut<usize> for ListState<I> {
 #[derive(Clone, Debug, Default)]
 pub struct RoomsWidget {
     names: ListState<(String, RoomId)>,
-    rooms: HashMap<RoomId, RoomInfo>,
+    rooms: HashMap<String, Arc<RwLock<Room>>>,
 
 }
 
 impl RoomsWidget {
-    pub(crate) fn populate_rooms(&mut self, rooms: HashMap<RoomId, RoomInfo>) {
+    pub(crate) fn populate_rooms(&mut self, rooms: HashMap<String, Arc<RwLock<Room>>>) {
         
     }
 }

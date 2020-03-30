@@ -1,5 +1,8 @@
 use std::io;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
+use matrix_sdk::Room;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
@@ -16,7 +19,15 @@ pub struct ChatWidget {
     pub msgs: MessageWidget,
 }
 
-impl ChatWidget {}
+impl ChatWidget {
+    pub(crate) fn set_room_state(&mut self, rooms: HashMap<String, Arc<RwLock<Room>>>) {
+        self.room.populate_rooms(rooms);
+    }
+}
+
+impl matrix_sdk::EventEmitter for ChatWidget {
+
+}
 
 impl RenderWidget for ChatWidget {
     fn render<B>(&mut self, f: &mut Frame<B>, area: Rect)

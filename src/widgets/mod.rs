@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::io;
 use std::process::{Child, Command, Stdio};
+use std::sync::{Arc, RwLock};
 
 use anyhow::{Result, Context, Error};
 use chrono::{offset::TimeZone, DateTime, Local};
@@ -53,7 +54,7 @@ pub struct AppWidget {
     /// The login element. This knows how to render and also holds the state of logging in.
     pub login_w: LoginWidget,
     /// The main screen. Holds the state once a user is logged in.
-    pub chat: ChatWidget,
+    pub chat: Arc<RwLock<ChatWidget>>,
     /// the event loop for MatrixClient tasks to run on.
     pub ev_loop: MatrixEventHandle,
     /// Send MatrixClient jobs to the event handler
@@ -71,7 +72,7 @@ impl AppWidget {
             title: "RumaTui".to_string(),
             should_quit: false,
             login_w: LoginWidget::default(),
-            chat: ChatWidget::default(),
+            chat: Arc::new(RwLock::new(ChatWidget::default())),
             ev_loop,
             send_jobs,
             client_jobs: recv,
@@ -113,7 +114,6 @@ impl AppWidget {
                     } = &self.login_w.login;
                     self.login_w.logging_in = true;
                     if let Err(e) = self.send_jobs.send(UserRequest::Login(username.into(), password.into())).await {
-                        println!("CHANNEL ERROR");
                         self.set_error(Error::from(e));
                     }
                 }
@@ -147,21 +147,30 @@ impl AppWidget {
     }
 
     /// This checks once then continues returns to continue the ui loop.
-    pub fn on_tick(&mut self) {
+    pub async fn on_tick(&mut self) {
         match self.client_jobs.try_recv() {
             Ok(res) => match res {
-                RequestResult::Login(Ok(_)) => {
+                RequestResult::Login(Ok(rooms)) => {
                     self.login_w.logged_in = true;
                     self.login_w.logging_in = false;
+                    self.chat.write().unwrap().set_room_state(rooms);
                 },
                 RequestResult::Login(Err(e)) => {
-                    println!("ERRORRRRRRRR");
                     self.login_w.logging_in = false;
+                    self.set_error(e)
+                },
+                RequestResult::Sync(Ok(_)) => {},
+                RequestResult::Sync(Err(e)) => {
                     self.set_error(e)
                 },
             }
             _ => {},
         }
+
+        // let ee: Arc<RwLock<dyn matrix_sdk::EventEmitter>> = self.chat.as_event_emitter();
+        // if let Err(e) = self.send_jobs.send(UserRequest::Sync(ee)).await {
+        //     self.set_error(Error::from(e));
+        // }
     }
 }
 
@@ -188,7 +197,7 @@ impl DrawWidget for AppWidget {
                 if !self.login_w.logged_in {
                     self.login_w.render(&mut f, chunks2[0])
                 } else {
-                    self.chat.render(&mut f, chunks2[0])
+                    self.chat.write().unwrap().render(&mut f, chunks2[0])
                 }
             }
         })
