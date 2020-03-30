@@ -88,10 +88,10 @@ impl MatrixClient {
     pub(crate) async fn sync(
         &mut self,
         settings: matrix_sdk::SyncSettings,
-        ee: Arc<Mutex<dyn matrix_sdk::EventEmitter>>,
     ) -> Result<()> {
 
-        self.inner.sync_with(settings, ee).await.map_err(Error::from)
+        self.inner.sync_forever(settings, move |res| async { }).await;
+        Ok(())
     }
 
     pub(crate) async fn send_message(

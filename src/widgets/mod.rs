@@ -1,15 +1,15 @@
 use std::cell::RefCell;
 use std::io;
 use std::process::{Child, Command, Stdio};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 
 use anyhow::{Result, Context, Error};
 use chrono::{offset::TimeZone, DateTime, Local};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tokio::runtime::{Runtime, Handle};
 use tokio::task::JoinHandle;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::{Sender, Receiver};
+use tokio::sync::Mutex;
+use tokio::sync::mpsc::{self, Sender, Receiver};
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
@@ -37,7 +37,7 @@ pub trait RenderWidget {
 pub trait DrawWidget {
     fn draw<B>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()>
     where
-        B: Backend;
+        B: Backend + Send;
     fn draw_with<B>(&mut self, terminal: &mut Terminal<B>, area: Rect) -> io::Result<()>
     where
         B: Backend
@@ -51,6 +51,8 @@ pub struct AppWidget {
     pub title: String,
     /// When user quits this is true,
     pub should_quit: bool,
+    /// Have we started the sync loop yet.
+    pub sync_started: bool,
     /// The login element. This knows how to render and also holds the state of logging in.
     pub login_w: LoginWidget,
     /// The main screen. Holds the state once a user is logged in.
@@ -71,6 +73,7 @@ impl AppWidget {
         Self {
             title: "RumaTui".to_string(),
             should_quit: false,
+            sync_started: false,
             login_w: LoginWidget::default(),
             chat: Arc::new(Mutex::new(ChatWidget::default())),
             ev_loop,
@@ -153,31 +156,25 @@ impl AppWidget {
                 RequestResult::Login(Ok(rooms)) => {
                     self.login_w.logged_in = true;
                     self.login_w.logging_in = false;
-                    self.chat.lock().unwrap().set_room_state(rooms);
+                    self.chat.lock().await.set_room_state(rooms);
                 },
                 RequestResult::Login(Err(e)) => {
                     self.login_w.logging_in = false;
-                    self.set_error(e)
-                },
-                RequestResult::Sync(Ok(_)) => {},
-                RequestResult::Sync(Err(e)) => {
                     self.set_error(e)
                 },
             }
             _ => {},
         }
 
-        if self.login_w.logged_in {
-            let ee = Arc::clone(&self.chat);
-            if let Err(e) = self.send_jobs.send(UserRequest::Sync(ee)).await {
-                self.set_error(Error::from(e));
-            }
+        if self.login_w.logged_in && !self.sync_started {
+            self.sync_started = true;
+            self.ev_loop.start_sync();
         }
     }
 }
 
 impl DrawWidget for AppWidget {
-    fn draw<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
+    fn draw<B: Backend + Send>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
         terminal.draw(|mut f| {
             let chunks = Layout::default()
                 .constraints([Constraint::Length(2), Constraint::Min(0)].as_ref())
@@ -199,33 +196,55 @@ impl DrawWidget for AppWidget {
                 if !self.login_w.logged_in {
                     self.login_w.render(&mut f, chunks2[0])
                 } else {
-                    self.chat.lock().unwrap().render(&mut f, chunks2[0])
+                    // TODO not ideal yuck
+                    task::block_on(async { self.chat.lock().await }).render(&mut f, chunks2[0])
                 }
             }
         })
     }
 }
 
-mod date_fmt {
-    use super::*;
+#[allow(dead_code)]
+mod task {
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::ptr;
+    use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
-    const FORMAT: &str = "%Y-%m-%d %H:%M:%S";
+    const RAW_WAKER: RawWaker = RawWaker::new(ptr::null(), &VTABLE);
+    const VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
 
-    pub fn serialize<S>(date: &DateTime<Local>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let s = format!("{}", date.format(FORMAT));
-        serializer.serialize_str(&s)
+    unsafe fn clone(_: *const ()) -> RawWaker {
+        RAW_WAKER
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Local>, D::Error>
+    unsafe fn wake(_: *const ()) {}
+
+    unsafe fn wake_by_ref(_: *const ()) {}
+
+    unsafe fn drop(_: *const ()) {}
+
+    pub fn create() -> Waker {
+        // Safety: The waker points to a vtable with functions that do nothing. Doing
+        // is always safe.
+        unsafe { Waker::from_raw(RAW_WAKER) }
+    }
+
+    pub fn block_on<F, T>(mut future: F) -> T
     where
-        D: Deserializer<'de>,
+        F: Future<Output = T>,
     {
-        let s = String::deserialize(deserializer)?;
-        Local
-            .datetime_from_str(&s, FORMAT)
-            .map_err(serde::de::Error::custom)
+        // Safety: since we own the future no one can move any part of it but us, and we won't.
+        let mut fut = unsafe { Pin::new_unchecked(&mut future) };
+        let waker = create();
+        let mut ctx = Context::from_waker(&waker);
+        loop {
+            if let Poll::Ready(res) = fut.as_mut().poll(&mut ctx) {
+                return res;
+            }
+            // TODO since criterion is single threaded simply looping seems ok
+            // burning cpu for a simpler function seems fair
+            // possible `std::sync::atomic::spin_loop_hint` here.
+        }
     }
 }

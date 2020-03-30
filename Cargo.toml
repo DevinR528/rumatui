@@ -12,7 +12,8 @@ readme = "README.md"
 exclude = [ "resources" ]
 
 [dependencies]
-anyhow = "1.0.7"
+async-trait = "0.1.27"
+anyhow = "1.0.27"
 chrono = "0.4"
 failure = "0.1.7"
 futures-core = "0.3.4"
