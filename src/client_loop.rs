@@ -17,7 +17,7 @@ use crate::client::MatrixClient;
 
 pub enum UserRequest {
     Login(String, String),
-    Sync(Arc<Mutex<dyn EventEmitter>>),
+    Sync(Arc<Mutex<crate::widgets::chat::ChatWidget>>),
     Quit,
 }
 unsafe impl Send for UserRequest {}
@@ -57,13 +57,13 @@ impl MatrixEventHandle {
                     UserRequest::Quit => return Ok(()),
                     UserRequest::Login(u, p) => {
                         if let Err(e) = tx.send(RequestResult::Login(client.login(u, p).await)).await {
-                            panic!("client event handler chrashed {}", e)
+                            panic!("client event handler crashed {}", e)
                         }
                     }
                     UserRequest::Sync(ee) => {
                         let settings = matrix_sdk::SyncSettings::default();
                         if let Err(e) = tx.send(RequestResult::Sync(client.sync(settings, ee).await)).await {
-                            panic!("client event handler chrashed {}", e)
+                            panic!("client event handler crashed {}", e)
                         }
                     }
                 }

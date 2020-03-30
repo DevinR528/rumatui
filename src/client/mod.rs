@@ -34,28 +34,6 @@ use url::Url;
 
 mod event_stream;
 
-#[derive(Clone, Debug)]
-pub struct RoomInfo {
-    pub name: Option<String>,
-    pub alias: Option<RoomAliasId>,
-    pub user: UserId,
-}
-impl RoomInfo {
-    pub(crate) fn from_name(user: UserId, name: &str) -> Self {
-        Self {
-            name: Some(name.to_string()),
-            user,
-            alias: None,
-        }
-    }
-    pub(crate) fn from_alias(user: UserId, alias: RoomAliasId) -> Self {
-        Self {
-            name: None,
-            user,
-            alias: Some(alias),
-        }
-    }
-}
 #[derive(Clone)]
 pub struct MatrixClient {
     inner: AsyncClient,

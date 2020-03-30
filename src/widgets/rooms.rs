@@ -12,7 +12,6 @@ use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, List, Paragraph, Tabs, Text, Widget};
 use tui::{Frame, Terminal};
 
-use crate::client::RoomInfo;
 use super::RenderWidget;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
