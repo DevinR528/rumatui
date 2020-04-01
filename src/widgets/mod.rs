@@ -1,19 +1,19 @@
-use std::cell::RefCell;
-use std::io;
-use std::process::{Child, Command, Stdio};
-use std::sync::{Arc, RwLock};
 
-use anyhow::{Result, Context, Error};
-use chrono::{offset::TimeZone, DateTime, Local};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use tokio::runtime::{Runtime, Handle};
-use tokio::task::JoinHandle;
-use tokio::sync::Mutex;
-use tokio::sync::mpsc::{self, Sender, Receiver};
+use std::io;
+
+
+
+use anyhow::{Error};
+
+
+use tokio::runtime::{Handle};
+
+
+use tokio::sync::mpsc::{self};
 use tui::backend::Backend;
-use tui::layout::{Constraint, Direction, Layout, Rect};
+use tui::layout::{Constraint, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Paragraph, Tabs, Text, Widget};
+use tui::widgets::{Block, Borders, Widget};
 use tui::{Frame, Terminal};
 
 pub mod chat;
@@ -22,7 +22,7 @@ mod msgs;
 mod rooms;
 pub mod error;
 
-use crate::client::{event_stream::{EventStream, StateResult}, MatrixClient};
+use crate::client::{event_stream::{EventStream, StateResult}};
 use crate::client_loop::{MatrixEventHandle, UserRequest, RequestResult};
 use chat::ChatWidget;
 use login::{Login, LoginSelect, LoginWidget};
@@ -38,7 +38,7 @@ pub trait DrawWidget {
     fn draw<B>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()>
     where
         B: Backend + Send;
-    fn draw_with<B>(&mut self, terminal: &mut Terminal<B>, area: Rect) -> io::Result<()>
+    fn draw_with<B>(&mut self, _terminal: &mut Terminal<B>, _area: Rect) -> io::Result<()>
     where
         B: Backend
     {
@@ -120,15 +120,13 @@ impl AppWidget {
     async fn add_char(&mut self, c: char) {
         // TODO add homeserver_url sign in in client??
         if !self.login_w.logged_in {
-            if c == '\n' {
-                if self.login_w.try_login() {
-                    let Login {
-                        username, password, ..
-                    } = &self.login_w.login;
-                    self.login_w.logging_in = true;
-                    if let Err(e) = self.send_jobs.send(UserRequest::Login(username.into(), password.into())).await {
-                        self.set_error(Error::from(e));
-                    }
+            if c == '\n' && self.login_w.try_login() {
+                let Login {
+                    username, password, ..
+                } = &self.login_w.login;
+                self.login_w.logging_in = true;
+                if let Err(e) = self.send_jobs.send(UserRequest::Login(username.into(), password.into())).await {
+                    self.set_error(Error::from(e));
                 }
             }
             if let LoginSelect::Username = self.login_w.login.selected {
@@ -202,12 +200,10 @@ impl DrawWidget for AppWidget {
 
             if let Some(err) = self.error.as_ref() {
                 ErrorWidget::new(err).render(&mut f, chunks2[0])
+            } else if !self.login_w.logged_in {
+                self.login_w.render(&mut f, chunks2[0])
             } else {
-                if !self.login_w.logged_in {
-                    self.login_w.render(&mut f, chunks2[0])
-                } else {
-                    self.chat.render(&mut f, chunks2[0])
-                }
+                self.chat.render(&mut f, chunks2[0])
             }
         })
     }

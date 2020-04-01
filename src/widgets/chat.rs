@@ -1,13 +1,12 @@
-use std::io;
+
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use matrix_sdk::Room;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
-use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Paragraph, Tabs, Text, Widget};
-use tui::{Frame, Terminal};
+
+use tui::{Frame};
 
 use super::msgs::MessageWidget;
 use super::rooms::RoomsWidget;

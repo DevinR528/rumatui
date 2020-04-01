@@ -1,11 +1,10 @@
 use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::fmt;
-use std::io::{self, Write};
-use std::sync::{Arc, RwLock, Mutex};
 
-use failure::Fail;
-use anyhow::{Result, Context, Error};
+use std::fmt;
+
+use std::sync::{Arc, RwLock};
+
+use anyhow::{Result, Context};
 
 use matrix_sdk::{
     self,
@@ -54,10 +53,10 @@ impl fmt::Debug for MatrixClient {
 
 impl MatrixClient {
     pub fn new(homeserver: &str) -> Result<Self, failure::Error> {
-        let client_config = AsyncClientConfig::default();
+        let _client_config = AsyncClientConfig::default();
         let homeserver_url = Url::parse(&homeserver)?;
 
-        let mut client = Self {
+        let client = Self {
             inner: AsyncClient::new(homeserver_url, None)?,
             homeserver: homeserver.into(),
             user: None,
@@ -77,7 +76,7 @@ impl MatrixClient {
         let res = self.inner.login(username, password, None, None).await?;
         self.user = Some(res.user_id.clone());
 
-        let response = self
+        let _response = self
             .inner
             .sync(SyncSettings::new().full_state(true))
             .await?;
@@ -91,7 +90,7 @@ impl MatrixClient {
         settings: matrix_sdk::SyncSettings,
     ) -> Result<()> {
 
-        self.inner.sync_forever(settings, move |res| async { }).await;
+        self.inner.sync_forever(settings, move |_res| async { }).await;
         Ok(())
     }
 

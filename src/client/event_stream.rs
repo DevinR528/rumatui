@@ -1,40 +1,20 @@
-use std::fmt;
-use std::thread;
-use std::time::Duration;
-use std::ops::{Deref, DerefMut};
-use std::marker::PhantomData;
-use std::collections::HashMap;
-use std::sync::{atomic::AtomicBool, Arc, RwLock};
 
-use anyhow::{Result, Context};
+
+
+
+
+
+
+
+
 use matrix_sdk::{
-    self,
-    api::r0::{
-        directory::get_public_rooms_filtered,
-        filter::RoomEventFilter,
-        message::create_message_event,
-        search::search_events::{self, Categories, Criteria},
-        sync::sync_events,
-    },
-    events::{
-        collections::all::{RoomEvent, StateEvent},
-        room::aliases::AliasesEvent,
-        room::canonical_alias::CanonicalAliasEvent,
-        room::create::CreateEvent,
-        room::member::{MemberEvent, MembershipState},
-        room::message::{MessageEvent, MessageEventContent, TextMessageEventContent},
-        room::name::{NameEvent, NameEventContent},
-        EventResult, EventType,
-    },
-    identifiers::{UserId, RoomId, RoomAliasId},
-    ruma_traits::{Endpoint, Outgoing},
-    AsyncClient, AsyncClientConfig, Room, SyncSettings, EventEmitter,
+    self, EventEmitter,
 };
-use tokio::task::JoinHandle;
+
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::{Sender, Receiver};
-use tokio::runtime::Handle;
-use tokio::sync::Mutex;
+
+
+
 
 pub enum StateResult {
     Err,

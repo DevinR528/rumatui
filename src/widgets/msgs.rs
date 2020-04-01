@@ -1,10 +1,10 @@
-use std::io;
+
 
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Paragraph, Tabs, Text, Widget};
-use tui::{Frame, Terminal};
+use tui::widgets::{Block, Borders, Paragraph, Text, Widget};
+use tui::{Frame};
 
 use crate::widgets::RenderWidget;
 
@@ -18,7 +18,7 @@ impl RenderWidget for MessageWidget {
     where
         B: Backend,
     {
-        let chunks = Layout::default()
+        let _chunks = Layout::default()
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
             .direction(Direction::Horizontal)
             .split(area);

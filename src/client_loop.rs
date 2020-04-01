@@ -1,21 +1,21 @@
 use std::fmt;
-use std::thread;
-use std::time::Duration;
-use std::ops::{Deref, DerefMut};
-use std::marker::PhantomData;
+
+
+
+
 use std::collections::HashMap;
 use std::sync::{atomic::AtomicBool, Arc, RwLock};
 
-use anyhow::{Result, Context};
-use matrix_sdk::{EventEmitter, Room};
+use anyhow::{Result};
+use matrix_sdk::{Room};
 use tokio::task::JoinHandle;
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::{Sender, Receiver};
+use tokio::sync::mpsc::{Sender};
 use tokio::runtime::Handle;
 use tokio::sync::Mutex;
 
 use crate::client::MatrixClient;
-use crate::client::event_stream::{EventStream, StateResult};
+use crate::client::event_stream::{EventStream};
 
 pub enum UserRequest {
     Login(String, String),

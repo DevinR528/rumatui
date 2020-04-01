@@ -1,11 +1,11 @@
-use std::io;
 
-use anyhow::{Result, Context, Error};
+
+use anyhow::{Error};
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
-use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Paragraph, Tabs, Text, Widget};
-use tui::{Frame, Terminal};
+use tui::style::{Color, Style};
+use tui::widgets::{Block, Borders, Paragraph, Text, Widget};
+use tui::{Frame};
 
 use crate::widgets::RenderWidget;
 
@@ -19,11 +19,11 @@ impl<'e> ErrorWidget<'e> {
 }
 
 impl<'e> RenderWidget for ErrorWidget<'e> {
-    fn render<B>(&mut self, f: &mut Frame<B>, area: Rect)
+    fn render<B>(&mut self, f: &mut Frame<B>, _area: Rect)
     where
         B: Backend,
     {
-        let chunks = Layout::default()
+        let _chunks = Layout::default()
             .constraints(
                 [
                     Constraint::Percentage(15),

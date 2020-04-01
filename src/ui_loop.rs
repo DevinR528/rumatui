@@ -1,9 +1,9 @@
-use std::io::{self, Write};
+use std::io::{self};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use termion::event::{Event as TermEvent, Key, MouseEvent};
+use termion::event::{Event as TermEvent, Key};
 use termion::input::MouseTerminal;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
@@ -32,7 +32,7 @@ impl UiEventHandle {
         let (send, recv) = mpsc::channel();
 
         let stdout = io::stdout().into_raw_mode().unwrap();
-        let mut stdout = MouseTerminal::from(stdout);
+        let _stdout = MouseTerminal::from(stdout);
 
         let input_handle = {
             let send = send.clone();

@@ -1,17 +1,16 @@
 #![allow(dead_code)]
 
-use std::collections::HashMap;
-use std::io::{self, Write};
-use std::sync::{Arc, RwLock};
+
+use std::io::{self};
+
 use std::time::Duration;
 
 use termion::event::{Event as TermEvent, Key, MouseEvent};
 use termion::input::MouseTerminal;
 use termion::raw::IntoRawMode;
-use tokio::sync::mpsc;
-use tokio::runtime::Runtime;
+
+
 use tui::backend::TermionBackend;
-use tui::widgets::Widget;
 use tui::Terminal;
 
 mod client;
@@ -19,9 +18,9 @@ mod ui_loop;
 mod client_loop;
 mod widgets;
 
-use widgets::error::ErrorWidget;
+
 use ui_loop::{Config, Event, UiEventHandle};
-use widgets::{AppWidget, DrawWidget, RenderWidget};
+use widgets::{AppWidget, DrawWidget};
 
 fn main() -> Result<(), failure::Error> {
     let mut runtime = tokio::runtime::Builder::new()

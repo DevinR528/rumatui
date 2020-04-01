@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::io;
+
 use std::ops::{Index, IndexMut};
 use std::sync::{Arc, RwLock};
 
@@ -7,10 +7,10 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use matrix_sdk::identifiers::{RoomAliasId, RoomId, UserId};
 use matrix_sdk::Room;
 use tui::backend::Backend;
-use tui::layout::{Constraint, Direction, Layout, Rect};
+use tui::layout::{Rect};
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, List, Paragraph, Tabs, Text, Widget};
-use tui::{Frame, Terminal};
+use tui::widgets::{Block, Borders, List, Text, Widget};
+use tui::{Frame};
 
 use super::RenderWidget;
 
@@ -85,7 +85,7 @@ pub struct RoomsWidget {
 }
 
 impl RoomsWidget {
-    pub(crate) fn populate_rooms(&mut self, rooms: HashMap<String, Arc<RwLock<Room>>>) {
+    pub(crate) fn populate_rooms(&mut self, _rooms: HashMap<String, Arc<RwLock<Room>>>) {
         
     }
 }
@@ -115,7 +115,7 @@ impl RenderWidget for RoomsWidget {
                 .items
                 .iter()
                 .enumerate()
-                .map(|(i, (id, name))| {   
+                .map(|(i, (_id, name))| {   
                     if i == selected {
                         let style = Style::default()
                             .bg(highlight_style.bg)

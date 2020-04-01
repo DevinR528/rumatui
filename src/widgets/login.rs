@@ -1,10 +1,10 @@
-use std::io;
+
 
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Paragraph, Tabs, Text, Widget};
-use tui::{Frame, Terminal};
+use tui::widgets::{Block, Borders, Paragraph, Text, Widget};
+use tui::{Frame};
 
 use crate::widgets::RenderWidget;
 
@@ -129,7 +129,7 @@ impl RenderWidget for LoginWidget {
 
             Paragraph::new(
                 [Text::styled(
-                    &format!("{}", ".".repeat(self.waiting.count)),
+                    &".".repeat(self.waiting.count),
                     Style::default().fg(Color::Magenta),
                 )]
                 .iter(),
