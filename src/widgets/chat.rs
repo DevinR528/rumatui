@@ -1,12 +1,12 @@
 
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use matrix_sdk::Room;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
-
 use tui::{Frame};
+use tokio::sync::Mutex;
 
 use super::msgs::MessageWidget;
 use super::rooms::RoomsWidget;
@@ -19,7 +19,7 @@ pub struct ChatWidget {
 }
 
 impl ChatWidget {
-    pub(crate) fn set_room_state(&mut self, rooms: HashMap<String, Arc<RwLock<Room>>>) {
+    pub(crate) fn set_room_state(&mut self, rooms: HashMap<String, Arc<Mutex<Room>>>) {
         self.room.populate_rooms(rooms);
     }
 }

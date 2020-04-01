@@ -30,6 +30,7 @@ use matrix_sdk::{
     AsyncClient, AsyncClientConfig, Room, SyncSettings,
 };
 use url::Url;
+use tokio::sync::Mutex;
 
 pub mod event_stream;
 
@@ -71,7 +72,7 @@ impl MatrixClient {
         &mut self,
         username: String,
         password: String,
-    ) -> Result<HashMap<String, Arc<RwLock<Room>>>> {
+    ) -> Result<HashMap<String, Arc<Mutex<Room>>>> {
 
         let res = self.inner.login(username, password, None, None).await?;
         self.user = Some(res.user_id.clone());

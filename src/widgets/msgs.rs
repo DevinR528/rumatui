@@ -9,9 +9,15 @@ use tui::{Frame};
 use crate::widgets::RenderWidget;
 
 #[derive(Clone, Debug, Default)]
-pub struct MessageWidget {}
+pub struct MessageWidget {
+    messages: Vec<String>,
+}
 
-impl MessageWidget {}
+impl MessageWidget {
+    pub fn add_message(&mut self, msg: String) {
+        self.messages.push(msg)
+    }
+}
 
 impl RenderWidget for MessageWidget {
     fn render<B>(&mut self, f: &mut Frame<B>, area: Rect)
@@ -23,9 +29,10 @@ impl RenderWidget for MessageWidget {
             .direction(Direction::Horizontal)
             .split(area);
 
+        let text = self.messages.join("\n");
             Paragraph::new(
                 vec![Text::styled(
-                    "Incoming",
+                    text,
                     Style::default().fg(Color::Blue),
                 )]
                 .iter(),

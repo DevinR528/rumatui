@@ -32,7 +32,7 @@ impl fmt::Debug for UserRequest {
     }
 }
 pub enum RequestResult {
-    Login(Result<HashMap<String, Arc<RwLock<Room>>>>),
+    Login(Result<HashMap<String, Arc<Mutex<Room>>>>),
 
 }
 unsafe impl Send for RequestResult {}

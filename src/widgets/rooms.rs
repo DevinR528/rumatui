@@ -11,6 +11,7 @@ use tui::layout::{Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, List, Text, Widget};
 use tui::{Frame};
+use tokio::sync::Mutex;
 
 use super::RenderWidget;
 
@@ -85,7 +86,7 @@ pub struct RoomsWidget {
 }
 
 impl RoomsWidget {
-    pub(crate) fn populate_rooms(&mut self, _rooms: HashMap<String, Arc<RwLock<Room>>>) {
+    pub(crate) fn populate_rooms(&mut self, _rooms: HashMap<String, Arc<Mutex<Room>>>) {
         
     }
 }
