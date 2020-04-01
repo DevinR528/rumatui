@@ -1,4 +1,3 @@
-#![allow(unused)]
 #![allow(dead_code)]
 
 use std::collections::HashMap;
@@ -35,7 +34,7 @@ fn main() -> Result<(), failure::Error> {
     let executor = runtime.handle().clone();
 
     runtime.block_on(async {
-        let mut app = AppWidget::new(executor);
+        let mut app = AppWidget::new(executor).await;
         let events = UiEventHandle::with_config(Config {
             tick_rate: Duration::from_millis(60),
             exit_key: termion::event::Key::Ctrl('q'),

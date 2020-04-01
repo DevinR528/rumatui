@@ -13,9 +13,9 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Sender, Receiver};
 use tokio::runtime::Handle;
 use tokio::sync::Mutex;
-use tokio::sync::Barrier;
 
 use crate::client::MatrixClient;
+use crate::client::event_stream::{EventStream, StateResult};
 
 pub enum UserRequest {
     Login(String, String),
@@ -45,13 +45,15 @@ pub struct MatrixEventHandle {
 unsafe impl Send for MatrixEventHandle {}
 
 impl MatrixEventHandle {
-    pub fn new(mut to_app: Sender<RequestResult>, exec_hndl: Handle) -> (Self, Sender<UserRequest>) {
+    pub async fn new(stream: EventStream, to_app: Sender<RequestResult>, exec_hndl: Handle) -> (Self, Sender<UserRequest>) {
         let (app_sender, mut recv) = mpsc::channel(1024);
 
         let mut tx = to_app.clone();
 
-        let mut client = Arc::new(Mutex::new(MatrixClient::new("http://matrix.org").unwrap()));
+        let mut c = MatrixClient::new("http://matrix.org").unwrap();
+        c.inner.add_event_emitter(Arc::new(Mutex::new(Box::new(stream)))).await;
 
+        let client = Arc::new(Mutex::new(c));
         let cli = Arc::clone(&client);
 
         // when the ui loop logs in start_sync releases and starts `sync_forever`
@@ -61,9 +63,9 @@ impl MatrixEventHandle {
             while !is_sync.load(std::sync::atomic::Ordering::SeqCst) {
                 std::sync::atomic::spin_loop_hint();
             }
-            println!("START");
             let set = matrix_sdk::SyncSettings::default();
-            cli.lock().await.sync(set).await
+            let mut c = cli.lock().await;
+            c.sync_forever(set).await
         });
 
         let cli_jobs = exec_hndl.spawn(async move {
@@ -72,7 +74,9 @@ impl MatrixEventHandle {
                 match input {
                     UserRequest::Quit => return Ok(()),
                     UserRequest::Login(u, p) => {
-                        if let Err(e) = tx.send(RequestResult::Login(client.lock().await.login(u, p).await)).await {
+                        let mut cli = client.lock().await;
+                        let res = cli.login(u, p).await;
+                        if let Err(e) = tx.send(RequestResult::Login(res)).await {
                             panic!("client event handler crashed {}", e)
                         }
                     },

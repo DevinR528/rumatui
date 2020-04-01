@@ -1,3 +1,12 @@
+use std::fmt;
+use std::thread;
+use std::time::Duration;
+use std::ops::{Deref, DerefMut};
+use std::marker::PhantomData;
+use std::collections::HashMap;
+use std::sync::{atomic::AtomicBool, Arc, RwLock};
+
+use anyhow::{Result, Context};
 use matrix_sdk::{
     self,
     api::r0::{
@@ -21,10 +30,30 @@ use matrix_sdk::{
     ruma_traits::{Endpoint, Outgoing},
     AsyncClient, AsyncClientConfig, Room, SyncSettings, EventEmitter,
 };
-pub struct EventStream {
+use tokio::task::JoinHandle;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{Sender, Receiver};
+use tokio::runtime::Handle;
+use tokio::sync::Mutex;
 
+pub enum StateResult {
+    Err,
+}
+unsafe impl Send for StateResult {}
+
+pub struct EventStream {
+    send: mpsc::Sender<StateResult>
+}
+unsafe impl Send for EventStream {}
+
+impl EventStream {
+    pub(crate) fn new() -> (Self, mpsc::Receiver<StateResult>) {
+        let (send, recv) = mpsc::channel(1024);
+
+        (Self { send, }, recv) 
+    }
 }
 
 impl EventEmitter for EventStream {
-
+    
 }

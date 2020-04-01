@@ -32,16 +32,17 @@ use matrix_sdk::{
 };
 use url::Url;
 
-mod event_stream;
+pub mod event_stream;
 
 #[derive(Clone)]
 pub struct MatrixClient {
-    inner: AsyncClient,
+    pub inner: AsyncClient,
     homeserver: String,
     pub current_room_id: Option<RoomId>,
     pub curr_sync: Option<String>,
     user: Option<UserId>,
 }
+unsafe impl Send for MatrixClient {}
 
 impl fmt::Debug for MatrixClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -82,10 +83,10 @@ impl MatrixClient {
             .await?;
 
         self.current_room_id = self.inner.current_room_id().await;
-        Ok(self.inner.base_client().read().await.joined_rooms.clone())
+        Ok(self.inner.get_rooms().await)
     }
 
-    pub(crate) async fn sync(
+    pub(crate) async fn sync_forever(
         &mut self,
         settings: matrix_sdk::SyncSettings,
     ) -> Result<()> {

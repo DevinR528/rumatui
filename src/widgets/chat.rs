@@ -26,7 +26,7 @@ impl ChatWidget {
 }
 
 impl matrix_sdk::EventEmitter for ChatWidget {
-
+    
 }
 
 impl RenderWidget for ChatWidget {

@@ -22,7 +22,7 @@ mod msgs;
 mod rooms;
 pub mod error;
 
-use crate::client::MatrixClient;
+use crate::client::{event_stream::{EventStream, StateResult}, MatrixClient};
 use crate::client_loop::{MatrixEventHandle, UserRequest, RequestResult};
 use chat::ChatWidget;
 use login::{Login, LoginSelect, LoginWidget};
@@ -56,29 +56,39 @@ pub struct AppWidget {
     /// The login element. This knows how to render and also holds the state of logging in.
     pub login_w: LoginWidget,
     /// The main screen. Holds the state once a user is logged in.
-    pub chat: Arc<Mutex<ChatWidget>>,
+    /// 
+    /// ## Note
+    /// Locking this may cause short deadlocks but the looping in the
+    /// `matrix_sdk::AsyncClient:sync` should be short enough investigate.
+    pub chat: ChatWidget,
     /// the event loop for MatrixClient tasks to run on.
     pub ev_loop: MatrixEventHandle,
     /// Send MatrixClient jobs to the event handler
     pub send_jobs: mpsc::Sender<UserRequest>,
     /// The result of any MatrixClient job.
-    pub client_jobs: mpsc::Receiver<RequestResult>,
+    pub ev_msgs: mpsc::Receiver<RequestResult>,
+    /// The result of any MatrixClient job.
+    pub emitter_msgs: mpsc::Receiver<StateResult>,
     pub error: Option<anyhow::Error>,
 }
 
 impl AppWidget {
-    pub fn new(rt: Handle) -> Self {
+    pub async fn new(rt: Handle) -> Self {
         let (send, recv) = mpsc::channel(1024);
-        let (ev_loop, send_jobs) = MatrixEventHandle::new(send, rt);
+        
+        let (emitter, emitter_msgs) = EventStream::new();
+
+        let (ev_loop, send_jobs) = MatrixEventHandle::new(emitter, send, rt).await;
         Self {
             title: "RumaTui".to_string(),
             should_quit: false,
             sync_started: false,
             login_w: LoginWidget::default(),
-            chat: Arc::new(Mutex::new(ChatWidget::default())),
+            chat: ChatWidget::default(),
             ev_loop,
             send_jobs,
-            client_jobs: recv,
+            ev_msgs: recv,
+            emitter_msgs,
             error: None,
         }
     }
@@ -151,12 +161,12 @@ impl AppWidget {
 
     /// This checks once then continues returns to continue the ui loop.
     pub async fn on_tick(&mut self) {
-        match self.client_jobs.try_recv() {
+        match self.ev_msgs.try_recv() {
             Ok(res) => match res {
                 RequestResult::Login(Ok(rooms)) => {
                     self.login_w.logged_in = true;
                     self.login_w.logging_in = false;
-                    self.chat.lock().await.set_room_state(rooms);
+                    self.chat.set_room_state(rooms);
                 },
                 RequestResult::Login(Err(e)) => {
                     self.login_w.logging_in = false;
@@ -196,8 +206,7 @@ impl DrawWidget for AppWidget {
                 if !self.login_w.logged_in {
                     self.login_w.render(&mut f, chunks2[0])
                 } else {
-                    // TODO not ideal yuck
-                    task::block_on(async { self.chat.lock().await }).render(&mut f, chunks2[0])
+                    self.chat.render(&mut f, chunks2[0])
                 }
             }
         })
