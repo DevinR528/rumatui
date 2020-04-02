@@ -1,20 +1,18 @@
-
-
-use anyhow::{Error};
+use anyhow::Error;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Style};
 use tui::widgets::{Block, Borders, Paragraph, Text, Widget};
-use tui::{Frame};
+use tui::Frame;
 
-use crate::widgets::RenderWidget;
+use super::app::RenderWidget;
 
 #[derive(Debug)]
 pub struct ErrorWidget<'e>(pub &'e Error);
 
 impl<'e> ErrorWidget<'e> {
     pub fn new(error: &'e Error) -> Self {
-        ErrorWidget( error )
+        ErrorWidget(error)
     }
 }
 
@@ -33,9 +31,9 @@ impl<'e> RenderWidget for ErrorWidget<'e> {
                 .as_ref(),
             )
             .split(f.size());
-            
+
         let chunks = Layout::default()
-            .direction(Direction::Horizontal) 
+            .direction(Direction::Horizontal)
             .constraints(
                 [
                     Constraint::Percentage(15),
@@ -53,11 +51,12 @@ impl<'e> RenderWidget for ErrorWidget<'e> {
             )]
             .iter(),
         )
-            .block(Block::default()
+        .block(
+            Block::default()
                 .title("Error")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Red))
-            )
-            .render(f, chunks[1])
+                .border_style(Style::default().fg(Color::Red)),
+        )
+        .render(f, chunks[1])
     }
 }

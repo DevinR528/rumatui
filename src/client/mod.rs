@@ -4,7 +4,7 @@ use std::fmt;
 
 use std::sync::{Arc, RwLock};
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 
 use matrix_sdk::{
     self,
@@ -25,13 +25,14 @@ use matrix_sdk::{
         room::name::{NameEvent, NameEventContent},
         EventResult, EventType,
     },
-    identifiers::{UserId, RoomId, RoomAliasId},
+    identifiers::{RoomAliasId, RoomId, UserId},
     ruma_traits::{Endpoint, Outgoing},
     AsyncClient, AsyncClientConfig, Room, SyncSettings,
 };
-use url::Url;
 use tokio::sync::Mutex;
+use url::Url;
 
+pub mod client_loop;
 pub mod event_stream;
 
 #[derive(Clone)]
@@ -77,7 +78,6 @@ impl MatrixClient {
         username: String,
         password: String,
     ) -> Result<HashMap<String, Arc<Mutex<Room>>>> {
-
         let res = self.inner.login(username, password, None, None).await?;
         self.user = Some(res.user_id.clone());
 
@@ -87,15 +87,14 @@ impl MatrixClient {
             .await?;
 
         self.current_room_id = self.inner.current_room_id().await;
+        println!("{:?}", self.current_room_id);
         Ok(self.inner.get_rooms().await)
     }
 
-    pub(crate) async fn sync_forever(
-        &mut self,
-        settings: matrix_sdk::SyncSettings,
-    ) -> Result<()> {
-
-        self.inner.sync_forever(settings, move |_res| async { }).await;
+    pub(crate) async fn sync_forever(&mut self, settings: matrix_sdk::SyncSettings) -> Result<()> {
+        self.inner
+            .sync_forever(settings, move |_res| async {})
+            .await;
         Ok(())
     }
 
@@ -105,6 +104,9 @@ impl MatrixClient {
         id: &str,
         msg: MessageEventContent,
     ) -> Result<create_message_event::Response> {
-        client.room_send(&id, msg).await.context("Message failed to send")
+        client
+            .room_send(&id, msg)
+            .await
+            .context("Message failed to send")
     }
 }

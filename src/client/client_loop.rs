@@ -1,18 +1,18 @@
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::atomic::Ordering;
-use std::collections::HashMap;
 use std::sync::{atomic::AtomicBool, Arc, RwLock};
 
-use anyhow::{Result};
-use matrix_sdk::{Room};
-use tokio::task::JoinHandle;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::{Sender};
+use anyhow::Result;
+use matrix_sdk::Room;
 use tokio::runtime::Handle;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::Sender;
 use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
 
+use crate::client::event_stream::EventStream;
 use crate::client::MatrixClient;
-use crate::client::event_stream::{EventStream};
 use matrix_sdk::identifiers::RoomId;
 
 pub enum UserRequest {
@@ -25,13 +25,12 @@ impl fmt::Debug for UserRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Login(_, _) => write!(f, "failed login"),
-            Self::Quit => write!(f, "quitting filed")
+            Self::Quit => write!(f, "quitting filed"),
         }
     }
 }
 pub enum RequestResult {
     Login(Result<(HashMap<String, Arc<Mutex<Room>>>, Option<RoomId>)>),
-
 }
 unsafe impl Send for RequestResult {}
 
@@ -44,13 +43,19 @@ pub struct MatrixEventHandle {
 unsafe impl Send for MatrixEventHandle {}
 
 impl MatrixEventHandle {
-    pub async fn new(stream: EventStream, to_app: Sender<RequestResult>, exec_hndl: Handle) -> (Self, Sender<UserRequest>) {
+    pub async fn new(
+        stream: EventStream,
+        to_app: Sender<RequestResult>,
+        exec_hndl: Handle,
+    ) -> (Self, Sender<UserRequest>) {
         let (app_sender, mut recv) = mpsc::channel(1024);
 
         let mut tx = to_app.clone();
 
         let mut c = MatrixClient::new("http://matrix.org").unwrap();
-        c.inner.add_event_emitter(Arc::new(Mutex::new(Box::new(stream)))).await;
+        c.inner
+            .add_event_emitter(Arc::new(Mutex::new(Box::new(stream))))
+            .await;
 
         let client = Arc::new(Mutex::new(c));
         let cli = Arc::clone(&client);
@@ -61,20 +66,26 @@ impl MatrixEventHandle {
 
         let is_sync = Arc::clone(&start_sync);
         let quitting = Arc::clone(&quit_flag);
+        // this loop uses the above `AtomicBool` to signal shutdown.
         let sync_jobs = exec_hndl.spawn(async move {
             while !is_sync.load(Ordering::SeqCst) {
-                if quitting.load(Ordering::SeqCst) { return Ok(()); }
+                if quitting.load(Ordering::SeqCst) {
+                    return Ok(());
+                }
 
                 std::sync::atomic::spin_loop_hint();
             }
-            
-            if quitting.load(Ordering::SeqCst) { return Ok(()); }
+
+            if quitting.load(Ordering::SeqCst) {
+                return Ok(());
+            }
 
             let set = matrix_sdk::SyncSettings::default();
             let mut c = cli.lock().await;
             c.sync_forever(set).await
         });
 
+        // this loop is shutdown with a channel message
         let cli_jobs = exec_hndl.spawn(async move {
             for input in recv.recv().await {
                 let input: UserRequest = input;
@@ -82,12 +93,14 @@ impl MatrixEventHandle {
                     UserRequest::Quit => return Ok(()),
                     UserRequest::Login(u, p) => {
                         let mut cli = client.lock().await;
+
+                        let res = cli.login(u, p).await;
                         let curr = cli.current_room_id().await;
-                        let res = cli.login(u, p).await.map(|r| (r, curr));
-                        if let Err(e) = tx.send(RequestResult::Login(res)).await {
+                        if let Err(e) = tx.send(RequestResult::Login(res.map(|r| (r, curr)))).await
+                        {
                             panic!("client event handler crashed {}", e)
                         }
-                    },
+                    }
                 }
             }
             Ok(())
@@ -103,12 +116,16 @@ impl MatrixEventHandle {
             app_sender,
         )
     }
-    
+
+    /// This is called after login and initial sync to start `AsyncClient::sync_forever` loop.
     pub(crate) fn start_sync(&self) {
-        self.start_sync.swap(true, std::sync::atomic::Ordering::SeqCst);
+        self.start_sync
+            .swap(true, std::sync::atomic::Ordering::SeqCst);
     }
 
+    /// This is called when the user quits to signal the `tokio::Runtime` to shutdown.
     pub(crate) fn quit_sync(&self) {
-        self.quit_flag.swap(true, std::sync::atomic::Ordering::SeqCst);
+        self.quit_flag
+            .swap(true, std::sync::atomic::Ordering::SeqCst);
     }
 }

@@ -3,18 +3,18 @@ use std::convert::TryFrom;
 use std::ops::{Index, IndexMut};
 use std::sync::{Arc, RwLock};
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use matrix_sdk::identifiers::{RoomAliasId, RoomId, UserId};
 use matrix_sdk::Room;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use termion::event::MouseButton;
+use tokio::sync::Mutex;
 use tui::backend::Backend;
-use tui::layout::{Rect};
+use tui::layout::Rect;
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, List, Text, Widget};
-use tui::{Frame};
-use tokio::sync::Mutex;
+use tui::Frame;
 
-use super::RenderWidget;
+use super::app::RenderWidget;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ListState<I> {
@@ -41,12 +41,14 @@ impl<I> ListState<I> {
         self.items.is_empty()
     }
 
+    /// Scrolls back up the list
     pub fn select_previous(&mut self) {
         if self.selected != 0 {
             self.selected -= 1;
         }
     }
 
+    /// Scrolls down the list
     pub fn select_next(&mut self) {
         if self.is_empty() {
             return;
@@ -82,36 +84,80 @@ impl<I> IndexMut<usize> for ListState<I> {
 #[derive(Clone, Debug, Default)]
 pub struct RoomsWidget {
     area: Rect,
-    current: Option<String>,
-    names: ListState<(String, RoomId)>,
-    rooms: HashMap<String, Arc<Mutex<Room>>>,
-
+    /// This is the RoomId of the last used room, the room to show on startup.
+    current: Arc<RwLock<Option<crate::RoomIdStr>>>,
+    /// List of displayable room name and room id
+    pub names: ListState<(String, RoomId)>,
+    /// Map of room id and matrix_sdk::Room
+    rooms: HashMap<crate::RoomIdStr, Arc<Mutex<Room>>>,
 }
 
 impl RoomsWidget {
     /// Updates the `RoomWidget` state to reflect the current client state.
-    /// 
+    ///
     /// ## Arguments
     ///  * rooms - A `HashMap` of room_id to `Room`.
-    pub(crate) async fn populate_rooms(&mut self, rooms: HashMap<String, Arc<Mutex<Room>>>, current: Option<RoomId>) {
+    ///  * current is the current room id controlled by the ChatWidget.
+    pub(crate) async fn populate_rooms(
+        &mut self,
+        rooms: HashMap<crate::RoomIdStr, Arc<Mutex<Room>>>,
+        current: Arc<RwLock<Option<crate::RoomIdStr>>>,
+    ) {
         self.rooms = rooms.clone();
-        self.current = current.map(|id| id.to_string());
+        self.current = current;
 
         let mut items = Vec::default();
         for (id, room) in &rooms {
             let r = room.lock().await;
             items.push((r.calculate_name(), RoomId::try_from(id.as_str()).unwrap()));
         }
-        self.names = ListState::new(items)
-    }
 
-    pub(crate) async fn current_room(&self) -> Option<&str> {
-        self.current.as_deref()
+        if let Some(idx) = items.iter().position(|(_, id)| {
+            Some(&id.to_string()) == self.current.read().expect("room id read").as_ref()
+        }) {
+            self.names.selected = idx;
+        }
+
+        self.names = ListState::new(items);
     }
 
     pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {
-        if self.area.intersects(Rect::new(x, y, 1, 1)) {
-            
+        if self.area.intersects(Rect::new(x, y, 1, 1)) {}
+    }
+
+    pub fn select_next(&mut self) {
+        self.names.select_next();
+        if let Some((_name, id)) = self.names.get_selected() {
+            println!(
+                "{} {} {:?}",
+                _name,
+                id,
+                self.current.read().unwrap().as_ref()
+            );
+
+            let mut curr = self
+                .current
+                .write()
+                .expect("RoomWidget tried to set current room id");
+
+            if let Some(r_id) = curr.as_mut() {
+                *r_id = id.to_string()
+            } else {
+                let mut curr = curr.as_mut();
+                curr = Some(&mut id.to_string());
+            }
+        }
+    }
+
+    pub fn select_previous(&mut self) {
+        self.names.select_previous();
+        if let Some((_name, id)) = self.names.get_selected() {
+            let mut curr = self
+                .current
+                .write()
+                .expect("RoomWidget tried to set current room id")
+                .as_mut();
+            curr = Some(&mut id.to_string());
         }
     }
 }
@@ -126,7 +172,9 @@ impl RenderWidget for RoomsWidget {
 
         // Use highlight_style only if something is selected
         let selected = self.names.selected;
-        let highlight_style = Style::default().fg(Color::LightGreen).modifier(Modifier::BOLD);
+        let highlight_style = Style::default()
+            .fg(Color::LightGreen)
+            .modifier(Modifier::BOLD);
         let highlight_symbol = ">>";
         // Make sure the list show the selected item
         let offset = {
@@ -138,26 +186,21 @@ impl RenderWidget for RoomsWidget {
         };
 
         // Render items
-        let item = self.names
+        let item = self
+            .names
             .items
             .iter()
             .enumerate()
-            .map(|(i, (_id, name))| {   
+            .map(|(i, (name, _id))| {
                 if i == selected {
                     let style = Style::default()
                         .bg(highlight_style.bg)
                         .fg(highlight_style.fg)
                         .modifier(highlight_style.modifier);
-                    Text::styled(
-                        format!("{} {}", highlight_symbol, name),
-                        style,
-                    )
+                    Text::styled(format!("{} {}", highlight_symbol, name), style)
                 } else {
                     let style = Style::default().fg(Color::Blue);
-                    Text::styled(
-                        format!("   {}", name),
-                        style,
-                    )
+                    Text::styled(format!("   {}", name), style)
                 }
             })
             .skip(offset as usize);

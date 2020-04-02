@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-
 use std::io::{self};
 
 use std::time::Duration;
@@ -9,18 +8,18 @@ use termion::event::{Event as TermEvent, Key, MouseEvent};
 use termion::input::MouseTerminal;
 use termion::raw::IntoRawMode;
 
-
 use tui::backend::TermionBackend;
 use tui::Terminal;
 
 mod client;
 mod ui_loop;
-mod client_loop;
 mod widgets;
 
-
 use ui_loop::{Config, Event, UiEventHandle};
-use widgets::{AppWidget, DrawWidget};
+use widgets::app::{AppWidget, DrawWidget};
+
+pub type RoomIdStr = String;
+pub type UserIdStr = String;
 
 fn main() -> Result<(), failure::Error> {
     let mut runtime = tokio::runtime::Builder::new()
@@ -47,7 +46,6 @@ fn main() -> Result<(), failure::Error> {
             app.draw(&mut terminal)?;
 
             if let Some(er) = app.error.take() {
-                println!("SOME ERROR {:?}", er);
                 while let Event::Tick = events.next()? {}
             }
 
@@ -63,9 +61,7 @@ fn main() -> Result<(), failure::Error> {
                         _ => {}
                     },
                     TermEvent::Mouse(m) => match m {
-                        MouseEvent::Press(btn, x, y) => {
-                            app.on_click(btn, x, y)
-                        }
+                        MouseEvent::Press(btn, x, y) => app.on_click(btn, x, y),
                         MouseEvent::Release(_, _) => {}
                         MouseEvent::Hold(_, _) => {}
                     },

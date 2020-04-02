@@ -3,9 +3,9 @@ use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, Text, Widget};
-use tui::{Frame};
+use tui::Frame;
 
-use crate::widgets::RenderWidget;
+use super::app::RenderWidget;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Loading {
@@ -149,7 +149,6 @@ impl RenderWidget for LoginWidget {
             )
             .block(blk)
             .render(f, width_chunk1[1]);
-            
         } else {
             let (high_user, high_pass) = if self.login.selected == LoginSelect::Username {
                 (
@@ -179,7 +178,7 @@ impl RenderWidget for LoginWidget {
             )
             .block(high_user)
             .render(f, width_chunk1[1]);
-            
+
             // Password from here down
             let width_chunk2 = Layout::default()
                 .direction(Direction::Horizontal)
@@ -195,7 +194,7 @@ impl RenderWidget for LoginWidget {
 
             self.user_area = width_chunk1[1];
             self.password_area = width_chunk2[1];
-    
+
             Paragraph::new(
                 [Text::styled(
                     &self.login.password,

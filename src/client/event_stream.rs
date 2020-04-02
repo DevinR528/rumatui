@@ -1,9 +1,9 @@
-use std::sync::Arc;
 use std::ops::Deref;
+use std::sync::Arc;
 
 use matrix_sdk::{
     self,
-    identifiers::{RoomId, RoomAliasId, UserId},
+    identifiers::{RoomAliasId, RoomId, UserId},
     EventEmitter, Room,
 };
 
@@ -34,7 +34,9 @@ use matrix_sdk::events::{
         history_visibility::HistoryVisibilityEvent,
         join_rules::JoinRulesEvent,
         member::MemberEvent,
-        message::{feedback::FeedbackEvent, MessageEvent, MessageEventContent, TextMessageEventContent},
+        message::{
+            feedback::FeedbackEvent, MessageEvent, MessageEventContent, TextMessageEventContent,
+        },
         name::NameEvent,
         pinned_events::PinnedEventsEvent,
         power_levels::PowerLevelsEvent,
@@ -52,20 +54,17 @@ use matrix_sdk::events::{
     CustomEvent, CustomRoomEvent, CustomStateEvent,
 };
 
-use tokio::sync::Mutex;
 use tokio::sync::mpsc;
-
-
-
+use tokio::sync::Mutex;
 
 pub enum StateResult {
-    Message(String, String),
+    Message(crate::UserIdStr, String, crate::RoomIdStr),
     Err,
 }
 unsafe impl Send for StateResult {}
 
 pub struct EventStream {
-    send: mpsc::Sender<StateResult>
+    send: mpsc::Sender<StateResult>,
 }
 unsafe impl Send for EventStream {}
 
@@ -73,7 +72,7 @@ impl EventStream {
     pub(crate) fn new() -> (Self, mpsc::Receiver<StateResult>) {
         let (send, recv) = mpsc::channel(1024);
 
-        (Self { send, }, recv) 
+        (Self { send }, recv)
     }
 }
 
@@ -94,17 +93,17 @@ impl EventEmitter for EventStream {
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomAvatar` event.
     async fn on_room_avatar(&mut self, _: Arc<Mutex<Room>>, _: Arc<Mutex<AvatarEvent>>) {}
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomMessage` event.
-     /// Fires when `AsyncClient` receives a `RoomEvent::RoomMessage` event.
-     async fn on_room_message(&mut self, room: Arc<Mutex<Room>>, event: Arc<Mutex<MessageEvent>>) {
+    /// Fires when `AsyncClient` receives a `RoomEvent::RoomMessage` event.
+    async fn on_room_message(&mut self, room: Arc<Mutex<Room>>, event: Arc<Mutex<MessageEvent>>) {
         let r = room.lock().await;
-        let Room { room_id, room_name, members, .. } = r.deref();
+        let Room {
+            room_id, members, ..
+        } = r.deref();
         let ev = event.lock().await;
         let ev = ev.deref();
 
         let MessageEvent {
-            content,
-            sender,
-            ..
+            content, sender, ..
         } = ev;
 
         let name = if let Some(mem) = members.get(&sender.to_string()) {
@@ -114,13 +113,21 @@ impl EventEmitter for EventStream {
         };
         match content {
             MessageEventContent::Text(TextMessageEventContent { body: msg_body, .. }) => {
-                if let Err(e) = self.send.send(StateResult::Message(name, msg_body.clone())).await {
+                if let Err(e) = self
+                    .send
+                    .send(StateResult::Message(
+                        name,
+                        msg_body.clone(),
+                        room_id.clone(),
+                    ))
+                    .await
+                {
                     panic!("{}", e)
                 }
             }
-            _ => {},
+            _ => {}
         }
-     }
+    }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomMessageFeedback` event.
     async fn on_room_message_feedback(
         &mut self,
@@ -176,11 +183,12 @@ impl EventEmitter for EventStream {
     async fn on_account_data_fully_read(
         &mut self,
         _: Arc<Mutex<Room>>,
-        _: Arc<Mutex<FullyReadEvent>>,
+        event: Arc<Mutex<FullyReadEvent>>,
     ) {
+        
     }
 
     // `PresenceEvent` is a struct so there is only the one method
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomAliases` event.
-    async fn on_presence_event(&mut self, _: Arc<Mutex<Room>>, _: Arc<Mutex<PresenceEvent>>) {}
+    async fn on_presence_event(&mut self, _: Arc<Mutex<Room>>, event: Arc<Mutex<PresenceEvent>>) {}
 }
