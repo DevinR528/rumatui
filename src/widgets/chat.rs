@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use matrix_sdk::Room;
+use matrix_sdk::identifiers::RoomId;
+use termion::event::MouseButton;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::{Frame};
@@ -14,18 +16,20 @@ use super::RenderWidget;
 
 #[derive(Clone, Debug, Default)]
 pub struct ChatWidget {
+    pub current_room: Option<RoomId>,
     pub room: RoomsWidget,
     pub msgs: MessageWidget,
 }
 
 impl ChatWidget {
-    pub(crate) fn set_room_state(&mut self, rooms: HashMap<String, Arc<Mutex<Room>>>) {
-        self.room.populate_rooms(rooms);
+    pub(crate) async fn set_room_state(&mut self, rooms: HashMap<String, Arc<Mutex<Room>>>, current: Option<RoomId>) {
+        self.current_room = current.clone();
+        self.room.populate_rooms(rooms, current).await;
     }
-}
 
-impl matrix_sdk::EventEmitter for ChatWidget {
-    
+    pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {
+
+    }
 }
 
 impl RenderWidget for ChatWidget {

@@ -63,8 +63,8 @@ fn main() -> Result<(), failure::Error> {
                         _ => {}
                     },
                     TermEvent::Mouse(m) => match m {
-                        MouseEvent::Press(_button, x, y) => {
-                            terminal.set_cursor(x, y).unwrap();
+                        MouseEvent::Press(btn, x, y) => {
+                            app.on_click(btn, x, y)
                         }
                         MouseEvent::Release(_, _) => {}
                         MouseEvent::Hold(_, _) => {}
@@ -78,6 +78,7 @@ fn main() -> Result<(), failure::Error> {
 
             if app.should_quit {
                 terminal.clear()?;
+                app.on_quit().await;
                 break;
             }
         }

@@ -8,7 +8,7 @@ use anyhow::{Error};
 
 use tokio::runtime::{Handle};
 
-
+use termion::event::{Event as TermEvent, Key, MouseButton, MouseEvent};
 use tokio::sync::mpsc::{self};
 use tui::backend::Backend;
 use tui::layout::{Constraint, Layout, Rect};
@@ -93,6 +93,11 @@ impl AppWidget {
         }
     }
 
+    pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {
+        self.login_w.on_click(btn, x, y);
+        self.chat.room.on_click(btn, x, y)
+    }
+
     pub fn on_up(&mut self) {
         if !self.login_w.logged_in {
             if let LoginSelect::Username = self.login_w.login.selected {
@@ -166,10 +171,10 @@ impl AppWidget {
         // this will login, send messages, and any other user initiated requests
         match self.ev_msgs.try_recv() {
             Ok(res) => match res {
-                RequestResult::Login(Ok(rooms)) => {
+                RequestResult::Login(Ok((rooms, current))) => {
                     self.login_w.logged_in = true;
                     self.login_w.logging_in = false;
-                    self.chat.set_room_state(rooms);
+                    self.chat.set_room_state(rooms, current).await;
                 },
                 RequestResult::Login(Err(e)) => {
                     self.login_w.logging_in = false;
@@ -188,6 +193,13 @@ impl AppWidget {
             }
             _ => {},
         }
+    }
+
+    pub async fn on_quit(&mut self) {
+        if self.send_jobs.send(UserRequest::Quit).await.is_err() {
+            panic!("quit send failed")
+        };
+        self.ev_loop.quit_sync()
     }
 }
 

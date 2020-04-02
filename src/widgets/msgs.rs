@@ -10,6 +10,7 @@ use crate::widgets::RenderWidget;
 
 #[derive(Clone, Debug, Default)]
 pub struct MessageWidget {
+    area: Rect,
     messages: Vec<String>,
 }
 
@@ -24,6 +25,7 @@ impl RenderWidget for MessageWidget {
     where
         B: Backend,
     {
+        self.area = area;
         let _chunks = Layout::default()
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
             .direction(Direction::Horizontal)

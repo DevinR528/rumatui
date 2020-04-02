@@ -1,11 +1,12 @@
 use std::collections::HashMap;
-
+use std::convert::TryFrom;
 use std::ops::{Index, IndexMut};
 use std::sync::{Arc, RwLock};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use matrix_sdk::identifiers::{RoomAliasId, RoomId, UserId};
 use matrix_sdk::Room;
+use termion::event::MouseButton;
 use tui::backend::Backend;
 use tui::layout::{Rect};
 use tui::style::{Color, Modifier, Style};
@@ -80,14 +81,38 @@ impl<I> IndexMut<usize> for ListState<I> {
 
 #[derive(Clone, Debug, Default)]
 pub struct RoomsWidget {
+    area: Rect,
+    current: Option<String>,
     names: ListState<(String, RoomId)>,
-    rooms: HashMap<String, Arc<RwLock<Room>>>,
+    rooms: HashMap<String, Arc<Mutex<Room>>>,
 
 }
 
 impl RoomsWidget {
-    pub(crate) fn populate_rooms(&mut self, _rooms: HashMap<String, Arc<Mutex<Room>>>) {
-        
+    /// Updates the `RoomWidget` state to reflect the current client state.
+    /// 
+    /// ## Arguments
+    ///  * rooms - A `HashMap` of room_id to `Room`.
+    pub(crate) async fn populate_rooms(&mut self, rooms: HashMap<String, Arc<Mutex<Room>>>, current: Option<RoomId>) {
+        self.rooms = rooms.clone();
+        self.current = current.map(|id| id.to_string());
+
+        let mut items = Vec::default();
+        for (id, room) in &rooms {
+            let r = room.lock().await;
+            items.push((r.calculate_name(), RoomId::try_from(id.as_str()).unwrap()));
+        }
+        self.names = ListState::new(items)
+    }
+
+    pub(crate) async fn current_room(&self) -> Option<&str> {
+        self.current.as_deref()
+    }
+
+    pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {
+        if self.area.intersects(Rect::new(x, y, 1, 1)) {
+            
+        }
     }
 }
 
@@ -95,49 +120,50 @@ impl RenderWidget for RoomsWidget {
     fn render<B>(&mut self, f: &mut Frame<B>, area: Rect)
     where
         B: Backend,
-    {        
-            let list_height = area.height as usize;
-    
-            // Use highlight_style only if something is selected
-            let selected = self.names.selected;
-            let highlight_style = Style::default().fg(Color::LightGreen).modifier(Modifier::BOLD);
-            let highlight_symbol = ">>";
-            // Make sure the list show the selected item
-            let offset = {
-                if selected >= list_height {
-                    selected - list_height + 1
+    {
+        self.area = area;
+        let list_height = area.height as usize;
+
+        // Use highlight_style only if something is selected
+        let selected = self.names.selected;
+        let highlight_style = Style::default().fg(Color::LightGreen).modifier(Modifier::BOLD);
+        let highlight_symbol = ">>";
+        // Make sure the list show the selected item
+        let offset = {
+            if selected >= list_height {
+                selected - list_height + 1
+            } else {
+                0
+            }
+        };
+
+        // Render items
+        let item = self.names
+            .items
+            .iter()
+            .enumerate()
+            .map(|(i, (_id, name))| {   
+                if i == selected {
+                    let style = Style::default()
+                        .bg(highlight_style.bg)
+                        .fg(highlight_style.fg)
+                        .modifier(highlight_style.modifier);
+                    Text::styled(
+                        format!("{} {}", highlight_symbol, name),
+                        style,
+                    )
                 } else {
-                    0
+                    let style = Style::default().fg(Color::Blue);
+                    Text::styled(
+                        format!("   {}", name),
+                        style,
+                    )
                 }
-            };
-    
-            // Render items
-            let item = self.names
-                .items
-                .iter()
-                .enumerate()
-                .map(|(i, (_id, name))| {   
-                    if i == selected {
-                        let style = Style::default()
-                            .bg(highlight_style.bg)
-                            .fg(highlight_style.fg)
-                            .modifier(highlight_style.modifier);
-                        Text::styled(
-                            format!("{} {}", highlight_symbol, name),
-                            style,
-                        )
-                    } else {
-                        let style = Style::default().fg(Color::Blue);
-                        Text::styled(
-                            format!("   {}", name),
-                            style,
-                        )
-                    }
-                })
-                .skip(offset as usize);
-            List::new(item)
-                .block(Block::default().borders(Borders::ALL).title("Rooms"))
-                .style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD))
-                .render(f, area);
+            })
+            .skip(offset as usize);
+        List::new(item)
+            .block(Block::default().borders(Borders::ALL).title("Rooms"))
+            .style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD))
+            .render(f, area);
     }
 }

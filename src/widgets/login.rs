@@ -1,5 +1,4 @@
-
-
+use termion::event::MouseButton;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
@@ -59,6 +58,7 @@ pub struct Login {
 
 #[derive(Clone, Debug, Default)]
 pub struct LoginWidget {
+    area: Rect,
     pub login: Login,
     pub logging_in: bool,
     pub logged_in: bool,
@@ -71,6 +71,12 @@ impl LoginWidget {
             && !self.login.password.is_empty()
             && !self.login.username.is_empty()
     }
+
+    pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {
+        if self.area.intersects(Rect::new(x, y, 1, 1)) {
+            
+        }
+    }
 }
 
 impl RenderWidget for LoginWidget {
@@ -78,6 +84,7 @@ impl RenderWidget for LoginWidget {
     where
         B: Backend,
     {
+        self.area = area;
         let chunks = Layout::default()
             .horizontal_margin(40)
             .constraints(

@@ -68,6 +68,10 @@ impl MatrixClient {
         Ok(client)
     }
 
+    pub(crate) async fn current_room_id(&self) -> Option<RoomId> {
+        self.inner.current_room_id().await
+    }
+
     pub(crate) async fn login(
         &mut self,
         username: String,
