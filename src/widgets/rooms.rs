@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::ops::{Index, IndexMut};
 use std::sync::{Arc, RwLock};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use matrix_sdk::identifiers::{RoomAliasId, RoomId, UserId};
 use matrix_sdk::Room;
@@ -85,7 +87,7 @@ impl<I> IndexMut<usize> for ListState<I> {
 pub struct RoomsWidget {
     area: Rect,
     /// This is the RoomId of the last used room, the room to show on startup.
-    current: Arc<RwLock<Option<crate::RoomIdStr>>>,
+    current: Rc<RefCell<Option<crate::RoomIdStr>>>,
     /// List of displayable room name and room id
     pub names: ListState<(String, RoomId)>,
     /// Map of room id and matrix_sdk::Room
@@ -101,21 +103,23 @@ impl RoomsWidget {
     pub(crate) async fn populate_rooms(
         &mut self,
         rooms: HashMap<crate::RoomIdStr, Arc<Mutex<Room>>>,
-        current: Arc<RwLock<Option<crate::RoomIdStr>>>,
+        current: Rc<RefCell<Option<crate::RoomIdStr>>>,
     ) {
         self.rooms = rooms.clone();
         self.current = current;
 
-        let mut items = Vec::default();
+        let mut items: Vec<(String, RoomId)> = Vec::default();
         for (id, room) in &rooms {
             let r = room.lock().await;
+            // TODO when RoomId impls AsRef<str> cleanup
+            if items.iter().any(|(_name, rid)| id == &rid.to_string()) { continue; }
+
             items.push((r.calculate_name(), RoomId::try_from(id.as_str()).unwrap()));
         }
 
-        if let Some(idx) = items.iter().position(|(_, id)| {
-            Some(&id.to_string()) == self.current.read().expect("room id read").as_ref()
-        }) {
-            self.names.selected = idx;
+        let mut curr = self.current.borrow_mut();
+        if let Some((id, _room)) = items.first() {
+            *curr = Some(id.clone());
         }
 
         self.names = ListState::new(items);
@@ -125,39 +129,21 @@ impl RoomsWidget {
         if self.area.intersects(Rect::new(x, y, 1, 1)) {}
     }
 
+    /// Moves selection down the list
     pub fn select_next(&mut self) {
         self.names.select_next();
         if let Some((_name, id)) = self.names.get_selected() {
-            println!(
-                "{} {} {:?}",
-                _name,
-                id,
-                self.current.read().unwrap().as_ref()
-            );
-
-            let mut curr = self
-                .current
-                .write()
-                .expect("RoomWidget tried to set current room id");
-
-            if let Some(r_id) = curr.as_mut() {
-                *r_id = id.to_string()
-            } else {
-                let mut curr = curr.as_mut();
-                curr = Some(&mut id.to_string());
-            }
+            let mut curr = self.current.borrow_mut();
+            *curr = Some(id.to_string());
         }
     }
 
+    /// Moves the selection up the list
     pub fn select_previous(&mut self) {
         self.names.select_previous();
         if let Some((_name, id)) = self.names.get_selected() {
-            let mut curr = self
-                .current
-                .write()
-                .expect("RoomWidget tried to set current room id")
-                .as_mut();
-            curr = Some(&mut id.to_string());
+            let mut curr = self.current.borrow_mut();
+            *curr = Some(id.to_string());
         }
     }
 }

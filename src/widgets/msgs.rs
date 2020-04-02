@@ -1,4 +1,6 @@
 use std::sync::{Arc, RwLock};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
@@ -12,7 +14,7 @@ use super::app::RenderWidget;
 pub struct MessageWidget {
     area: Rect,
     /// This is the RoomId of the last used room, the room to show on startup.
-    pub(crate) current_room: Arc<RwLock<Option<crate::RoomIdStr>>>,
+    pub(crate) current_room: Rc<RefCell<Option<crate::RoomIdStr>>>,
     messages: Vec<(crate::RoomIdStr, String)>,
 }
 
@@ -32,10 +34,10 @@ impl RenderWidget for MessageWidget {
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
             .direction(Direction::Horizontal)
             .split(area);
+
         let cmp_id = if let Some(id) = self
             .current_room
-            .read()
-            .expect("current room RwLock::read")
+            .borrow()
             .as_ref()
         {
             Some(id.to_string())
@@ -56,7 +58,7 @@ impl RenderWidget for MessageWidget {
                 Block::default()
                     .borders(Borders::ALL)
                     .border_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
-                    .title("Incoming")
+                    .title("Messages")
                     .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
             )
             .wrap(true)

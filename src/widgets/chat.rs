@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use matrix_sdk::identifiers::RoomId;
 use matrix_sdk::Room;
@@ -15,7 +17,7 @@ use super::rooms::RoomsWidget;
 
 #[derive(Clone, Debug, Default)]
 pub struct ChatWidget {
-    pub current_room: Arc<RwLock<Option<crate::RoomIdStr>>>,
+    pub current_room: Rc<RefCell<Option<crate::RoomIdStr>>>,
     pub room: RoomsWidget,
     pub msgs: MessageWidget,
     pub main_screen: bool,
@@ -25,12 +27,9 @@ impl ChatWidget {
     pub(crate) async fn set_room_state(
         &mut self,
         rooms: HashMap<String, Arc<Mutex<Room>>>,
-        current: Option<RoomId>,
     ) {
-        let cur = Arc::new(RwLock::new(current.map(|id| id.to_string())));
-        self.current_room = Arc::clone(&cur);
-        self.msgs.current_room = Arc::clone(&cur);
-        self.room.populate_rooms(rooms, Arc::clone(&cur)).await;
+        self.msgs.current_room = Rc::clone(&self.current_room);
+        self.room.populate_rooms(rooms, Rc::clone(&self.current_room)).await;
     }
 
     pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {}

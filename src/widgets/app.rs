@@ -167,11 +167,11 @@ impl AppWidget {
         // this will login, send messages, and any other user initiated requests
         match self.ev_msgs.try_recv() {
             Ok(res) => match res {
-                RequestResult::Login(Ok((rooms, current))) => {
+                RequestResult::Login(Ok(rooms)) => {
                     self.login_w.logged_in = true;
                     self.chat.main_screen = true;
                     self.login_w.logging_in = false;
-                    self.chat.set_room_state(rooms, current).await;
+                    self.chat.set_room_state(rooms).await;
                 }
                 RequestResult::Login(Err(e)) => {
                     self.login_w.logging_in = false;
@@ -196,7 +196,8 @@ impl AppWidget {
     pub async fn on_quit(&mut self) {
         self.ev_loop.quit_sync();
         if self.send_jobs.send(UserRequest::Quit).await.is_err() {
-            panic!("quit send failed")
+            // TODO what should happen when a send fails
+            return;
         };
     }
 }

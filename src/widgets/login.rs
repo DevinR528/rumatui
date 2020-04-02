@@ -197,7 +197,7 @@ impl RenderWidget for LoginWidget {
 
             Paragraph::new(
                 [Text::styled(
-                    &self.login.password,
+                    "*".repeat(self.login.password.len()),
                     Style::default().fg(Color::Cyan),
                 )]
                 .iter(),

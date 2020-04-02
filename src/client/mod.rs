@@ -39,7 +39,6 @@ pub mod event_stream;
 pub struct MatrixClient {
     pub inner: AsyncClient,
     homeserver: String,
-    pub current_room_id: Option<RoomId>,
     pub curr_sync: Option<String>,
     user: Option<UserId>,
 }
@@ -62,15 +61,10 @@ impl MatrixClient {
             inner: AsyncClient::new(homeserver_url, None)?,
             homeserver: homeserver.into(),
             user: None,
-            current_room_id: None,
             curr_sync: None,
         };
 
         Ok(client)
-    }
-
-    pub(crate) async fn current_room_id(&self) -> Option<RoomId> {
-        self.inner.current_room_id().await
     }
 
     pub(crate) async fn login(
@@ -86,8 +80,6 @@ impl MatrixClient {
             .sync(SyncSettings::new().full_state(true))
             .await?;
 
-        self.current_room_id = self.inner.current_room_id().await;
-        println!("{:?}", self.current_room_id);
         Ok(self.inner.get_rooms().await)
     }
 

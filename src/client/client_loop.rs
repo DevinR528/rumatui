@@ -30,7 +30,7 @@ impl fmt::Debug for UserRequest {
     }
 }
 pub enum RequestResult {
-    Login(Result<(HashMap<String, Arc<Mutex<Room>>>, Option<RoomId>)>),
+    Login(Result<HashMap<String, Arc<Mutex<Room>>>>),
 }
 unsafe impl Send for RequestResult {}
 
@@ -95,8 +95,7 @@ impl MatrixEventHandle {
                         let mut cli = client.lock().await;
 
                         let res = cli.login(u, p).await;
-                        let curr = cli.current_room_id().await;
-                        if let Err(e) = tx.send(RequestResult::Login(res.map(|r| (r, curr)))).await
+                        if let Err(e) = tx.send(RequestResult::Login(res)).await
                         {
                             panic!("client event handler crashed {}", e)
                         }
