@@ -58,7 +58,8 @@ pub struct Login {
 
 #[derive(Clone, Debug, Default)]
 pub struct LoginWidget {
-    area: Rect,
+    user_area: Rect,
+    password_area: Rect,
     pub login: Login,
     pub logging_in: bool,
     pub logged_in: bool,
@@ -72,9 +73,15 @@ impl LoginWidget {
             && !self.login.username.is_empty()
     }
 
+    /// If right mouse button and clicked within the area of the username or
+    /// password field the respective text box is selected.
     pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {
-        if self.area.intersects(Rect::new(x, y, 1, 1)) {
-            
+        if let MouseButton::Left = btn {
+            if self.user_area.intersects(Rect::new(x, y, 1, 1)) {
+                self.login.selected = LoginSelect::Username;
+            } else if self.password_area.intersects(Rect::new(x, y, 1, 1)) {
+                self.login.selected = LoginSelect::Password;
+            }
         }
     }
 }
@@ -84,7 +91,6 @@ impl RenderWidget for LoginWidget {
     where
         B: Backend,
     {
-        self.area = area;
         let chunks = Layout::default()
             .horizontal_margin(40)
             .constraints(
@@ -162,6 +168,8 @@ impl RenderWidget for LoginWidget {
                         .borders(Borders::ALL),
                 )
             };
+
+            // User name
             Paragraph::new(
                 [Text::styled(
                     &self.login.username,
@@ -171,7 +179,8 @@ impl RenderWidget for LoginWidget {
             )
             .block(high_user)
             .render(f, width_chunk1[1]);
-    
+            
+            // Password from here down
             let width_chunk2 = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints(
@@ -183,6 +192,9 @@ impl RenderWidget for LoginWidget {
                     .as_ref(),
                 )
                 .split(height_chunk[2]);
+
+            self.user_area = width_chunk1[1];
+            self.password_area = width_chunk2[1];
     
             Paragraph::new(
                 [Text::styled(
