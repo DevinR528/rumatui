@@ -3,62 +3,62 @@ use std::sync::Arc;
 
 use matrix_sdk::{
     self,
-    identifiers::{RoomAliasId, RoomId, UserId},
+    identifiers::{RoomId},
     EventEmitter, Room,
 };
 
 use matrix_sdk::events::{
-    call::{
-        answer::AnswerEvent, candidates::CandidatesEvent, hangup::HangupEvent, invite::InviteEvent,
-    },
-    direct::DirectEvent,
-    dummy::DummyEvent,
-    forwarded_room_key::ForwardedRoomKeyEvent,
+    // call::{
+    //     answer::AnswerEvent, candidates::CandidatesEvent, hangup::HangupEvent, invite::InviteEvent,
+    // },
+    // direct::DirectEvent,
+    // dummy::DummyEvent,
+    // forwarded_room_key::ForwardedRoomKeyEvent,
     fully_read::FullyReadEvent,
     ignored_user_list::IgnoredUserListEvent,
-    key::verification::{
-        accept::AcceptEvent, cancel::CancelEvent, key::KeyEvent, mac::MacEvent,
-        request::RequestEvent, start::StartEvent,
-    },
+    // key::verification::{
+    //     accept::AcceptEvent, cancel::CancelEvent, key::KeyEvent, mac::MacEvent,
+    //     request::RequestEvent, start::StartEvent,
+    // },
     presence::PresenceEvent,
     push_rules::PushRulesEvent,
-    receipt::ReceiptEvent,
+    // receipt::ReceiptEvent,
     room::{
         aliases::AliasesEvent,
         avatar::AvatarEvent,
         canonical_alias::CanonicalAliasEvent,
-        create::CreateEvent,
-        encrypted::EncryptedEvent,
-        encryption::EncryptionEvent,
-        guest_access::GuestAccessEvent,
-        history_visibility::HistoryVisibilityEvent,
+        // create::CreateEvent,
+        // encrypted::EncryptedEvent,
+        // encryption::EncryptionEvent,
+        // guest_access::GuestAccessEvent,
+        // history_visibility::HistoryVisibilityEvent,
         join_rules::JoinRulesEvent,
         member::MemberEvent,
         message::{
             feedback::FeedbackEvent, MessageEvent, MessageEventContent, TextMessageEventContent,
         },
         name::NameEvent,
-        pinned_events::PinnedEventsEvent,
+        // pinned_events::PinnedEventsEvent,
         power_levels::PowerLevelsEvent,
         redaction::RedactionEvent,
-        server_acl::ServerAclEvent,
-        third_party_invite::ThirdPartyInviteEvent,
-        tombstone::TombstoneEvent,
-        topic::TopicEvent,
+        // server_acl::ServerAclEvent,
+        // third_party_invite::ThirdPartyInviteEvent,
+        // tombstone::TombstoneEvent,
+        // topic::TopicEvent,
     },
-    room_key::RoomKeyEvent,
-    room_key_request::RoomKeyRequestEvent,
-    sticker::StickerEvent,
-    tag::TagEvent,
-    typing::TypingEvent,
-    CustomEvent, CustomRoomEvent, CustomStateEvent,
+    // room_key::RoomKeyEvent,
+    // room_key_request::RoomKeyRequestEvent,
+    // sticker::StickerEvent,
+    // tag::TagEvent,
+    // typing::TypingEvent,
+    // CustomEvent, CustomRoomEvent, CustomStateEvent,
 };
 
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 
 pub enum StateResult {
-    Message(crate::UserIdStr, String, crate::RoomIdStr),
+    Message(crate::UserIdStr, String, RoomId),
     Err,
 }
 unsafe impl Send for StateResult {}
@@ -106,7 +106,7 @@ impl EventEmitter for EventStream {
             content, sender, ..
         } = ev;
 
-        let name = if let Some(mem) = members.get(&sender.to_string()) {
+        let name = if let Some(mem) = members.get(&sender) {
             mem.name.clone()
         } else {
             sender.localpart().into()
@@ -183,12 +183,12 @@ impl EventEmitter for EventStream {
     async fn on_account_data_fully_read(
         &mut self,
         _: Arc<Mutex<Room>>,
-        event: Arc<Mutex<FullyReadEvent>>,
+        _event: Arc<Mutex<FullyReadEvent>>,
     ) {
         
     }
 
     // `PresenceEvent` is a struct so there is only the one method
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomAliases` event.
-    async fn on_presence_event(&mut self, _: Arc<Mutex<Room>>, event: Arc<Mutex<PresenceEvent>>) {}
+    async fn on_presence_event(&mut self, _: Arc<Mutex<Room>>, _event: Arc<Mutex<PresenceEvent>>) {}
 }

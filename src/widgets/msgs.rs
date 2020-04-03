@@ -1,54 +1,107 @@
-use std::sync::{Arc, RwLock};
 use std::cell::RefCell;
+use std::io;
 use std::rc::Rc;
 
-use tui::backend::Backend;
+use matrix_sdk::identifiers::RoomId;
+use matrix_sdk::events::room::message::{
+    MessageEventContent, TextMessageEventContent,
+};
+use tui::backend::{Backend};
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, Text, Widget};
-use tui::Frame;
+use tui::{Frame, Terminal};
 
-use super::app::RenderWidget;
+use super::app::{DrawWidget, RenderWidget};
+use super::utils::write_markdown_string;
+
+
+pub enum MsgType {
+    PlainText,
+    FormattedText,
+    RichReply,
+    Audio,
+    Emote,
+    File,
+    Location,
+    Image,
+    ServerNotice,
+    Video,
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct MessageWidget {
     area: Rect,
-    /// This is the RoomId of the last used room, the room to show on startup.
-    pub(crate) current_room: Rc<RefCell<Option<crate::RoomIdStr>>>,
-    messages: Vec<(crate::RoomIdStr, String)>,
+    // TODO save this to a local "database" somehow
+    /// This is the RoomId of the last used room.
+    pub(crate) current_room: Rc<RefCell<Option<RoomId>>>,
+    messages: Vec<(RoomId, String)>,
+    send_msg: String,
 }
 
 impl MessageWidget {
-    pub fn add_message(&mut self, msg: String, room: crate::RoomIdStr) {
+    pub fn add_message(&mut self, msg: String, room: RoomId) {
         self.messages.push((room, msg))
+    }
+
+    fn process_message(&self) -> MsgType {
+        if self.send_msg.contains('`') {
+            MsgType::FormattedText
+        } else {
+            MsgType::PlainText
+        }
+    }
+
+    pub fn get_sending_message(&self) -> Result<MessageEventContent, anyhow::Error> {
+        match self.process_message() {
+            MsgType::PlainText => Ok(MessageEventContent::Text(TextMessageEventContent {
+                body: self.send_msg.clone(),
+                format: None,
+                formatted_body: None,
+                relates_to: None,
+            })),
+            MsgType::FormattedText => Ok(MessageEventContent::Text(TextMessageEventContent {
+                body: self.send_msg.clone(),
+                format: Some("org.matrix.custom.html".into()),
+                formatted_body: Some(write_markdown_string(&self.send_msg)?),
+                relates_to: None,
+            })),
+            _ => todo!("implement more sending messages")
+        }
+    }
+
+    pub fn add_char(&mut self, ch: char) -> bool {
+        if ch == '\n' {
+            true
+        } else {
+            self.send_msg.push(ch);
+            false
+        }
+    }
+    pub fn pop(&mut self) {
+        self.send_msg.pop();
     }
 }
 
 impl RenderWidget for MessageWidget {
-    fn render<B>(&mut self, f: &mut Frame<B>, area: Rect)
-    where
-        B: Backend,
-    {
+    fn render<B: Backend>(&mut self, f: &mut Frame<B>, area: Rect) {
         self.area = area;
-        let _chunks = Layout::default()
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-            .direction(Direction::Horizontal)
+        let chunks = Layout::default()
+            .constraints([Constraint::Percentage(90), Constraint::Percentage(10)].as_ref())
+            .direction(Direction::Vertical)
             .split(area);
 
-        let cmp_id = if let Some(id) = self
-            .current_room
-            .borrow()
-            .as_ref()
-        {
-            Some(id.to_string())
+        let b = self.current_room.borrow();
+        let cmp_id = if let Some(id) = b.as_ref() {
+            Some(id)
         } else {
-            self.messages.first().map(|(id, _msg)| id.to_string())
+            self.messages.first().map(|(id, _msg)| id)
         };
 
         let text = self
             .messages
             .iter()
-            .filter(|(id, _)| Some(id) == cmp_id.as_ref())
+            .filter(|(id, _)| Some(id) == cmp_id)
             .map(|(_, msg)| msg.to_string())
             .collect::<Vec<_>>()
             .join("\n");
@@ -62,6 +115,17 @@ impl RenderWidget for MessageWidget {
                     .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
             )
             .wrap(true)
-            .render(f, area);
+            .render(f, chunks[0]);
+            
+        Paragraph::new(vec![Text::styled(&self.send_msg, Style::default().fg(Color::Blue))].iter())
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
+                    .title("Send")
+                    .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
+            )
+            .wrap(true)
+            .render(f, chunks[1]);
     }
 }

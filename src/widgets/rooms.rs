@@ -1,13 +1,12 @@
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::ops::{Index, IndexMut};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use matrix_sdk::identifiers::{RoomAliasId, RoomId, UserId};
+use matrix_sdk::identifiers::RoomId;
 use matrix_sdk::Room;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use termion::event::MouseButton;
 use tokio::sync::Mutex;
 use tui::backend::Backend;
@@ -87,11 +86,11 @@ impl<I> IndexMut<usize> for ListState<I> {
 pub struct RoomsWidget {
     area: Rect,
     /// This is the RoomId of the last used room, the room to show on startup.
-    current: Rc<RefCell<Option<crate::RoomIdStr>>>,
+    current: Rc<RefCell<Option<RoomId>>>,
     /// List of displayable room name and room id
     pub names: ListState<(String, RoomId)>,
     /// Map of room id and matrix_sdk::Room
-    rooms: HashMap<crate::RoomIdStr, Arc<Mutex<Room>>>,
+    rooms: HashMap<RoomId, Arc<Mutex<Room>>>,
 }
 
 impl RoomsWidget {
@@ -102,8 +101,8 @@ impl RoomsWidget {
     ///  * current is the current room id controlled by the ChatWidget.
     pub(crate) async fn populate_rooms(
         &mut self,
-        rooms: HashMap<crate::RoomIdStr, Arc<Mutex<Room>>>,
-        current: Rc<RefCell<Option<crate::RoomIdStr>>>,
+        rooms: HashMap<RoomId, Arc<Mutex<Room>>>,
+        current: Rc<RefCell<Option<RoomId>>>,
     ) {
         self.rooms = rooms.clone();
         self.current = current;
@@ -112,20 +111,20 @@ impl RoomsWidget {
         for (id, room) in &rooms {
             let r = room.lock().await;
             // TODO when RoomId impls AsRef<str> cleanup
-            if items.iter().any(|(_name, rid)| id == &rid.to_string()) { continue; }
+            if items.iter().any(|(_name, rid)| id == rid) { continue; }
 
-            items.push((r.calculate_name(), RoomId::try_from(id.as_str()).unwrap()));
+            items.push((r.calculate_name(), id.clone()));
         }
 
         let mut curr = self.current.borrow_mut();
-        if let Some((id, _room)) = items.first() {
+        if let Some((_name, id)) = items.first() {
             *curr = Some(id.clone());
         }
 
         self.names = ListState::new(items);
     }
 
-    pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {
+    pub fn on_click(&mut self, _btn: MouseButton, x: u16, y: u16) {
         if self.area.intersects(Rect::new(x, y, 1, 1)) {}
     }
 
@@ -134,7 +133,7 @@ impl RoomsWidget {
         self.names.select_next();
         if let Some((_name, id)) = self.names.get_selected() {
             let mut curr = self.current.borrow_mut();
-            *curr = Some(id.to_string());
+            *curr = Some(id.clone());
         }
     }
 
@@ -143,7 +142,7 @@ impl RoomsWidget {
         self.names.select_previous();
         if let Some((_name, id)) = self.names.get_selected() {
             let mut curr = self.current.borrow_mut();
-            *curr = Some(id.to_string());
+            *curr = Some(id.clone());
         }
     }
 }

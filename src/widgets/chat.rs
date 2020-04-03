@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -17,7 +17,7 @@ use super::rooms::RoomsWidget;
 
 #[derive(Clone, Debug, Default)]
 pub struct ChatWidget {
-    pub current_room: Rc<RefCell<Option<crate::RoomIdStr>>>,
+    pub current_room: Rc<RefCell<Option<RoomId>>>,
     pub room: RoomsWidget,
     pub msgs: MessageWidget,
     pub main_screen: bool,
@@ -26,13 +26,13 @@ pub struct ChatWidget {
 impl ChatWidget {
     pub(crate) async fn set_room_state(
         &mut self,
-        rooms: HashMap<String, Arc<Mutex<Room>>>,
+        rooms: HashMap<RoomId, Arc<Mutex<Room>>>,
     ) {
         self.msgs.current_room = Rc::clone(&self.current_room);
         self.room.populate_rooms(rooms, Rc::clone(&self.current_room)).await;
     }
 
-    pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {}
+    pub fn on_click(&mut self, _btn: MouseButton, _x: u16, _y: u16) {}
 }
 
 impl RenderWidget for ChatWidget {
@@ -41,7 +41,7 @@ impl RenderWidget for ChatWidget {
         B: Backend,
     {
         let chunks = Layout::default()
-            .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
+            .constraints([Constraint::Percentage(20), Constraint::Percentage(80)].as_ref())
             .direction(Direction::Horizontal)
             .split(area);
 

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::atomic::Ordering;
-use std::sync::{atomic::AtomicBool, Arc, RwLock};
+use std::sync::{atomic::AtomicBool, Arc};
 
 use anyhow::Result;
 use matrix_sdk::Room;
@@ -14,9 +14,11 @@ use tokio::task::JoinHandle;
 use crate::client::event_stream::EventStream;
 use crate::client::MatrixClient;
 use matrix_sdk::identifiers::RoomId;
-
+use matrix_sdk::events::room::message::{MessageEventContent, };
+use matrix_sdk::api::r0::message::create_message_event as create_msg;
 pub enum UserRequest {
     Login(String, String),
+    SendMessage(RoomId, MessageEventContent),
     Quit,
 }
 unsafe impl Send for UserRequest {}
@@ -25,12 +27,14 @@ impl fmt::Debug for UserRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Login(_, _) => write!(f, "failed login"),
+            Self::SendMessage(_, _) => write!(f, "failed sending message"),
             Self::Quit => write!(f, "quitting filed"),
         }
     }
 }
 pub enum RequestResult {
-    Login(Result<HashMap<String, Arc<Mutex<Room>>>>),
+    Login(Result<HashMap<RoomId, Arc<Mutex<Room>>>>),
+    SendMessage(Result<create_msg::Response>)
 }
 unsafe impl Send for RequestResult {}
 
@@ -93,10 +97,15 @@ impl MatrixEventHandle {
                     UserRequest::Quit => return Ok(()),
                     UserRequest::Login(u, p) => {
                         let mut cli = client.lock().await;
-
                         let res = cli.login(u, p).await;
-                        if let Err(e) = tx.send(RequestResult::Login(res)).await
-                        {
+                        if let Err(e) = tx.send(RequestResult::Login(res)).await {
+                            panic!("client event handler crashed {}", e)
+                        }
+                    }
+                    UserRequest::SendMessage(room, msg) => {
+                        let mut cli = client.lock().await;
+                        let res = cli.send_message(&room, msg).await;
+                        if let Err(e) = tx.send(RequestResult::SendMessage(res)).await {
                             panic!("client event handler crashed {}", e)
                         }
                     }

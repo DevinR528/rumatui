@@ -2,31 +2,19 @@ use std::collections::HashMap;
 
 use std::fmt;
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 
 use matrix_sdk::{
     self,
     api::r0::{
-        directory::get_public_rooms_filtered,
-        filter::RoomEventFilter,
         message::create_message_event,
-        search::search_events::{self, Categories, Criteria},
-        sync::sync_events,
     },
     events::{
-        collections::all::{RoomEvent, StateEvent},
-        room::aliases::AliasesEvent,
-        room::canonical_alias::CanonicalAliasEvent,
-        room::create::CreateEvent,
-        room::member::{MemberEvent, MembershipState},
-        room::message::{MessageEvent, MessageEventContent, TextMessageEventContent},
-        room::name::{NameEvent, NameEventContent},
-        EventResult, EventType,
+        room::message::MessageEventContent,
     },
-    identifiers::{RoomAliasId, RoomId, UserId},
-    ruma_traits::{Endpoint, Outgoing},
+    identifiers::{RoomId, UserId},
     AsyncClient, AsyncClientConfig, Room, SyncSettings,
 };
 use tokio::sync::Mutex;
@@ -71,7 +59,7 @@ impl MatrixClient {
         &mut self,
         username: String,
         password: String,
-    ) -> Result<HashMap<String, Arc<Mutex<Room>>>> {
+    ) -> Result<HashMap<RoomId, Arc<Mutex<Room>>>> {
         let res = self.inner.login(username, password, None, None).await?;
         self.user = Some(res.user_id.clone());
 
@@ -90,14 +78,20 @@ impl MatrixClient {
         Ok(())
     }
 
+    /// Sends a MessageEvent to the specified room.
+    /// 
+    /// # Arguments
+    /// 
+    /// * id - A valid RoomId otherwise sending will fail.
+    /// * msg - `MessageEventContent`s is an enum that can handle all the types
+    /// of messages eg. `Text`, `Audio`, `Video` ect.
     pub(crate) async fn send_message(
-        &self,
-        client: &mut AsyncClient,
-        id: &str,
+        &mut self,
+        id: &RoomId,
         msg: MessageEventContent,
     ) -> Result<create_message_event::Response> {
-        client
-            .room_send(&id, msg)
+        self.inner
+            .room_send(&id.to_string(), msg)
             .await
             .context("Message failed to send")
     }

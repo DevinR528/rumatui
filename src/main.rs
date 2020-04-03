@@ -42,10 +42,11 @@ fn main() -> Result<(), failure::Error> {
         let backend = TermionBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
         terminal.clear()?;
+
         loop {
             app.draw(&mut terminal)?;
 
-            if let Some(er) = app.error.take() {
+            if let Some(_er) = app.error.take() {
                 while let Event::Tick = events.next()? {}
             }
 

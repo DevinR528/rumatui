@@ -3,7 +3,7 @@ use std::io;
 use anyhow::Error;
 use tokio::runtime::Handle;
 
-use termion::event::{Event as TermEvent, Key, MouseButton, MouseEvent};
+use termion::event::MouseButton;
 use tokio::sync::mpsc::{self};
 use tui::backend::Backend;
 use tui::layout::{Constraint, Layout, Rect};
@@ -135,6 +135,29 @@ impl AppWidget {
             } else {
                 self.login_w.login.password.push(c);
             }
+        } else if self.chat.main_screen {
+            if self.chat.msgs.add_char(c) {
+                // unfortunately we have to do it this way or we have a mutable borrow in the scope of immutable
+                let res = if let Some(room) = self.chat.current_room.borrow().as_ref() {
+                    match self.chat.msgs.get_sending_message() {
+                        Ok(msg) => {
+                            if let Err(e) = self.send_jobs
+                                .send(UserRequest::SendMessage(room.clone(), msg))
+                                .await {
+                                    Err(anyhow::Error::from(e))
+                                } else {
+                                    Ok(())
+                                }
+                        }
+                        Err(e) => Err(e),
+                    }
+                } else {
+                    Ok(())
+                };
+                if let Err(e) = res {
+                    self.set_error(Error::from(e));
+                }
+            }
         }
     }
 
@@ -149,6 +172,8 @@ impl AppWidget {
             } else {
                 self.login_w.login.password.pop();
             }
+        } else if self.chat.main_screen {
+            self.chat.msgs.pop();
         }
     }
 
@@ -175,6 +200,13 @@ impl AppWidget {
                 }
                 RequestResult::Login(Err(e)) => {
                     self.login_w.logging_in = false;
+                    self.set_error(e)
+                }
+                // TODO this has the EventId which we need to keep
+                RequestResult::SendMessage(Ok(_res)) => {
+
+                }
+                RequestResult::SendMessage(Err(e)) => {
                     self.set_error(e)
                 }
             },
