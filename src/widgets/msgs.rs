@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::io;
 use std::rc::Rc;
 
 use matrix_sdk::identifiers::RoomId;
@@ -9,10 +8,10 @@ use matrix_sdk::events::room::message::{
 use tui::backend::{Backend};
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Paragraph, Text, Widget};
+use tui::widgets::{Block, Borders, Paragraph, Text};
 use tui::{Frame, Terminal};
 
-use super::app::{DrawWidget, RenderWidget};
+use super::app::{RenderWidget};
 use super::utils::write_markdown_string;
 
 
@@ -72,6 +71,7 @@ impl MessageWidget {
 
     pub fn add_char(&mut self, ch: char) -> bool {
         if ch == '\n' {
+            self.messages.push((self.current_room.borrow().as_ref().unwrap().clone(), write_markdown_string(&self.send_msg).unwrap()));
             true
         } else {
             self.send_msg.push(ch);
@@ -106,7 +106,8 @@ impl RenderWidget for MessageWidget {
             .collect::<Vec<_>>()
             .join("\n");
 
-        Paragraph::new(vec![Text::styled(text, Style::default().fg(Color::Blue))].iter())
+        let t = vec![Text::styled(text, Style::default().fg(Color::Blue))];
+        let p = Paragraph::new(t.iter())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -114,10 +115,12 @@ impl RenderWidget for MessageWidget {
                     .title("Messages")
                     .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
             )
-            .wrap(true)
-            .render(f, chunks[0]);
-            
-        Paragraph::new(vec![Text::styled(&self.send_msg, Style::default().fg(Color::Blue))].iter())
+            .wrap(true);
+
+        f.render_widget(p, chunks[0]);
+        
+        let t2 = vec![Text::styled(&self.send_msg, Style::default().fg(Color::Blue))];
+        let p2 = Paragraph::new(t2.iter())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -125,7 +128,9 @@ impl RenderWidget for MessageWidget {
                     .title("Send")
                     .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
             )
-            .wrap(true)
-            .render(f, chunks[1]);
+            .wrap(true);
+        
+        f.render_widget(p2, chunks[1]);
     }
 }
+

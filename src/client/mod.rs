@@ -91,7 +91,7 @@ impl MatrixClient {
         msg: MessageEventContent,
     ) -> Result<create_message_event::Response> {
         self.inner
-            .room_send(&id.to_string(), msg)
+            .room_send(&id, msg)
             .await
             .context("Message failed to send")
     }

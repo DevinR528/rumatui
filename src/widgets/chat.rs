@@ -28,8 +28,9 @@ impl ChatWidget {
         &mut self,
         rooms: HashMap<RoomId, Arc<Mutex<Room>>>,
     ) {
-        self.msgs.current_room = Rc::clone(&self.current_room);
-        self.room.populate_rooms(rooms, Rc::clone(&self.current_room)).await;
+        self.room.populate_rooms(rooms).await;
+        self.msgs.current_room = Rc::clone(&self.room.current_room);
+        self.current_room = Rc::clone(&self.room.current_room);
     }
 
     pub fn on_click(&mut self, _btn: MouseButton, _x: u16, _y: u16) {}

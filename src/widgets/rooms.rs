@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use tui::backend::Backend;
 use tui::layout::Rect;
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, List, Text, Widget};
+use tui::widgets::{Block, Borders, List, Text};
 use tui::Frame;
 
 use super::app::RenderWidget;
@@ -86,7 +86,7 @@ impl<I> IndexMut<usize> for ListState<I> {
 pub struct RoomsWidget {
     area: Rect,
     /// This is the RoomId of the last used room, the room to show on startup.
-    current: Rc<RefCell<Option<RoomId>>>,
+    pub(crate) current_room: Rc<RefCell<Option<RoomId>>>,
     /// List of displayable room name and room id
     pub names: ListState<(String, RoomId)>,
     /// Map of room id and matrix_sdk::Room
@@ -102,11 +102,8 @@ impl RoomsWidget {
     pub(crate) async fn populate_rooms(
         &mut self,
         rooms: HashMap<RoomId, Arc<Mutex<Room>>>,
-        current: Rc<RefCell<Option<RoomId>>>,
     ) {
         self.rooms = rooms.clone();
-        self.current = current;
-
         let mut items: Vec<(String, RoomId)> = Vec::default();
         for (id, room) in &rooms {
             let r = room.lock().await;
@@ -116,9 +113,8 @@ impl RoomsWidget {
             items.push((r.calculate_name(), id.clone()));
         }
 
-        let mut curr = self.current.borrow_mut();
         if let Some((_name, id)) = items.first() {
-            *curr = Some(id.clone());
+            *self.current_room.borrow_mut() = Some(id.clone());
         }
 
         self.names = ListState::new(items);
@@ -132,8 +128,7 @@ impl RoomsWidget {
     pub fn select_next(&mut self) {
         self.names.select_next();
         if let Some((_name, id)) = self.names.get_selected() {
-            let mut curr = self.current.borrow_mut();
-            *curr = Some(id.clone());
+            *self.current_room.borrow_mut() = Some(id.clone());
         }
     }
 
@@ -141,8 +136,7 @@ impl RoomsWidget {
     pub fn select_previous(&mut self) {
         self.names.select_previous();
         if let Some((_name, id)) = self.names.get_selected() {
-            let mut curr = self.current.borrow_mut();
-            *curr = Some(id.clone());
+            *self.current_room.borrow_mut() = Some(id.clone());
         }
     }
 }
@@ -189,9 +183,10 @@ impl RenderWidget for RoomsWidget {
                 }
             })
             .skip(offset as usize);
-        List::new(item)
+        let list = List::new(item)
             .block(Block::default().borders(Borders::ALL).title("Rooms"))
-            .style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD))
-            .render(f, area);
+            .style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD));
+            
+        f.render_widget(list, area);
     }
 }

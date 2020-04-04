@@ -43,20 +43,18 @@ impl<'e> RenderWidget for ErrorWidget<'e> {
                 .as_ref(),
             )
             .split(f.size());
-
-        Paragraph::new(
-            [Text::styled(
-                self.0.to_string(),
-                Style::default().fg(Color::Red),
-            )]
-            .iter(),
-        )
+        
+        let txt = [Text::styled(
+            self.0.to_string(),
+            Style::default().fg(Color::Red),
+        )];
+        let p = Paragraph::new(txt.iter())
         .block(
             Block::default()
                 .title("Error")
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Red)),
-        )
-        .render(f, chunks[1])
+        );
+        f.render_widget(p, chunks[1])
     }
 }

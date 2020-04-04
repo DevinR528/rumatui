@@ -3,7 +3,7 @@ use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, Text, Widget};
-use tui::Frame;
+use tui::{Frame, Terminal};
 
 use super::app::RenderWidget;
 
@@ -103,10 +103,10 @@ impl RenderWidget for LoginWidget {
             )
             .split(area);
 
-        Block::default()
+        let blk = Block::default()
             .title("Log In")
-            .borders(Borders::ALL)
-            .render(f, chunks[1]);
+            .borders(Borders::ALL);
+        f.render_widget(blk, chunks[1]);
 
         let height_chunk = Layout::default()
             .direction(Direction::Vertical)
@@ -140,15 +140,14 @@ impl RenderWidget for LoginWidget {
                 .border_style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD))
                 .borders(Borders::ALL);
 
-            Paragraph::new(
-                [Text::styled(
-                    &".".repeat(self.waiting.count),
-                    Style::default().fg(Color::Magenta),
-                )]
-                .iter(),
-            )
-            .block(blk)
-            .render(f, width_chunk1[1]);
+            let t = [Text::styled(
+                ".".repeat(self.waiting.count),
+                Style::default().fg(Color::Magenta),
+            )];
+            let p = Paragraph::new(t.iter())
+                .block(blk);
+
+            f.render_widget(p, width_chunk1[1]);
         } else {
             let (high_user, high_pass) = if self.login.selected == LoginSelect::Username {
                 (
@@ -169,15 +168,14 @@ impl RenderWidget for LoginWidget {
             };
 
             // User name
-            Paragraph::new(
-                [Text::styled(
-                    &self.login.username,
-                    Style::default().fg(Color::Cyan),
-                )]
-                .iter(),
-            )
-            .block(high_user)
-            .render(f, width_chunk1[1]);
+            let t = [Text::styled(
+                &self.login.username,
+                Style::default().fg(Color::Cyan),
+            )];
+            let p = Paragraph::new(t.iter())
+                .block(high_user);
+
+            f.render_widget(p, width_chunk1[1]);
 
             // Password from here down
             let width_chunk2 = Layout::default()
@@ -195,15 +193,14 @@ impl RenderWidget for LoginWidget {
             self.user_area = width_chunk1[1];
             self.password_area = width_chunk2[1];
 
-            Paragraph::new(
-                [Text::styled(
-                    "*".repeat(self.login.password.len()),
-                    Style::default().fg(Color::Cyan),
-                )]
-                .iter(),
-            )
-            .block(high_pass)
-            .render(f, width_chunk2[1])
+            let t2 = [Text::styled(
+                "*".repeat(self.login.password.len()),
+                Style::default().fg(Color::Cyan),
+            )];
+            let p2 = Paragraph::new(t2.iter())
+                .block(high_pass);
+
+            f.render_widget(p2, width_chunk2[1])
         }
     }
 }

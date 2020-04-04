@@ -55,7 +55,6 @@ fn main() {
         let parser = Parser::new_ext(&input, options);
         let syntax_set = SyntaxSet::load_defaults_nonewlines();
 
-        println!("{:?}", TerminalCapabilities::detect().name);
         let mut w = Writter::default();
         mdcat::push_tty(
             &mut w,

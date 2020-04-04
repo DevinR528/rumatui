@@ -7,6 +7,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d2e7343e7fc9de883d1b0341e0b13970f764c14101234857d2ddafa1cb1cac2"
 
 [[package]]
+name = "ahash"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0989268a37e128d4d7a8028f1c60099430113fdbc70419010601ce51a228e4fe"
+dependencies = [
+ "const-random",
+]
+
+[[package]]
 name = "ansi_term"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -53,6 +62,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "atomic"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c210c1f4db048cda477b652d170572d84c9640695835f17663595d3bd543fc28"
 
 [[package]]
 name = "atty"
@@ -198,6 +213,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0dbbb57365263e881e805dc77d94697c9118fd94d8da011240555aa7b23445bd"
 
 [[package]]
+name = "const-random"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f1af9ac737b2dd2d577701e59fd09ba34822f6f2ebdb30a7647405d9e55e16a"
+dependencies = [
+ "const-random-macro",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "const-random-macro"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25e4c606eb459dd29f7c57b2e0879f2b6f14ee130918c2b78ccb58a9624e6c7a"
+dependencies = [
+ "getrandom",
+ "proc-macro-hack",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -277,6 +312,17 @@ dependencies = [
  "autocfg",
  "cfg-if",
  "lazy_static",
+]
+
+[[package]]
+name = "dashmap"
+version = "3.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0899c830f359a74834c84ed43b4c0cb6fd714a6fa64e20ab78c78f8cf86d8fc0"
+dependencies = [
+ "ahash",
+ "cfg-if",
+ "num_cpus",
 ]
 
 [[package]]
@@ -671,9 +717,9 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.8.2"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f56a2d0bc861f9165be4eb3442afd3c236d8a98afd426f65d92324ae1091a484"
+checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
 dependencies = [
  "either",
 ]
@@ -705,9 +751,9 @@ dependencies = [
 
 [[package]]
 name = "js_int"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4937d8b6672d78c0dd9689d671e3faf2c9744fa36cbcb437e22cc8b1bd59ac25"
+checksum = "f97dc0d13f3bf0369f00504ad806499490045d6f93524a6ead4081c380703a2f"
 dependencies = [
  "serde",
 ]
@@ -773,8 +819,11 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 [[package]]
 name = "matrix-sdk"
 version = "0.1.0"
+source = "git+https://github.com/matrix-org/matrix-rust-sdk/#eff322c0c55f3213e768da927439bb5dec84ce40"
 dependencies = [
  "async-trait",
+ "atomic",
+ "dashmap",
  "futures",
  "http",
  "js_int",
@@ -1311,8 +1360,8 @@ dependencies = [
 
 [[package]]
 name = "ruma-client-api"
-version = "0.6.0"
-source = "git+https://github.com/matrix-org/ruma-client-api/#7bb066fe50638189ee95d7b2517b247bffabc5ee"
+version = "0.7.0"
+source = "git+https://github.com/matrix-org/ruma-client-api/#8acfb1688e6d0176151753c911f4320a0defb7c5"
 dependencies = [
  "http",
  "js_int",
@@ -1327,8 +1376,8 @@ dependencies = [
 
 [[package]]
 name = "ruma-events"
-version = "0.17.0"
-source = "git+https://github.com/matrix-org/ruma-events#bca29711e6b7c386cc25064013a26d27ad4088e7"
+version = "0.18.0"
+source = "git+https://github.com/matrix-org/ruma-events#65e03b5fd9724bffe97931ac07f34df0fe134e8e"
 dependencies = [
  "js_int",
  "ruma-events-macros",
@@ -1339,8 +1388,8 @@ dependencies = [
 
 [[package]]
 name = "ruma-events-macros"
-version = "0.2.0"
-source = "git+https://github.com/matrix-org/ruma-events#bca29711e6b7c386cc25064013a26d27ad4088e7"
+version = "0.3.0"
+source = "git+https://github.com/matrix-org/ruma-events#65e03b5fd9724bffe97931ac07f34df0fe134e8e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1379,6 +1428,7 @@ dependencies = [
  "termion",
  "tokio",
  "tui",
+ "unicode-width",
  "url",
 ]
 
@@ -1456,18 +1506,18 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.105"
+version = "1.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e707fbbf255b8fc8c3b99abb91e7257a622caeb20a9818cbadbeeede4e0932ff"
+checksum = "36df6ac6412072f67cf767ebbde4133a5b2e88e76dc6187fa7104cd16f783399"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.105"
+version = "1.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac5d00fc561ba2724df6758a17de23df5914f20e41cb00f94d5b7ae42fffaff8"
+checksum = "9e549e3abf4fb8621bd1609f11dfc9f5e50320802273b12f3811a67e6716ea6c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1665,9 +1715,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.15"
+version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "619cdb2245c40c42d563089b72e80c5df659513d667a017598439ef7a7b1ffe1"
+checksum = "ee5a0dd887e37d37390c13ff8ac830f992307fe30a1fff0ab8427af67211ba28"
 dependencies = [
  "bytes",
  "fnv",
@@ -1772,14 +1822,12 @@ checksum = "e604eb7b43c06650e854be16a2a03155743d3752dd1c943f6829e26b7a36e382"
 [[package]]
 name = "tui"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b871b61f4c4b81e630215cd12e0ec29953d4545898e21a9e023b7520a74a9f9"
+source = "git+https://github.com/fdehau/tui-rs/#867ba1fd8c1a3bc02457333a74a7023e5cd2a7e0"
 dependencies = [
  "bitflags",
  "cassowary",
  "either",
  "itertools",
- "log",
  "termion",
  "unicode-segmentation",
  "unicode-width",
