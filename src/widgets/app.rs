@@ -8,7 +8,7 @@ use tokio::sync::mpsc::{self};
 use tui::backend::Backend;
 use tui::layout::{Constraint, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Widget};
+use tui::widgets::{Block, Borders};
 use tui::{Frame, Terminal};
 
 use super::chat::ChatWidget;
@@ -42,6 +42,8 @@ pub struct AppWidget {
     pub should_quit: bool,
     /// Have we started the sync loop yet.
     pub sync_started: bool,
+    /// The number of ticks since last sync
+    pub ticks: usize,
     /// The login element. This knows how to render and also holds the state of logging in.
     pub login_w: LoginWidget,
     /// The main screen. Holds the state once a user is logged in.
@@ -68,6 +70,7 @@ impl AppWidget {
             title: "RumaTui".to_string(),
             should_quit: false,
             sync_started: false,
+            ticks: 0,
             login_w: LoginWidget::default(),
             chat: ChatWidget::default(),
             ev_loop,
@@ -139,25 +142,25 @@ impl AppWidget {
             if self.chat.msgs.add_char(c) {
                 // unfortunately we have to do it this way or we have a mutable borrow in the scope of immutable
                 
-                // let res = if let Some(room) = self.chat.current_room.borrow().as_ref() {
-                //     match self.chat.msgs.get_sending_message() {
-                //         Ok(msg) => {
-                //             if let Err(e) = self.send_jobs
-                //                 .send(UserRequest::SendMessage(room.clone(), msg))
-                //                 .await {
-                //                     Err(anyhow::Error::from(e))
-                //                 } else {
-                //                     Ok(())
-                //                 }
-                //         }
-                //         Err(e) => Err(e),
-                //     }
-                // } else {
-                //     Ok(())
-                // };
-                // if let Err(e) = res {
-                //     self.set_error(Error::from(e));
-                // }
+                let res = if let Some(room) = self.chat.current_room.borrow().as_ref() {
+                    match self.chat.msgs.get_sending_message() {
+                        Ok(msg) => {
+                            if let Err(e) = self.send_jobs
+                                .send(UserRequest::SendMessage(room.clone(), msg))
+                                .await {
+                                    Err(anyhow::Error::from(e))
+                                } else {
+                                    Ok(())
+                                }
+                        }
+                        Err(e) => Err(e),
+                    }
+                } else {
+                    Ok(())
+                };
+                if let Err(e) = res {
+                    self.set_error(Error::from(e));
+                }
             }
         }
     }
@@ -204,8 +207,8 @@ impl AppWidget {
                     self.set_error(e)
                 }
                 // TODO this has the EventId which we need to keep
-                RequestResult::SendMessage(Ok(_res)) => {
-
+                RequestResult::SendMessage(Ok(res)) => {
+                    println!("{:?}", res);
                 }
                 RequestResult::SendMessage(Err(e)) => {
                     self.set_error(e)
@@ -223,6 +226,22 @@ impl AppWidget {
                 _ => {}
             },
             _ => {}
+        }
+
+        if self.sync_started && self.ticks == 10 {
+            self.ticks = 0;
+            if let Err(e) = self
+                .send_jobs
+                .send(UserRequest::Sync)
+                .await
+            {
+                self.set_error(Error::from(e));
+            }
+        }
+
+        // increment tick counter for next sync
+        if self.login_w.logged_in && self.chat.main_screen {
+            self.ticks += 1;
         }
     }
 

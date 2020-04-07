@@ -34,7 +34,7 @@ fn main() -> Result<(), failure::Error> {
     runtime.block_on(async {
         let mut app = AppWidget::new(executor).await;
         let events = UiEventHandle::with_config(Config {
-            tick_rate: Duration::from_millis(60),
+            tick_rate: Duration::from_millis(100),
             exit_key: termion::event::Key::Ctrl('q'),
         });
         let stdout = io::stdout().into_raw_mode()?;

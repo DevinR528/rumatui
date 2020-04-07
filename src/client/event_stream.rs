@@ -112,12 +112,17 @@ impl EventEmitter for EventStream {
             sender.localpart().into()
         };
         match content {
-            MessageEventContent::Text(TextMessageEventContent { body: msg_body, .. }) => {
+            MessageEventContent::Text(TextMessageEventContent { body: msg_body, formatted_body, .. }) => {
+                let msg = if let Some(_fmted) = formatted_body {
+                    crate::widgets::utils::markdown_to_terminal(msg_body).unwrap_or(msg_body.clone())
+                } else {
+                    msg_body.clone()
+                };
                 if let Err(e) = self
                     .send
                     .send(StateResult::Message(
                         name,
-                        msg_body.clone(),
+                        msg,
                         room_id.clone(),
                     ))
                     .await

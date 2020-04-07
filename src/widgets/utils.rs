@@ -3,6 +3,7 @@ use std::fmt::{self, Display};
 use pulldown_cmark::{Options, Parser};
 use syntect::parsing::SyntaxSet;
 use mdcat::{self, ResourceAccess, TerminalCapabilities, TerminalSize};
+use comrak;
 
 #[derive(Default)]
 pub struct Writter(Vec<u8>);
@@ -30,7 +31,7 @@ fn test_html_write() {
     
 }
 
-pub(crate) fn write_markdown_string(input: &str) -> Result<String, anyhow::Error> {
+pub(crate) fn markdown_to_terminal(input: &str) -> Result<String, anyhow::Error> {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TASKLISTS);
     options.insert(Options::ENABLE_STRIKETHROUGH);
@@ -49,4 +50,8 @@ pub(crate) fn write_markdown_string(input: &str) -> Result<String, anyhow::Error
     ).map_err(|e| anyhow::Error::new(Error::new(ErrorKind::Other, e.to_string())))?;
 
     Ok(w.to_string())
+}
+
+pub(crate) fn markdown_to_html(input: &str) -> String {
+    comrak::markdown_to_html(input, &comrak::ComrakOptions::default())
 }

@@ -2,9 +2,9 @@ pub mod app;
 pub mod chat;
 pub mod error;
 mod login;
-mod msgs;
+mod message;
 mod rooms;
-mod utils;
+pub mod utils;
 
 #[cfg(test)]
 mod test {

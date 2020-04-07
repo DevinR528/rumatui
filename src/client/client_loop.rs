@@ -19,6 +19,7 @@ use matrix_sdk::api::r0::message::create_message_event as create_msg;
 pub enum UserRequest {
     Login(String, String),
     SendMessage(RoomId, MessageEventContent),
+    Sync,
     Quit,
 }
 unsafe impl Send for UserRequest {}
@@ -28,6 +29,7 @@ impl fmt::Debug for UserRequest {
         match self {
             Self::Login(_, _) => write!(f, "failed login"),
             Self::SendMessage(_, _) => write!(f, "failed sending message"),
+            Self::Sync => write!(f, "syncing filed"),
             Self::Quit => write!(f, "quitting filed"),
         }
     }
@@ -72,28 +74,33 @@ impl MatrixEventHandle {
         let quitting = Arc::clone(&quit_flag);
         // this loop uses the above `AtomicBool` to signal shutdown.
         let sync_jobs = exec_hndl.spawn(async move {
-            while !is_sync.load(Ordering::SeqCst) {
-                if quitting.load(Ordering::SeqCst) {
-                    return Ok(());
-                }
+        //     while !is_sync.load(Ordering::SeqCst) {
+        //         if quitting.load(Ordering::SeqCst) {
+        //             return Ok(());
+        //         }
 
-                std::sync::atomic::spin_loop_hint();
-            }
+        //         std::sync::atomic::spin_loop_hint();
+        //     }
 
-            if quitting.load(Ordering::SeqCst) {
-                return Ok(());
-            }
+        //     if quitting.load(Ordering::SeqCst) {
+        //         return Ok(());
+        //     }
 
-            let set = matrix_sdk::SyncSettings::default();
-            let mut c = cli.lock().await;
-            c.sync_forever(set).await
+            // let set = matrix_sdk::SyncSettings::default();
+            // loop {
+            //     let mut c = cli.lock().await;
+            //     c.sync(set.clone()).await;
+            // }
+            Ok(())
         });
 
         // this loop is shutdown with a channel message
         let cli_jobs = exec_hndl.spawn(async move {
-            for input in recv.recv().await {
-                let input: UserRequest = input;
-                match input {
+            loop {
+                let input = recv.recv().await;
+                if input.is_none() { return Ok(()); }
+
+                match input.unwrap() {
                     UserRequest::Quit => return Ok(()),
                     UserRequest::Login(u, p) => {
                         let mut cli = client.lock().await;
@@ -109,9 +116,12 @@ impl MatrixEventHandle {
                             panic!("client event handler crashed {}", e)
                         }
                     }
+                    UserRequest::Sync => {
+                        let mut c = cli.lock().await;
+                        c.sync().await;
+                    }
                 }
             }
-            Ok(())
         });
 
         (

@@ -9,11 +9,11 @@ use tui::backend::{Backend};
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, Text};
-use tui::{Frame, Terminal};
+use tui::{Frame, buffer::Buffer};
 
-use super::app::{RenderWidget};
-use super::utils::write_markdown_string;
-
+use crate::widgets::app::{RenderWidget};
+use crate::widgets::utils::{markdown_to_html, markdown_to_terminal};
+use super::list::List;
 
 pub enum MsgType {
     PlainText,
@@ -62,7 +62,7 @@ impl MessageWidget {
             MsgType::FormattedText => Ok(MessageEventContent::Text(TextMessageEventContent {
                 body: self.send_msg.clone(),
                 format: Some("org.matrix.custom.html".into()),
-                formatted_body: Some(write_markdown_string(&self.send_msg)?),
+                formatted_body: Some(markdown_to_html(&self.send_msg)),
                 relates_to: None,
             })),
             _ => todo!("implement more sending messages")
@@ -71,7 +71,6 @@ impl MessageWidget {
 
     pub fn add_char(&mut self, ch: char) -> bool {
         if ch == '\n' {
-            self.messages.push((self.current_room.borrow().as_ref().unwrap().clone(), write_markdown_string(&self.send_msg).unwrap()));
             true
         } else {
             self.send_msg.push(ch);
@@ -102,12 +101,10 @@ impl RenderWidget for MessageWidget {
             .messages
             .iter()
             .filter(|(id, _)| Some(id) == cmp_id)
-            .map(|(_, msg)| msg.to_string())
-            .collect::<Vec<_>>()
-            .join("\n");
+            .map(|(_, msg)| Text::raw(msg))
+            .collect::<Vec<_>>();
 
-        let t = vec![Text::styled(text, Style::default().fg(Color::Blue))];
-        let p = Paragraph::new(t.iter())
+        let p = List::new(text)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -133,4 +130,3 @@ impl RenderWidget for MessageWidget {
         f.render_widget(p2, chunks[1]);
     }
 }
-

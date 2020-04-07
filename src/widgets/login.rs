@@ -2,8 +2,8 @@ use termion::event::MouseButton;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Paragraph, Text, Widget};
-use tui::{Frame, Terminal};
+use tui::widgets::{Block, Borders, Paragraph, Text};
+use tui::Frame;
 
 use super::app::RenderWidget;
 

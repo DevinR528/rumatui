@@ -12,7 +12,7 @@ use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::Frame;
 
 use super::app::RenderWidget;
-use super::msgs::MessageWidget;
+use super::message::msgs::MessageWidget;
 use super::rooms::RoomsWidget;
 
 #[derive(Clone, Debug, Default)]

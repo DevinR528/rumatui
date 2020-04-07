@@ -27,8 +27,8 @@ pub mod event_stream;
 pub struct MatrixClient {
     pub inner: AsyncClient,
     homeserver: String,
-    pub curr_sync: Option<String>,
     user: Option<UserId>,
+    settings: SyncSettings,
 }
 unsafe impl Send for MatrixClient {}
 
@@ -49,7 +49,7 @@ impl MatrixClient {
             inner: AsyncClient::new(homeserver_url, None)?,
             homeserver: homeserver.into(),
             user: None,
-            curr_sync: None,
+            settings: SyncSettings::default(),
         };
 
         Ok(client)
@@ -71,11 +71,14 @@ impl MatrixClient {
         Ok(self.inner.get_rooms().await)
     }
 
-    pub(crate) async fn sync_forever(&mut self, settings: matrix_sdk::SyncSettings) -> Result<()> {
+    pub(crate) async fn sync(&mut self) -> Result<()> {
         self.inner
-            .sync_forever(settings, move |_res| async {})
-            .await;
-        Ok(())
+            .sync(self.settings.to_owned())
+            .await
+            .map(|res| {
+                self.settings = SyncSettings::new().token(res.next_batch);
+            })
+            .map_err(|e| anyhow::Error::from(e))
     }
 
     /// Sends a MessageEvent to the specified room.
