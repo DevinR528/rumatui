@@ -74,23 +74,21 @@ impl MatrixEventHandle {
         let quitting = Arc::clone(&quit_flag);
         // this loop uses the above `AtomicBool` to signal shutdown.
         let sync_jobs = exec_hndl.spawn(async move {
-        //     while !is_sync.load(Ordering::SeqCst) {
-        //         if quitting.load(Ordering::SeqCst) {
-        //             return Ok(());
-        //         }
+            // while !is_sync.load(Ordering::SeqCst) {
+            //     if quitting.load(Ordering::SeqCst) {
+            //         return Ok(());
+            //     }
 
-        //         std::sync::atomic::spin_loop_hint();
-        //     }
+            //     std::sync::atomic::spin_loop_hint();
+            // }
 
-        //     if quitting.load(Ordering::SeqCst) {
-        //         return Ok(());
-        //     }
+            // if quitting.load(Ordering::SeqCst) {
+            //     return Ok(());
+            // }
 
             // let set = matrix_sdk::SyncSettings::default();
-            // loop {
-            //     let mut c = cli.lock().await;
-            //     c.sync(set.clone()).await;
-            // }
+            // let mut c = cli.lock().await;
+            // c.inner.sync_forever(set.clone(), |_| async {}).await;
             Ok(())
         });
 
@@ -117,9 +115,11 @@ impl MatrixEventHandle {
                         }
                     }
                     UserRequest::Sync => {
-                        let mut c = cli.lock().await;
+                        let mut c = client.lock().await;
                         c.sync().await;
                     }
+                    _ => {},
+                    
                 }
             }
         });

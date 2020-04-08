@@ -189,10 +189,10 @@ impl AppWidget {
 
     /// This checks once then continues returns to continue the ui loop.
     pub async fn on_tick(&mut self) {
-        if self.login_w.logged_in && !self.sync_started {
-            self.sync_started = true;
-            self.ev_loop.start_sync();
-        }
+        // if self.login_w.logged_in && !self.sync_started {
+        //     self.sync_started = true;
+        //     self.ev_loop.start_sync();
+        // }
         // this will login, send messages, and any other user initiated requests
         match self.ev_msgs.try_recv() {
             Ok(res) => match res {
