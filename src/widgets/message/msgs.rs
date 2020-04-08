@@ -13,7 +13,7 @@ use tui::{Frame, buffer::Buffer};
 
 use crate::widgets::app::{RenderWidget};
 use crate::widgets::utils::{markdown_to_html, markdown_to_terminal};
-use super::list::List;
+use super::ctrl_char;
 
 pub enum MsgType {
     PlainText,
@@ -101,10 +101,10 @@ impl RenderWidget for MessageWidget {
             .messages
             .iter()
             .filter(|(id, _)| Some(id) == cmp_id)
-            .map(|(_, msg)| Text::raw(msg))
+            .flat_map(|(_, msg)| ctrl_char::process_text(msg))
             .collect::<Vec<_>>();
 
-        let p = List::new(text)
+        let p = Paragraph::new(text.iter())
             .block(
                 Block::default()
                     .borders(Borders::ALL)

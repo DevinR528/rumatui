@@ -189,10 +189,9 @@ impl AppWidget {
 
     /// This checks once then continues returns to continue the ui loop.
     pub async fn on_tick(&mut self) {
-        // if self.login_w.logged_in && !self.sync_started {
-        //     self.sync_started = true;
-        //     self.ev_loop.start_sync();
-        // }
+        if self.login_w.logged_in && !self.sync_started {
+            self.sync_started = true;
+        }
         // this will login, send messages, and any other user initiated requests
         match self.ev_msgs.try_recv() {
             Ok(res) => match res {
@@ -240,13 +239,12 @@ impl AppWidget {
         }
 
         // increment tick counter for next sync
-        if self.login_w.logged_in && self.chat.main_screen {
+        if self.sync_started {
             self.ticks += 1;
         }
     }
 
     pub async fn on_quit(&mut self) {
-        self.ev_loop.quit_sync();
         if self.send_jobs.send(UserRequest::Quit).await.is_err() {
             // TODO what should happen when a send fails
             return;

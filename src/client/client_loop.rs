@@ -42,9 +42,6 @@ unsafe impl Send for RequestResult {}
 
 pub struct MatrixEventHandle {
     cli_jobs: JoinHandle<Result<()>>,
-    sync_jobs: JoinHandle<Result<()>>,
-    start_sync: Arc<AtomicBool>,
-    quit_flag: Arc<AtomicBool>,
 }
 unsafe impl Send for MatrixEventHandle {}
 
@@ -64,33 +61,6 @@ impl MatrixEventHandle {
             .await;
 
         let client = Arc::new(Mutex::new(c));
-        let cli = Arc::clone(&client);
-
-        // when the ui loop logs in start_sync releases and starts `sync_forever`
-        let start_sync = Arc::from(AtomicBool::from(false));
-        let quit_flag = Arc::from(AtomicBool::from(false));
-
-        let is_sync = Arc::clone(&start_sync);
-        let quitting = Arc::clone(&quit_flag);
-        // this loop uses the above `AtomicBool` to signal shutdown.
-        let sync_jobs = exec_hndl.spawn(async move {
-            // while !is_sync.load(Ordering::SeqCst) {
-            //     if quitting.load(Ordering::SeqCst) {
-            //         return Ok(());
-            //     }
-
-            //     std::sync::atomic::spin_loop_hint();
-            // }
-
-            // if quitting.load(Ordering::SeqCst) {
-            //     return Ok(());
-            // }
-
-            // let set = matrix_sdk::SyncSettings::default();
-            // let mut c = cli.lock().await;
-            // c.inner.sync_forever(set.clone(), |_| async {}).await;
-            Ok(())
-        });
 
         // this loop is shutdown with a channel message
         let cli_jobs = exec_hndl.spawn(async move {
@@ -127,23 +97,8 @@ impl MatrixEventHandle {
         (
             MatrixEventHandle {
                 cli_jobs,
-                sync_jobs,
-                start_sync,
-                quit_flag,
             },
             app_sender,
         )
-    }
-
-    /// This is called after login and initial sync to start `AsyncClient::sync_forever` loop.
-    pub(crate) fn start_sync(&self) {
-        self.start_sync
-            .swap(true, std::sync::atomic::Ordering::SeqCst);
-    }
-
-    /// This is called when the user quits to signal the `tokio::Runtime` to shutdown.
-    pub(crate) fn quit_sync(&self) {
-        self.quit_flag
-            .swap(true, std::sync::atomic::Ordering::SeqCst);
     }
 }

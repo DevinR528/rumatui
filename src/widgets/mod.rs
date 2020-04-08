@@ -67,6 +67,6 @@ fn main() {
         )
         .expect("failed");
 
-        println!("{}", w.to_string());
+        println!("{:?}", w.to_string());
     }
 }
