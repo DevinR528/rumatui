@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use matrix_sdk::{
     self,
-    identifiers::{RoomId},
+    identifiers::{EventId, RoomId, UserId},
     EventEmitter, Room,
 };
 
@@ -53,12 +53,19 @@ use matrix_sdk::events::{
     // typing::TypingEvent,
     // CustomEvent, CustomRoomEvent, CustomStateEvent,
 };
-
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 
+#[derive(Clone, Debug)]
+pub struct Message {
+    pub name: String,
+    pub text: String,
+    pub user: UserId,
+    pub event_id: EventId,
+}
+
 pub enum StateResult {
-    Message(crate::UserIdStr, String, RoomId),
+    Message(Message, RoomId),
     Err,
 }
 unsafe impl Send for StateResult {}
@@ -103,7 +110,7 @@ impl EventEmitter for EventStream {
         let ev = ev.deref();
 
         let MessageEvent {
-            content, sender, ..
+            content, sender, event_id, ..
         } = ev;
 
         let name = if let Some(mem) = members.get(&sender) {
@@ -121,8 +128,7 @@ impl EventEmitter for EventStream {
                 if let Err(e) = self
                     .send
                     .send(StateResult::Message(
-                        name,
-                        msg,
+                        Message { name, user: sender.clone(), text: msg , event_id: event_id.clone() },
                         room_id.clone(),
                     ))
                     .await

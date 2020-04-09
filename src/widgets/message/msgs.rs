@@ -1,7 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use matrix_sdk::identifiers::RoomId;
+use itertools::Itertools;
+use matrix_sdk::identifiers::{EventId, RoomId};
 use matrix_sdk::events::room::message::{
     MessageEventContent, TextMessageEventContent,
 };
@@ -14,6 +15,7 @@ use tui::{Frame, buffer::Buffer};
 use crate::widgets::app::{RenderWidget};
 use crate::widgets::utils::{markdown_to_html, markdown_to_terminal};
 use super::ctrl_char;
+use crate::client::event_stream::Message;
 
 pub enum MsgType {
     PlainText,
@@ -34,12 +36,12 @@ pub struct MessageWidget {
     // TODO save this to a local "database" somehow
     /// This is the RoomId of the last used room.
     pub(crate) current_room: Rc<RefCell<Option<RoomId>>>,
-    messages: Vec<(RoomId, String)>,
+    messages: Vec<(RoomId, Message)>,
     send_msg: String,
 }
 
 impl MessageWidget {
-    pub fn add_message(&mut self, msg: String, room: RoomId) {
+    pub fn add_message(&mut self, msg: Message, room: RoomId) {
         self.messages.push((room, msg))
     }
 
@@ -101,6 +103,8 @@ impl RenderWidget for MessageWidget {
             .messages
             .iter()
             .filter(|(id, _)| Some(id) == cmp_id)
+            .unique_by(|(_id, msg)| &msg.event_id)
+            .map(|x| x)
             .flat_map(|(_, msg)| ctrl_char::process_text(msg))
             .collect::<Vec<_>>();
 

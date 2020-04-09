@@ -62,7 +62,6 @@ impl MatrixClient {
     ) -> Result<HashMap<RoomId, Arc<Mutex<Room>>>> {
         let res = self.inner.login(username, password, None, None).await?;
         self.user = Some(res.user_id.clone());
-
         let _response = self
             .inner
             .sync(SyncSettings::new().full_state(true))

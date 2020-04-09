@@ -165,9 +165,7 @@ impl RenderWidget for RoomsWidget {
         };
 
         // Render items
-        let item = self
-            .names
-            .items
+        let items = self.names.items
             .iter()
             .enumerate()
             .map(|(i, (name, _id))| {
@@ -183,7 +181,7 @@ impl RenderWidget for RoomsWidget {
                 }
             })
             .skip(offset as usize);
-        let list = List::new(item)
+        let list = List::new(items)
             .block(Block::default().borders(Borders::ALL).title("Rooms"))
             .style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD));
             

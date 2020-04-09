@@ -23,8 +23,9 @@ impl Default for Loading {
 }
 
 impl Loading {
-    pub fn tick(&mut self) {
-        if self.count > 10 {
+    pub fn tick(&mut self, max: u16) {
+        let max = (max - 1) as usize;
+        if self.count > max {
             self.add = false;
         }
         if self.count == 1 {
@@ -134,14 +135,14 @@ impl RenderWidget for LoginWidget {
             .split(height_chunk[1]);
 
         if self.logging_in {
-            self.waiting.tick();
+            self.waiting.tick(width_chunk1[1].width);
             let blk = Block::default()
                 .title("Loading")
                 .border_style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD))
                 .borders(Borders::ALL);
 
             let t = [Text::styled(
-                ".".repeat(self.waiting.count),
+                "*".repeat(self.waiting.count),
                 Style::default().fg(Color::Magenta),
             )];
             let p = Paragraph::new(t.iter())

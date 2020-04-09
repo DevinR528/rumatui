@@ -218,10 +218,10 @@ impl AppWidget {
 
         match self.emitter_msgs.try_recv() {
             Ok(res) => match res {
-                StateResult::Message(user, msg, room) => self
+                StateResult::Message(msg, room) => self
                     .chat
                     .msgs
-                    .add_message(format!("{} {}", user, msg), room),
+                    .add_message(msg, room),
                 _ => {}
             },
             _ => {}
