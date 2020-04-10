@@ -42,6 +42,8 @@ pub struct AppWidget {
     pub should_quit: bool,
     /// Have we started the sync loop yet.
     pub sync_started: bool,
+    /// Have we started a scroll request.
+    pub scrolling: bool,
     /// The number of ticks since last sync
     pub ticks: usize,
     /// The login element. This knows how to render and also holds the state of logging in.
@@ -70,6 +72,7 @@ impl AppWidget {
             title: "RumaTui".to_string(),
             should_quit: false,
             sync_started: false,
+            scrolling: false,
             ticks: 0,
             login_w: LoginWidget::default(),
             chat: ChatWidget::default(),
@@ -89,17 +92,21 @@ impl AppWidget {
         self.chat.room.on_click(btn, x, y)
     }
 
+    /// TODO limit scrolling for older messages
     pub async fn on_scroll_up(&mut self, x: u16, y: u16) {
         if self.chat.main_screen {
             if self.chat.msgs.on_scroll_up(x, y) {
-                let room_id = self.chat.room.current_room.borrow().as_ref().unwrap().clone();
-                if let Err(e) = self
-                        .send_jobs
-                        .send(UserRequest::RoomMsgs(room_id))
-                        .await
-                    {
-                        self.set_error(anyhow::Error::from(e))
-                    }
+                if !self.scrolling {
+                    self.scrolling = true;
+                    let room_id = self.chat.room.current_room.borrow().as_ref().unwrap().clone();
+                    if let Err(e) = self
+                            .send_jobs
+                            .send(UserRequest::RoomMsgs(room_id))
+                            .await
+                        {
+                            self.set_error(anyhow::Error::from(e))
+                        }
+                }
             }
         }
     }
@@ -226,7 +233,7 @@ impl AppWidget {
                 // TODO this has the EventId which we need to keep
                 RequestResult::SendMessage(Ok(_res)) => { println!("msg sent") }
                 RequestResult::SendMessage(Err(e)) => self.set_error(e),
-                RequestResult::RoomMsgs(Ok(_res)) => {  },
+                RequestResult::RoomMsgs(Ok(_res)) => self.scrolling = false,
                 RequestResult::RoomMsgs(Err(e)) => self.set_error(e),
 
                 // sync error

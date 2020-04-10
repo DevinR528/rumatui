@@ -29,7 +29,7 @@ pub struct MatrixClient {
     user: Option<UserId>,
     settings: SyncSettings,
     next_batch: Option<String>,
-    last_scroll: Option<String>,
+    last_scroll: HashMap<RoomId, String>,
 }
 unsafe impl Send for MatrixClient {}
 
@@ -52,7 +52,7 @@ impl MatrixClient {
             user: None,
             settings: SyncSettings::default(),
             next_batch: None,
-            last_scroll: None,
+            last_scroll: HashMap::new(),
         };
 
         Ok(client)
@@ -124,7 +124,7 @@ impl MatrixClient {
         &mut self,
         id: &RoomId,
     ) -> Result<get_message_events::IncomingResponse> {
-        let from = if let Some(scroll) = &self.last_scroll {
+        let from = if let Some(scroll) = self.last_scroll.get(id) {
             scroll.clone()
         } else {
             self.next_batch.as_ref().unwrap().clone()
@@ -140,7 +140,7 @@ impl MatrixClient {
 
         match self.inner.send(request).await.map_err(|e| anyhow::Error::from(e)) {
             Ok(res) => {
-                self.last_scroll = Some(res.end.clone());
+                self.last_scroll.insert(id.clone(), res.start.clone());
                 Ok(res)
             },
             Err(err) => Err(err),
