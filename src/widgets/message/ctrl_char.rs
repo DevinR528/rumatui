@@ -1,6 +1,6 @@
 use muncher::Muncher;
-use tui::widgets::{Block, Borders, Paragraph, Text};
 use tui::style::{Color, Modifier, Style};
+use tui::widgets::Text;
 
 use crate::client::event_stream::Message;
 
@@ -33,7 +33,10 @@ impl CtrlChunk {
             let ws = munch.eat_until(|c| !c.is_whitespace()).collect::<String>();
             link.push_str(&ws);
 
-            return Self { ctrl: vec![ "8;;".to_string() ], text: link, }
+            return Self {
+                ctrl: vec!["8;;".to_string()],
+                text: link,
+            };
         }
 
         munch.reset_peek();
@@ -42,7 +45,7 @@ impl CtrlChunk {
         }
 
         let text_or_ctrl = munch.eat_until(|c| *c == '\u{1b}').collect::<String>();
-        
+
         if text_or_ctrl.is_empty() {
             return Self {
                 ctrl: Vec::new(),
@@ -61,7 +64,7 @@ impl CtrlChunk {
             loop {
                 let ctrl_text = text_or_ctrl.splitn(2, 'm').collect::<Vec<_>>();
 
-                let mut ctrl = vec![ ctrl_text[0].replace("[", "") ];
+                let mut ctrl = vec![ctrl_text[0].replace("[", "")];
                 if ctrl[0].contains(';') {
                     ctrl = ctrl[0].split(';').map(|s| s.to_string()).collect();
                 }
@@ -77,7 +80,7 @@ impl CtrlChunk {
                     return Self {
                         ctrl: ctrl_chars,
                         text,
-                    }
+                    };
                 }
             }
         } else {
@@ -272,7 +275,10 @@ impl CtrlChars {
                 parsed.push(CtrlChunk::parse(&mut munch))
             }
         }
-        Self { input: input.to_string(), parsed, }
+        Self {
+            input: input.to_string(),
+            parsed,
+        }
     }
 
     pub fn into_text<'a>(self) -> Vec<Text<'a>> {
@@ -292,21 +298,20 @@ pub fn process_text<'a>(msg: &'a Message) -> Vec<Text<'a>> {
 
     let body = CtrlChars::parse(msg).into_text();
 
-    let mut formatted = vec![ Text::styled(name, Style::default().fg(Color::Magenta)) ];
+    let mut formatted = vec![Text::styled(name, Style::default().fg(Color::Magenta))];
     formatted.extend(body);
 
     formatted
-} 
-
+}
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::io::{self, Write};
-    use std::fmt::{self, Display};
-    use pulldown_cmark::{Options, Parser};
-    use syntect::parsing::SyntaxSet;
     use mdcat::{self, ResourceAccess, TerminalCapabilities, TerminalSize};
+    use pulldown_cmark::{Options, Parser};
+    use std::fmt::{self, Display};
+    use std::io::{self, Write};
+    use syntect::parsing::SyntaxSet;
 
     #[derive(Default)]
     pub struct Writter(Vec<u8>);
@@ -318,7 +323,9 @@ mod test {
             Ok(buf.len())
         }
         #[inline]
-        fn flush(&mut self) -> io::Result<()> { Ok(()) }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
     }
     impl Display for Writter {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -342,7 +349,7 @@ fn main() {
     println!("hello");
 }
 ```"#;
-        
+
         let mut options = Options::empty();
         options.insert(Options::ENABLE_TASKLISTS);
         options.insert(Options::ENABLE_STRIKETHROUGH);
@@ -368,7 +375,7 @@ fn main() {
     #[test]
     fn test_formatter2() {
         let input = r#"[`hi`](http://www.googlelskdnfodaf.com)"#;
-        
+
         let mut options = Options::empty();
         options.insert(Options::ENABLE_TASKLISTS);
         options.insert(Options::ENABLE_STRIKETHROUGH);
@@ -391,15 +398,13 @@ fn main() {
         println!("{:#?}", CtrlChars::parse(w.to_string()).into_text());
     }
 
-
     use tui::backend::TestBackend;
     use tui::layout::Alignment;
-    use tui::widgets::{Block, Borders, Paragraph, Text};
+    use tui::widgets::{Block, Borders, Paragraph};
     use tui::Terminal;
 
     #[test]
     fn paragraph_colors() {
-
         let input = r#"[google](http://www.google.com) `ruma-identifiers` __hello__
 # table
 - one
@@ -410,7 +415,7 @@ fn main() {
     println!("hello");
 }
 ```"#;
-        
+
         let mut options = Options::empty();
         options.insert(Options::ENABLE_TASKLISTS);
         options.insert(Options::ENABLE_STRIKETHROUGH);
@@ -476,9 +481,8 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
         .expect("failed");
 
         let parsed = CtrlChars::parse(w.to_string());
-        
+
         println!("{:#?}", parsed);
-        let text = parsed.into_text();
+        let _text = parsed.into_text();
     }
 }
-

@@ -89,6 +89,21 @@ impl AppWidget {
         self.chat.room.on_click(btn, x, y)
     }
 
+    pub async fn on_scroll_up(&mut self, x: u16, y: u16) {
+        if self.chat.main_screen {
+            if self.chat.msgs.on_scroll_up(x, y) {
+                let room_id = self.chat.room.current_room.borrow().as_ref().unwrap().clone();
+                if let Err(e) = self
+                        .send_jobs
+                        .send(UserRequest::RoomMsgs(room_id))
+                        .await
+                    {
+                        self.set_error(anyhow::Error::from(e))
+                    }
+            }
+        }
+    }
+
     pub fn on_up(&mut self) {
         if !self.login_w.logged_in {
             if let LoginSelect::Username = self.login_w.login.selected {
@@ -139,29 +154,7 @@ impl AppWidget {
                 self.login_w.login.password.push(c);
             }
         } else if self.chat.main_screen {
-            if self.chat.msgs.add_char(c) {
-                // unfortunately we have to do it this way or we have a mutable borrow in the scope of immutable
-                
-                let res = if let Some(room) = self.chat.current_room.borrow().as_ref() {
-                    match self.chat.msgs.get_sending_message() {
-                        Ok(msg) => {
-                            if let Err(e) = self.send_jobs
-                                .send(UserRequest::SendMessage(room.clone(), msg))
-                                .await {
-                                    Err(anyhow::Error::from(e))
-                                } else {
-                                    Ok(())
-                                }
-                        }
-                        Err(e) => Err(e),
-                    }
-                } else {
-                    Ok(())
-                };
-                if let Err(e) = res {
-                    self.set_error(Error::from(e));
-                }
-            }
+            self.chat.msgs.add_char(c);
         }
     }
 
@@ -182,6 +175,31 @@ impl AppWidget {
     }
 
     pub fn on_delete(&mut self) {}
+
+    pub async fn on_send(&mut self) {
+        // unfortunately we have to do it this way or we have a mutable borrow in the scope of immutable
+        let res = if let Some(room) = self.chat.current_room.borrow().as_ref() {
+            match self.chat.msgs.get_sending_message() {
+                Ok(msg) => {
+                    if let Err(e) = self
+                        .send_jobs
+                        .send(UserRequest::SendMessage(room.clone(), msg))
+                        .await
+                    {
+                        Err(anyhow::Error::from(e))
+                    } else {
+                        Ok(())
+                    }
+                }
+                Err(e) => Err(e),
+            }
+        } else {
+            Ok(())
+        };
+        if let Err(e) = res {
+            self.set_error(Error::from(e));
+        }
+    }
 
     fn set_error(&mut self, e: anyhow::Error) {
         self.error = Some(e);
@@ -206,22 +224,20 @@ impl AppWidget {
                     self.set_error(e)
                 }
                 // TODO this has the EventId which we need to keep
-                RequestResult::SendMessage(Ok(res)) => {
-                    println!("{:?}", res);
-                }
-                RequestResult::SendMessage(Err(e)) => {
-                    self.set_error(e)
-                }
+                RequestResult::SendMessage(Ok(_res)) => { println!("msg sent") }
+                RequestResult::SendMessage(Err(e)) => self.set_error(e),
+                RequestResult::RoomMsgs(Ok(_res)) => {  },
+                RequestResult::RoomMsgs(Err(e)) => self.set_error(e),
+
+                // sync error
+                RequestResult::Error(err) => self.set_error(err),
             },
             _ => {}
         }
 
         match self.emitter_msgs.try_recv() {
             Ok(res) => match res {
-                StateResult::Message(msg, room) => self
-                    .chat
-                    .msgs
-                    .add_message(msg, room),
+                StateResult::Message(msg, room) => self.chat.msgs.add_message(msg, room),
                 _ => {}
             },
             _ => {}
@@ -229,11 +245,7 @@ impl AppWidget {
 
         if self.sync_started && self.ticks == 10 {
             self.ticks = 0;
-            if let Err(e) = self
-                .send_jobs
-                .send(UserRequest::Sync)
-                .await
-            {
+            if let Err(e) = self.send_jobs.send(UserRequest::Sync).await {
                 self.set_error(Error::from(e));
             }
         }

@@ -43,13 +43,12 @@ impl<'e> RenderWidget for ErrorWidget<'e> {
                 .as_ref(),
             )
             .split(f.size());
-        
+
         let txt = [Text::styled(
             self.0.to_string(),
             Style::default().fg(Color::Red),
         )];
-        let p = Paragraph::new(txt.iter())
-        .block(
+        let p = Paragraph::new(txt.iter()).block(
             Block::default()
                 .title("Error")
                 .borders(Borders::ALL)

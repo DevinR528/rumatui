@@ -1579,6 +1579,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "itertools",
+ "js_int",
  "lazy_static",
  "matrix-sdk",
  "mdcat",

@@ -1,8 +1,8 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::{Index, IndexMut};
-use std::sync::Arc;
-use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use matrix_sdk::identifiers::RoomId;
 use matrix_sdk::Room;
@@ -99,16 +99,15 @@ impl RoomsWidget {
     /// ## Arguments
     ///  * rooms - A `HashMap` of room_id to `Room`.
     ///  * current is the current room id controlled by the ChatWidget.
-    pub(crate) async fn populate_rooms(
-        &mut self,
-        rooms: HashMap<RoomId, Arc<Mutex<Room>>>,
-    ) {
+    pub(crate) async fn populate_rooms(&mut self, rooms: HashMap<RoomId, Arc<Mutex<Room>>>) {
         self.rooms = rooms.clone();
         let mut items: Vec<(String, RoomId)> = Vec::default();
         for (id, room) in &rooms {
             let r = room.lock().await;
             // TODO when RoomId impls AsRef<str> cleanup
-            if items.iter().any(|(_name, rid)| id == rid) { continue; }
+            if items.iter().any(|(_name, rid)| id == rid) {
+                continue;
+            }
 
             items.push((r.calculate_name(), id.clone()));
         }
@@ -165,7 +164,9 @@ impl RenderWidget for RoomsWidget {
         };
 
         // Render items
-        let items = self.names.items
+        let items = self
+            .names
+            .items
             .iter()
             .enumerate()
             .map(|(i, (name, _id))| {
@@ -184,7 +185,7 @@ impl RenderWidget for RoomsWidget {
         let list = List::new(items)
             .block(Block::default().borders(Borders::ALL).title("Rooms"))
             .style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD));
-            
+
         f.render_widget(list, area);
     }
 }

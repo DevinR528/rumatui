@@ -2,20 +2,19 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use itertools::Itertools;
-use matrix_sdk::identifiers::{EventId, RoomId};
-use matrix_sdk::events::room::message::{
-    MessageEventContent, TextMessageEventContent,
-};
-use tui::backend::{Backend};
+use matrix_sdk::events::room::message::{MessageEventContent, TextMessageEventContent};
+use matrix_sdk::identifiers::RoomId;
+use termion::event::MouseButton;
+use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, Text};
-use tui::{Frame, buffer::Buffer};
+use tui::Frame;
 
-use crate::widgets::app::{RenderWidget};
-use crate::widgets::utils::{markdown_to_html, markdown_to_terminal};
 use super::ctrl_char;
 use crate::client::event_stream::Message;
+use crate::widgets::app::RenderWidget;
+use crate::widgets::utils::markdown_to_html;
 
 pub enum MsgType {
     PlainText,
@@ -67,18 +66,18 @@ impl MessageWidget {
                 formatted_body: Some(markdown_to_html(&self.send_msg)),
                 relates_to: None,
             })),
-            _ => todo!("implement more sending messages")
+            _ => todo!("implement more sending messages"),
         }
     }
 
-    pub fn add_char(&mut self, ch: char) -> bool {
-        if ch == '\n' {
-            true
-        } else {
-            self.send_msg.push(ch);
-            false
-        }
+    pub fn on_scroll_up(&mut self, x: u16, y: u16) -> bool {
+        self.area.intersects(Rect::new(x, y, 1, 1))
     }
+
+    pub fn add_char(&mut self, ch: char) {
+        self.send_msg.push(ch);
+    }
+
     pub fn pop(&mut self) {
         self.send_msg.pop();
     }
@@ -99,8 +98,10 @@ impl RenderWidget for MessageWidget {
             self.messages.first().map(|(id, _msg)| id)
         };
 
-        let text = self
-            .messages
+        // TODO no alloc
+        let mut messages = self.messages.clone();
+        messages.sort_by(|(_, msg), (_, msg2)| msg.timestamp.cmp(&msg2.timestamp));
+        let text = messages
             .iter()
             .filter(|(id, _)| Some(id) == cmp_id)
             .unique_by(|(_id, msg)| &msg.event_id)
@@ -119,8 +120,11 @@ impl RenderWidget for MessageWidget {
             .wrap(true);
 
         f.render_widget(p, chunks[0]);
-        
-        let t2 = vec![Text::styled(&self.send_msg, Style::default().fg(Color::Blue))];
+
+        let t2 = vec![Text::styled(
+            &self.send_msg,
+            Style::default().fg(Color::Blue),
+        )];
         let p2 = Paragraph::new(t2.iter())
             .block(
                 Block::default()
@@ -130,7 +134,7 @@ impl RenderWidget for MessageWidget {
                     .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
             )
             .wrap(true);
-        
+
         f.render_widget(p2, chunks[1]);
     }
 }

@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use std::sync::Arc;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use matrix_sdk::identifiers::RoomId;
 use matrix_sdk::Room;
@@ -24,10 +24,7 @@ pub struct ChatWidget {
 }
 
 impl ChatWidget {
-    pub(crate) async fn set_room_state(
-        &mut self,
-        rooms: HashMap<RoomId, Arc<Mutex<Room>>>,
-    ) {
+    pub(crate) async fn set_room_state(&mut self, rooms: HashMap<RoomId, Arc<Mutex<Room>>>) {
         self.room.populate_rooms(rooms).await;
         self.msgs.current_room = Rc::clone(&self.room.current_room);
         self.current_room = Rc::clone(&self.room.current_room);

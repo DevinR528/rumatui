@@ -104,9 +104,7 @@ impl RenderWidget for LoginWidget {
             )
             .split(area);
 
-        let blk = Block::default()
-            .title("Log In")
-            .borders(Borders::ALL);
+        let blk = Block::default().title("Log In").borders(Borders::ALL);
         f.render_widget(blk, chunks[1]);
 
         let height_chunk = Layout::default()
@@ -145,8 +143,7 @@ impl RenderWidget for LoginWidget {
                 "*".repeat(self.waiting.count),
                 Style::default().fg(Color::Magenta),
             )];
-            let p = Paragraph::new(t.iter())
-                .block(blk);
+            let p = Paragraph::new(t.iter()).block(blk);
 
             f.render_widget(p, width_chunk1[1]);
         } else {
@@ -173,8 +170,7 @@ impl RenderWidget for LoginWidget {
                 &self.login.username,
                 Style::default().fg(Color::Cyan),
             )];
-            let p = Paragraph::new(t.iter())
-                .block(high_user);
+            let p = Paragraph::new(t.iter()).block(high_user);
 
             f.render_widget(p, width_chunk1[1]);
 
@@ -198,8 +194,7 @@ impl RenderWidget for LoginWidget {
                 "*".repeat(self.login.password.len()),
                 Style::default().fg(Color::Cyan),
             )];
-            let p2 = Paragraph::new(t2.iter())
-                .block(high_pass);
+            let p2 = Paragraph::new(t2.iter()).block(high_pass);
 
             f.render_widget(p2, width_chunk2[1])
         }

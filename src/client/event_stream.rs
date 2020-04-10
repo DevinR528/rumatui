@@ -62,6 +62,7 @@ pub struct Message {
     pub text: String,
     pub user: UserId,
     pub event_id: EventId,
+    pub timestamp: js_int::UInt,
 }
 
 pub enum StateResult {
@@ -110,7 +111,11 @@ impl EventEmitter for EventStream {
         let ev = ev.deref();
 
         let MessageEvent {
-            content, sender, event_id, ..
+            content,
+            sender,
+            event_id,
+            origin_server_ts,
+            ..
         } = ev;
 
         let name = if let Some(mem) = members.get(&sender) {
@@ -119,16 +124,27 @@ impl EventEmitter for EventStream {
             sender.localpart().into()
         };
         match content {
-            MessageEventContent::Text(TextMessageEventContent { body: msg_body, formatted_body, .. }) => {
+            MessageEventContent::Text(TextMessageEventContent {
+                body: msg_body,
+                formatted_body,
+                ..
+            }) => {
                 let msg = if let Some(_fmted) = formatted_body {
-                    crate::widgets::utils::markdown_to_terminal(msg_body).unwrap_or(msg_body.clone())
+                    crate::widgets::utils::markdown_to_terminal(msg_body)
+                        .unwrap_or(msg_body.clone())
                 } else {
                     msg_body.clone()
                 };
                 if let Err(e) = self
                     .send
                     .send(StateResult::Message(
-                        Message { name, user: sender.clone(), text: msg , event_id: event_id.clone() },
+                        Message {
+                            name,
+                            user: sender.clone(),
+                            text: msg,
+                            event_id: event_id.clone(),
+                            timestamp: *origin_server_ts,
+                        },
                         room_id.clone(),
                     ))
                     .await
@@ -196,7 +212,6 @@ impl EventEmitter for EventStream {
         _: Arc<Mutex<Room>>,
         _event: Arc<Mutex<FullyReadEvent>>,
     ) {
-        
     }
 
     // `PresenceEvent` is a struct so there is only the one method

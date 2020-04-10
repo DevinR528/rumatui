@@ -4,7 +4,7 @@ use std::io::{self};
 
 use std::time::Duration;
 
-use termion::event::{Event as TermEvent, Key, MouseEvent};
+use termion::event::{Event as TermEvent, Key, MouseEvent, MouseButton};
 use termion::input::MouseTerminal;
 use termion::raw::IntoRawMode;
 
@@ -34,7 +34,7 @@ fn main() -> Result<(), failure::Error> {
     runtime.block_on(async {
         let mut app = AppWidget::new(executor).await;
         let events = UiEventHandle::with_config(Config {
-            tick_rate: Duration::from_millis(100),
+            tick_rate: Duration::from_millis(60),
             exit_key: termion::event::Key::Ctrl('q'),
         });
         let stdout = io::stdout().into_raw_mode()?;
@@ -42,7 +42,7 @@ fn main() -> Result<(), failure::Error> {
         let backend = TermionBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
         terminal.clear()?;
-
+        terminal.hide_cursor()?;
         loop {
             app.draw(&mut terminal)?;
 
@@ -54,6 +54,7 @@ fn main() -> Result<(), failure::Error> {
                 Event::Input(event) => match event {
                     TermEvent::Key(key) => match key {
                         Key::Ctrl(c) if c == 'q' => app.should_quit = true,
+                        Key::Ctrl(c) if c == 's' => app.on_send().await,
                         Key::Up => app.on_up(),
                         Key::Down => app.on_down(),
                         Key::Backspace => app.on_backspace(),
@@ -62,6 +63,9 @@ fn main() -> Result<(), failure::Error> {
                         _ => {}
                     },
                     TermEvent::Mouse(m) => match m {
+                        MouseEvent::Press(btn, x, y) if btn == MouseButton::WheelUp => {
+                            app.on_scroll_up(x, y).await
+                        },
                         MouseEvent::Press(btn, x, y) => app.on_click(btn, x, y),
                         MouseEvent::Release(_, _) => {}
                         MouseEvent::Hold(_, _) => {}

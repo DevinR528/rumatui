@@ -1,9 +1,9 @@
-use std::io::{self, Write, Error, ErrorKind};
-use std::fmt::{self, Display};
-use pulldown_cmark::{Options, Parser};
-use syntect::parsing::SyntaxSet;
-use mdcat::{self, ResourceAccess, TerminalCapabilities, TerminalSize};
 use comrak;
+use mdcat::{self, ResourceAccess, TerminalCapabilities, TerminalSize};
+use pulldown_cmark::{Options, Parser};
+use std::fmt::{self, Display};
+use std::io::{self, Error, ErrorKind, Write};
+use syntect::parsing::SyntaxSet;
 
 #[derive(Default)]
 pub struct Writter(Vec<u8>);
@@ -15,7 +15,9 @@ impl Write for Writter {
         Ok(buf.len())
     }
     #[inline]
-    fn flush(&mut self) -> io::Result<()> { Ok(()) }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 impl Display for Writter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -27,9 +29,7 @@ impl Display for Writter {
     }
 }
 
-fn test_html_write() {
-    
-}
+fn test_html_write() {}
 
 pub(crate) fn markdown_to_terminal(input: &str) -> Result<String, anyhow::Error> {
     let mut options = Options::empty();
@@ -42,12 +42,16 @@ pub(crate) fn markdown_to_terminal(input: &str) -> Result<String, anyhow::Error>
     mdcat::push_tty(
         &mut w,
         &TerminalCapabilities::detect(),
-        TerminalSize::detect().ok_or(anyhow::Error::new(Error::new(ErrorKind::Other, "could not detect terminal")))?,
+        TerminalSize::detect().ok_or(anyhow::Error::new(Error::new(
+            ErrorKind::Other,
+            "could not detect terminal",
+        )))?,
         parser,
         &std::path::Path::new("/"),
         ResourceAccess::RemoteAllowed,
         syntax_set,
-    ).map_err(|e| anyhow::Error::new(Error::new(ErrorKind::Other, e.to_string())))?;
+    )
+    .map_err(|e| anyhow::Error::new(Error::new(ErrorKind::Other, e.to_string())))?;
 
     Ok(w.to_string())
 }

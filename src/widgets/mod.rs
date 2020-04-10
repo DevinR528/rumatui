@@ -8,11 +8,11 @@ pub mod utils;
 
 #[cfg(test)]
 mod test {
-    use std::io::{self, Write};
-    use std::fmt::{self, Display};
-    use pulldown_cmark::{Options, Parser};
-    use syntect::parsing::SyntaxSet;
     use mdcat::{self, ResourceAccess, TerminalCapabilities, TerminalSize};
+    use pulldown_cmark::{Options, Parser};
+    use std::fmt::{self, Display};
+    use std::io::{self, Write};
+    use syntect::parsing::SyntaxSet;
 
     #[derive(Default)]
     pub struct Writter(Vec<u8>);
@@ -24,7 +24,9 @@ mod test {
             Ok(buf.len())
         }
         #[inline]
-        fn flush(&mut self) -> io::Result<()> { Ok(()) }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
     }
     impl Display for Writter {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -48,7 +50,7 @@ fn main() {
     println!("hello");
 }
 ```"#;
-        
+
         let mut options = Options::empty();
         options.insert(Options::ENABLE_TASKLISTS);
         options.insert(Options::ENABLE_STRIKETHROUGH);
