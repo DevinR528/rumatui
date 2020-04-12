@@ -16,6 +16,8 @@ use matrix_sdk::api::r0::message::create_message_event;
 use matrix_sdk::api::r0::message::get_message_events;
 use matrix_sdk::events::{room::message::MessageEventContent, EventResult};
 use matrix_sdk::identifiers::RoomId;
+use matrix_sdk::{AsyncClient, AsyncClientConfig};
+
 pub enum UserRequest {
     Login(String, String),
     SendMessage(RoomId, MessageEventContent),
@@ -52,16 +54,15 @@ unsafe impl Send for MatrixEventHandle {}
 impl MatrixEventHandle {
     pub async fn new(
         stream: EventStream,
-        to_app: Sender<RequestResult>,
+        mut to_app: Sender<RequestResult>,
         exec_hndl: Handle,
     ) -> (Self, Sender<UserRequest>) {
         let (app_sender, mut recv) = mpsc::channel(1024);
 
-        let mut tx = to_app.clone();
-
-        let mut c = MatrixClient::new("http://matrix.org").unwrap();
-        c.inner
-            .add_event_emitter(Arc::new(Mutex::new(Box::new(stream))))
+        let homeserver = "http://matrix.org";
+        
+        let mut c = MatrixClient::new(homeserver).unwrap();
+        c.inner.add_event_emitter(Arc::new(Mutex::new(Box::new(stream))))
             .await;
 
         let client = Arc::new(Mutex::new(c));
@@ -79,14 +80,14 @@ impl MatrixEventHandle {
                     UserRequest::Login(u, p) => {
                         let mut cli = client.lock().await;
                         let res = cli.login(u, p).await;
-                        if let Err(e) = tx.send(RequestResult::Login(res)).await {
+                        if let Err(e) = to_app.send(RequestResult::Login(res)).await {
                             panic!("client event handler crashed {}", e)
                         }
                     }
                     UserRequest::SendMessage(room, msg) => {
                         let mut cli = client.lock().await;
                         let res = cli.send_message(&room, msg).await;
-                        if let Err(e) = tx.send(RequestResult::SendMessage(res)).await {
+                        if let Err(e) = to_app.send(RequestResult::SendMessage(res)).await {
                             panic!("client event handler crashed {}", e)
                         }
                     }
@@ -103,12 +104,12 @@ impl MatrixEventHandle {
                                         base.emit_timeline_event(&room_id, e).await;
                                     }
                                 }
-                                if let Err(e) = tx.send(RequestResult::RoomMsgs(Ok(res))).await {
+                                if let Err(e) = to_app.send(RequestResult::RoomMsgs(Ok(res))).await {
                                     panic!("client event handler crashed {}", e)
                                 }
                             }
                             Err(get_msg_err) => {
-                                if let Err(e) = tx.send(RequestResult::Error(get_msg_err)).await {
+                                if let Err(e) = to_app.send(RequestResult::Error(get_msg_err)).await {
                                     panic!("client event handler crashed {}", e)
                                 }
                             }
@@ -117,7 +118,7 @@ impl MatrixEventHandle {
                     UserRequest::Sync => {
                         let mut c = client.lock().await;
                         if let Err(sync_err) = c.sync().await {
-                            if let Err(e) = tx.send(RequestResult::Error(sync_err)).await {
+                            if let Err(e) = to_app.send(RequestResult::Error(sync_err)).await {
                                 panic!("client event handler crashed {}", e)
                             }
                         }

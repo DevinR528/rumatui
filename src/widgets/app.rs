@@ -1,14 +1,14 @@
 use std::io;
+use std::time::{Duration, Instant};
 
 use anyhow::Error;
 use tokio::runtime::Handle;
-
 use termion::event::MouseButton;
 use tokio::sync::mpsc::{self};
 use tui::backend::Backend;
-use tui::layout::{Constraint, Layout, Rect};
+use tui::layout::{Constraint, Layout, Rect, Alignment};
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders};
+use tui::widgets::{Block, Borders, Paragraph, Text};
 use tui::{Frame, Terminal};
 
 use super::chat::ChatWidget;
@@ -44,8 +44,8 @@ pub struct AppWidget {
     pub sync_started: bool,
     /// Have we started a scroll request.
     pub scrolling: bool,
-    /// The number of ticks since last sync
-    pub ticks: usize,
+    /// The number time since last sync
+    pub last_sync: Instant,
     /// The login element. This knows how to render and also holds the state of logging in.
     pub login_w: LoginWidget,
     /// The main screen. Holds the state once a user is logged in.
@@ -73,7 +73,7 @@ impl AppWidget {
             should_quit: false,
             sync_started: false,
             scrolling: false,
-            ticks: 0,
+            last_sync: Instant::now(),
             login_w: LoginWidget::default(),
             chat: ChatWidget::default(),
             ev_loop,
@@ -92,7 +92,7 @@ impl AppWidget {
         self.chat.room.on_click(btn, x, y)
     }
 
-    /// TODO limit scrolling for older messages
+    /// TODO limit scrolling for older messages by time
     pub async fn on_scroll_up(&mut self, x: u16, y: u16) {
         if self.chat.main_screen {
             if self.chat.msgs.on_scroll_up(x, y) {
@@ -111,6 +111,12 @@ impl AppWidget {
         }
     }
 
+    pub fn on_scroll_down(&mut self, x: u16, y: u16) {
+        if self.chat.main_screen {
+            self.chat.msgs.on_scroll_down(x, y);
+        }
+    }
+
     pub fn on_up(&mut self) {
         if !self.login_w.logged_in {
             if let LoginSelect::Username = self.login_w.login.selected {
@@ -119,7 +125,8 @@ impl AppWidget {
                 self.login_w.login.selected = LoginSelect::Username;
             }
         } else if self.chat.main_screen {
-            self.chat.room.select_previous()
+            self.chat.room.select_previous();
+            self.chat.msgs.reset_scroll()
         }
     }
 
@@ -131,7 +138,8 @@ impl AppWidget {
                 self.login_w.login.selected = LoginSelect::Username;
             }
         } else if self.chat.main_screen {
-            self.chat.room.select_next()
+            self.chat.room.select_next();
+            self.chat.msgs.reset_scroll()
         }
     }
 
@@ -250,16 +258,12 @@ impl AppWidget {
             _ => {}
         }
 
-        if self.sync_started && self.ticks == 10 {
-            self.ticks = 0;
+        let now = Instant::now();
+        if self.sync_started && now <= self.last_sync + Duration::from_secs(2) {
+            self.last_sync = now;
             if let Err(e) = self.send_jobs.send(UserRequest::Sync).await {
                 self.set_error(Error::from(e));
             }
-        }
-
-        // increment tick counter for next sync
-        if self.sync_started {
-            self.ticks += 1;
         }
     }
 
@@ -275,15 +279,28 @@ impl DrawWidget for AppWidget {
     fn draw<B: Backend + Send>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
         terminal.draw(|mut f| {
             let chunks = Layout::default()
-                .constraints([Constraint::Length(2), Constraint::Min(0)].as_ref())
+                .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
                 .split(f.size());
 
-            let blk = Block::default()
-                .borders(Borders::ALL)
-                .title(&self.title)
-                .title_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD));
+            let text = if self.scrolling {
+                vec![ Text::styled("Loading previous messages", Style::new().fg(Color::Green)) ]
+            } else if !self.login_w.logged_in {
+                vec![ Text::styled("Login to a Matrix Server", Style::new().fg(Color::Green)) ]
+            } else if self.chat.main_screen {
+                vec![ Text::styled("Chatting", Style::new().fg(Color::Green)) ]
+            } else {
+                vec![ Text::styled("", Style::new().fg(Color::Green)) ]
+            };
+            let para = Paragraph::new(text.iter())
+                .block(Block::default()
+                    .borders(Borders::ALL)
+                    .title(&self.title)
+                    .title_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
+                )
+                .alignment(Alignment::Center);
+            
 
-            f.render_widget(blk, chunks[0]);
+            f.render_widget(para, chunks[0]);
 
             let chunks2 = Layout::default()
                 .constraints([Constraint::Percentage(100)].as_ref())

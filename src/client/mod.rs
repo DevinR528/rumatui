@@ -6,6 +6,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use matrix_sdk::{
     self,
+    api::r0::filter::{LazyLoadOptions, RoomEventFilter},
     api::r0::message::create_message_event,
     api::r0::message::get_message_events,
     events::room::message::MessageEventContent,
@@ -20,7 +21,7 @@ pub mod client_loop;
 pub mod event_stream;
 
 
-const SYNC_TIMEOUT: Duration = Duration::from_secs(1);
+const SYNC_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Clone)]
 pub struct MatrixClient {
@@ -76,21 +77,21 @@ impl MatrixClient {
         self.user = Some(res.user_id.clone());
 
         let _response = self.inner.sync(SyncSettings::default().timeout(SYNC_TIMEOUT)).await?;
+        self.next_batch = self.inner.sync_token().await;
 
         Ok(self.inner.get_rooms().await)
     }
 
     pub(crate) async fn sync(&mut self) -> Result<()> {
-        self.next_batch = self.inner.sync_token().await;
-        let tkn = self.next_batch.as_ref().unwrap();
+        let tkn = self.sync_token().unwrap();
+
         self.settings = SyncSettings::new()
             .token(tkn)
-            .full_state(true)
             .timeout(SYNC_TIMEOUT);
         self.inner
             .sync(self.settings.to_owned())
             .await
-            .map(|res| ())
+            .map(|_res| ())
             .map_err(|e| anyhow::Error::from(e))
     }
 
@@ -134,16 +135,23 @@ impl MatrixClient {
             from,
             to: None,
             dir: get_message_events::Direction::Backward,
-            limit: js_int::UInt::new(20),
+            limit: js_int::UInt::new(30),
             filter: None,
+            // filter: Some(RoomEventFilter {
+            //     lazy_load_options: LazyLoadOptions::Enabled { include_redundant_members: false, },
+            //     .. Default::default()
+            // }),
         };
 
         match self.inner.send(request).await.map_err(|e| anyhow::Error::from(e)) {
             Ok(res) => {
-                self.last_scroll.insert(id.clone(), res.start.clone());
+                self.last_scroll.insert(id.clone(), res.end.clone());
                 Ok(res)
             },
-            Err(err) => Err(err),
+            Err(err) => {
+                println!("{:#?}", err);
+                Err(err)
+            },
         }
     }
 }

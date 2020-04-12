@@ -66,6 +66,9 @@ fn main() -> Result<(), failure::Error> {
                         MouseEvent::Press(btn, x, y) if btn == MouseButton::WheelUp => {
                             app.on_scroll_up(x, y).await
                         },
+                        MouseEvent::Press(btn, x, y) if btn == MouseButton::WheelDown => {
+                            app.on_scroll_down(x, y)
+                        }
                         MouseEvent::Press(btn, x, y) => app.on_click(btn, x, y),
                         MouseEvent::Release(_, _) => {}
                         MouseEvent::Hold(_, _) => {}

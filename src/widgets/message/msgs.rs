@@ -1,12 +1,11 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use itertools::Itertools;
 use matrix_sdk::events::room::message::{MessageEventContent, TextMessageEventContent};
 use matrix_sdk::identifiers::RoomId;
-use termion::event::MouseButton;
 use tui::backend::Backend;
-use tui::layout::{Constraint, Direction, Layout, Rect};
+use tui::layout::{Constraint, Direction, Layout, Rect, ScrollMode};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, Text};
 use tui::Frame;
@@ -31,17 +30,21 @@ pub enum MsgType {
 
 #[derive(Clone, Debug, Default)]
 pub struct MessageWidget {
-    area: Rect,
+    msg_area: Rect,
     // TODO save this to a local "database" somehow
     /// This is the RoomId of the last used room.
     pub(crate) current_room: Rc<RefCell<Option<RoomId>>>,
     messages: Vec<(RoomId, Message)>,
     send_msg: String,
+    scroll_pos: usize,
+    did_overflow: Option<Rc<Cell<bool>>>,
+    at_top: Option<Rc<Cell<bool>>>,
 }
 
 impl MessageWidget {
     pub fn add_message(&mut self, msg: Message, room: RoomId) {
-        self.messages.push((room, msg))
+        self.messages.push((room, msg));
+        // self.calculate_scroll_down();
     }
 
     fn process_message(&self) -> MsgType {
@@ -70,8 +73,55 @@ impl MessageWidget {
         }
     }
 
+    pub fn reset_scroll(&mut self) {
+        self.scroll_pos = 0;
+        if let Some(over) = self.did_overflow.as_ref() {
+            over.set(false);
+        }
+        if let Some(top) = self.at_top.as_ref() {
+            top.set(false);
+        }
+    }
+    // TODO when room is switched reset scroll
     pub fn on_scroll_up(&mut self, x: u16, y: u16) -> bool {
-        self.area.intersects(Rect::new(x, y, 1, 1))
+        let intersects = self.msg_area.intersects(Rect::new(x, y, 1, 1));
+        if intersects {
+            if let Some(overflow) = self.did_overflow.as_ref() {
+                if overflow.get() {
+                    if let Some(at_top) = self.at_top.as_ref() {
+                        if at_top.get() {
+                            at_top.set(false);
+                            return true;
+                        } else {
+                            self.scroll_pos += 1;
+                            return false;
+                        }
+                    } else {
+                        self.scroll_pos += 1;
+                        return false
+                    }
+                } else {
+                    return true;
+                }
+            } else {
+                unreachable!("did_overflow was not set")
+            }
+        }
+        false
+    }
+
+    fn calculate_scroll_down(&mut self) {
+        if let Some(overflow) = self.did_overflow.as_ref() {
+            if overflow.get() && self.scroll_pos != 0 {
+                self.scroll_pos -= 1;
+            }
+        }
+    }
+
+    pub fn on_scroll_down(&mut self, x: u16, y: u16) {
+        if self.msg_area.intersects(Rect::new(x, y, 1, 1)) {
+            self.calculate_scroll_down();
+        }
     }
 
     pub fn add_char(&mut self, ch: char) {
@@ -85,12 +135,26 @@ impl MessageWidget {
 
 impl RenderWidget for MessageWidget {
     fn render<B: Backend>(&mut self, f: &mut Frame<B>, area: Rect) {
-        self.area = area;
+        if let None = self.did_overflow {
+            self.did_overflow = Some(Rc::new(Cell::new(false)));
+        }
+        if let None = self.at_top {
+            self.at_top = Some(Rc::new(Cell::new(false)));
+        }
+        let mut lines = self.send_msg.chars().filter(|c| *c == '\n').count();
+        if lines <= 1 {
+            lines = 2;
+        }
+        let (msg_height, send_height) = {
+            let send = (lines * 5) as u16;
+            (100 - send, send)
+        };
         let chunks = Layout::default()
-            .constraints([Constraint::Percentage(90), Constraint::Percentage(10)].as_ref())
+            .constraints([Constraint::Percentage(msg_height), Constraint::Percentage(send_height)].as_ref())
             .direction(Direction::Vertical)
             .split(area);
 
+        self.msg_area = chunks[0];
         let b = self.current_room.borrow();
         let cmp_id = if let Some(id) = b.as_ref() {
             Some(id)
@@ -117,14 +181,26 @@ impl RenderWidget for MessageWidget {
                     .title("Messages")
                     .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
             )
-            .wrap(true);
+            .wrap(true)
+            .scroll(self.scroll_pos as u16)
+            .scroll_mode(ScrollMode::Tail)
+            .did_overflow(Rc::clone(self.did_overflow.as_ref().unwrap()))
+            .at_top(Rc::clone(self.at_top.as_ref().unwrap()));
 
         f.render_widget(p, chunks[0]);
 
-        let t2 = vec![Text::styled(
-            &self.send_msg,
-            Style::default().fg(Color::Blue),
-        )];
+        let t2 = vec![
+            Text::styled(
+                &self.send_msg,
+                Style::default().fg(Color::Blue),
+            ),
+            Text::styled(
+                "<",
+                Style::default()
+                    .fg(Color::LightGreen)
+                    .modifier(Modifier::RAPID_BLINK),
+            ),
+        ];
         let p2 = Paragraph::new(t2.iter())
             .block(
                 Block::default()

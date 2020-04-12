@@ -286,6 +286,7 @@ impl CtrlChars {
     }
 }
 
+/// Parses CSI codes and converts them into `Vec<tui::widgets::Text>` chunks.
 pub fn process_text<'a>(msg: &'a Message) -> Vec<Text<'a>> {
     let name = format!("{}: ", msg.name);
     let msg = msg.text.to_string();

@@ -1,6 +1,6 @@
 use termion::event::MouseButton;
 use tui::backend::Backend;
-use tui::layout::{Constraint, Direction, Layout, Rect};
+use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, Text};
 use tui::Frame;
@@ -143,7 +143,7 @@ impl RenderWidget for LoginWidget {
                 "*".repeat(self.waiting.count),
                 Style::default().fg(Color::Magenta),
             )];
-            let p = Paragraph::new(t.iter()).block(blk);
+            let p = Paragraph::new(t.iter()).block(blk).alignment(Alignment::Center);
 
             f.render_widget(p, width_chunk1[1]);
         } else {
