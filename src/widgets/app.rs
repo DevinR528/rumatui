@@ -294,6 +294,7 @@ impl AppWidget {
     }
 
     pub async fn on_quit(&mut self) {
+        self.ev_loop.quit_sync();
         if self.send_jobs.send(UserRequest::Quit).await.is_err() {
             // TODO what should happen when a send fails
             return;

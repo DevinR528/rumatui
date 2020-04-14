@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
 
 use anyhow::Result;
 use matrix_sdk::Room;
@@ -24,7 +24,6 @@ pub enum UserRequest {
     Login(String, String),
     SendMessage(RoomId, MessageEventContent, Uuid),
     RoomMsgs(RoomId),
-    Sync,
     Quit,
 }
 unsafe impl Send for UserRequest {}
@@ -35,7 +34,6 @@ impl fmt::Debug for UserRequest {
             Self::Login(_, _) => write!(f, "failed login"),
             Self::SendMessage(id, _, _) => write!(f, "failed sending message for {}", id),
             Self::RoomMsgs(id) => write!(f, "failed to get room messages for {}", id),
-            Self::Sync => write!(f, "syncing filed"),
             Self::Quit => write!(f, "quitting filed"),
         }
     }
@@ -50,6 +48,9 @@ unsafe impl Send for RequestResult {}
 
 pub struct MatrixEventHandle {
     cli_jobs: JoinHandle<Result<()>>,
+    sync_jobs: JoinHandle<Result<()>>,
+    start_sync: Arc<AtomicBool>,
+    quit_flag: Arc<AtomicBool>,
 }
 unsafe impl Send for MatrixEventHandle {}
 
@@ -62,11 +63,35 @@ impl MatrixEventHandle {
     ) -> (Self, Sender<UserRequest>) {
         let (app_sender, mut recv) = mpsc::channel(1024);
         
-        let mut c = MatrixClient::new(homeserver).unwrap();
-        c.inner.add_event_emitter(Arc::new(Mutex::new(Box::new(stream))))
+        let mut client = MatrixClient::new(homeserver).unwrap();
+        client.inner.add_event_emitter(Arc::new(Mutex::new(Box::new(stream))))
             .await;
 
-        let client = Arc::new(Mutex::new(c));
+        let cli = client.inner.clone();
+        // when the ui loop logs in start_sync releases and starts `sync_forever`
+        let start_sync = Arc::from(AtomicBool::from(false));
+        let quit_flag = Arc::from(AtomicBool::from(false));
+
+        let is_sync = Arc::clone(&start_sync);
+        let quitting = Arc::clone(&quit_flag);
+        // this loop uses the above `AtomicBool` to signal shutdown.
+        let sync_jobs = exec_hndl.spawn(async move {
+            while !is_sync.load(Ordering::SeqCst) {
+                if quitting.load(Ordering::SeqCst) {
+                    return Ok(());
+                }
+
+                std::sync::atomic::spin_loop_hint();
+            }
+
+            if quitting.load(Ordering::SeqCst) {
+                return Ok(());
+            }
+
+            let set = matrix_sdk::SyncSettings::default();
+            cli.sync_forever(set.clone(), |_| async {}).await;
+            Ok(())
+        });
 
         // this loop is shutdown with a channel message
         let cli_jobs = exec_hndl.spawn(async move {
@@ -79,22 +104,19 @@ impl MatrixEventHandle {
                 match input.unwrap() {
                     UserRequest::Quit => return Ok(()),
                     UserRequest::Login(u, p) => {
-                        let mut cli = client.lock().await;
-                        let res = cli.login(u, p).await;
+                        let res = client.login(u, p).await;
                         if let Err(e) = to_app.send(RequestResult::Login(res)).await {
                             panic!("client event handler crashed {}", e)
                         }
                     }
                     UserRequest::SendMessage(room, msg, uuid) => {
-                        let mut cli = client.lock().await;
-                        let res = cli.send_message(&room, msg, uuid).await;
+                        let res = client.send_message(&room, msg, uuid).await;
                         if let Err(e) = to_app.send(RequestResult::SendMessage(res)).await {
                             panic!("client event handler crashed {}", e)
                         }
                     }
                     UserRequest::RoomMsgs(room_id) => {
-                        let mut cli = client.lock().await;
-                        match  cli.get_messages(&room_id).await {
+                        match  client.get_messages(&room_id).await {
                             Ok(mut res) => {
                                 let base = cli.base_client();
                                 let mut base = base.write().await;
@@ -116,18 +138,30 @@ impl MatrixEventHandle {
                             }
                         }
                     }
-                    UserRequest::Sync => {
-                        let mut c = client.lock().await;
-                        if let Err(sync_err) = c.sync().await {
-                            if let Err(e) = to_app.send(RequestResult::Error(sync_err)).await {
-                                panic!("client event handler crashed {}", e)
-                            }
-                        }
-                    }
                 }
             }
         });
 
-        (MatrixEventHandle { cli_jobs }, app_sender)
+        (
+            MatrixEventHandle {
+                cli_jobs,
+                sync_jobs,
+                start_sync,
+                quit_flag,
+            },
+            app_sender,
+        )
+    }
+
+    /// This is called after login and initial sync to start `AsyncClient::sync_forever` loop.
+    pub(crate) fn start_sync(&self) {
+        self.start_sync
+            .swap(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// This is called when the user quits to signal the `tokio::Runtime` to shutdown.
+    pub(crate) fn quit_sync(&self) {
+        self.quit_flag
+            .swap(true, std::sync::atomic::Ordering::SeqCst);
     }
 }
