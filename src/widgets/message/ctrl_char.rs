@@ -289,8 +289,10 @@ impl CtrlChars {
 /// Parses CSI codes and converts them into `Vec<tui::widgets::Text>` chunks.
 pub fn process_text<'a>(msg: &'a Message) -> Vec<Text<'a>> {
     let name = format!("{}: ", msg.name);
-    let msg = msg.text.to_string();
-
+    let mut msg = msg.text.to_string();
+    if msg.contains("    ") {
+        msg = msg.replace("    ", "\u{2800}   ");
+    }
     let msg = if msg.ends_with('\n') {
         msg.to_string()
     } else {

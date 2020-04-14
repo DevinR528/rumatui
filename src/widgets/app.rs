@@ -10,6 +10,7 @@ use tui::layout::{Constraint, Layout, Rect, Alignment};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, Text};
 use tui::{Frame, Terminal};
+use uuid::Uuid;
 
 use super::chat::ChatWidget;
 use super::error::ErrorWidget;
@@ -38,6 +39,8 @@ pub trait DrawWidget {
 pub struct AppWidget {
     /// Title of the app "RumaTui".
     pub title: String,
+    /// The address of the homeserver.
+    pub homeserver: String,
     /// When user quits this is true,
     pub should_quit: bool,
     /// Have we started the sync loop yet.
@@ -63,13 +66,16 @@ pub struct AppWidget {
 
 impl AppWidget {
     pub async fn new(rt: Handle) -> Self {
+        let homeserver = "http://matrix.org";
+
         let (send, recv) = mpsc::channel(1024);
 
         let (emitter, emitter_msgs) = EventStream::new();
 
-        let (ev_loop, send_jobs) = MatrixEventHandle::new(emitter, send, rt).await;
+        let (ev_loop, send_jobs) = MatrixEventHandle::new(emitter, send, rt, homeserver).await;
         Self {
             title: "RumaTui".to_string(),
+            homeserver: homeserver.to_string(),
             should_quit: false,
             sync_started: false,
             scrolling: false,
@@ -192,17 +198,34 @@ impl AppWidget {
     pub fn on_delete(&mut self) {}
 
     pub async fn on_send(&mut self) {
+        use std::ops::Deref;
         // unfortunately we have to do it this way or we have a mutable borrow in the scope of immutable
-        let res = if let Some(room) = self.chat.current_room.borrow().as_ref() {
+        let res = if let Some(room_id) = self.chat.current_room.borrow().as_ref() {
             match self.chat.msgs.get_sending_message() {
                 Ok(msg) => {
+                    self.chat.sending_message = true;
+                    let uuid = Uuid::new_v4();
+                    let message = msg.clone();
                     if let Err(e) = self
                         .send_jobs
-                        .send(UserRequest::SendMessage(room.clone(), msg))
+                        .send(UserRequest::SendMessage(room_id.clone(), msg, uuid))
                         .await
                     {
                         Err(anyhow::Error::from(e))
                     } else {
+                        if let Some(room) = self.chat.room.rooms.get(room_id) {
+                            let r = room.lock().await;
+                            let matrix_sdk::Room {
+                                members, ..
+                            } = r.deref();
+                            let name = if let Some(mem) = members.get(self.chat.msgs.me.as_ref().unwrap()) {
+                                mem.name.clone()
+                            } else {
+                                self.chat.msgs.me.as_ref().unwrap().localpart().into()
+                            };
+                            self.chat.msgs.echo_sent_msg(room_id, name, &self.homeserver, uuid, message);
+                        }
+                        self.chat.msgs.clear_send_msg();
                         Ok(())
                     }
                 }
@@ -228,10 +251,11 @@ impl AppWidget {
         // this will login, send messages, and any other user initiated requests
         match self.ev_msgs.try_recv() {
             Ok(res) => match res {
-                RequestResult::Login(Ok(rooms)) => {
+                RequestResult::Login(Ok((rooms, resp))) => {
                     self.login_w.logged_in = true;
                     self.chat.main_screen = true;
                     self.login_w.logging_in = false;
+                    self.chat.msgs.me = Some(resp.user_id.clone());
                     self.chat.set_room_state(rooms).await;
                 }
                 RequestResult::Login(Err(e)) => {
@@ -239,7 +263,9 @@ impl AppWidget {
                     self.set_error(e)
                 }
                 // TODO this has the EventId which we need to keep
-                RequestResult::SendMessage(Ok(_res)) => { println!("msg sent") }
+                RequestResult::SendMessage(Ok(_res)) => {
+                    self.chat.sending_message = false;
+                },
                 RequestResult::SendMessage(Err(e)) => self.set_error(e),
                 RequestResult::RoomMsgs(Ok(_res)) => self.scrolling = false,
                 RequestResult::RoomMsgs(Err(e)) => self.set_error(e),
@@ -259,7 +285,7 @@ impl AppWidget {
         }
 
         let now = Instant::now();
-        if self.sync_started && now <= self.last_sync + Duration::from_secs(2) {
+        if self.sync_started && now > self.last_sync + Duration::from_millis(500) {
             self.last_sync = now;
             if let Err(e) = self.send_jobs.send(UserRequest::Sync).await {
                 self.set_error(Error::from(e));
@@ -286,6 +312,8 @@ impl DrawWidget for AppWidget {
                 vec![ Text::styled("Loading previous messages", Style::new().fg(Color::Green)) ]
             } else if !self.login_w.logged_in {
                 vec![ Text::styled("Login to a Matrix Server", Style::new().fg(Color::Green)) ]
+            } else if self.chat.sending_message {
+                vec![ Text::styled("Sending message", Style::new().fg(Color::Green)) ]
             } else if self.chat.main_screen {
                 vec![ Text::styled("Chatting", Style::new().fg(Color::Green)) ]
             } else {

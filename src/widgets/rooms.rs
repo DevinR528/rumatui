@@ -90,7 +90,7 @@ pub struct RoomsWidget {
     /// List of displayable room name and room id
     pub names: ListState<(String, RoomId)>,
     /// Map of room id and matrix_sdk::Room
-    rooms: HashMap<RoomId, Arc<Mutex<Room>>>,
+    pub(crate) rooms: HashMap<RoomId, Arc<Mutex<Room>>>,
 }
 
 impl RoomsWidget {

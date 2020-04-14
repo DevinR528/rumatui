@@ -2,16 +2,18 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use itertools::Itertools;
+use js_int::UInt;
 use matrix_sdk::events::room::message::{MessageEventContent, TextMessageEventContent};
-use matrix_sdk::identifiers::RoomId;
+use matrix_sdk::identifiers::{EventId, RoomId, UserId};
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect, ScrollMode};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, Text};
 use tui::Frame;
+use uuid::Uuid;
 
 use super::ctrl_char;
-use crate::client::event_stream::Message;
+use crate::client::event_stream::{Message, MessageKind};
 use crate::widgets::app::RenderWidget;
 use crate::widgets::utils::markdown_to_html;
 
@@ -35,6 +37,7 @@ pub struct MessageWidget {
     /// This is the RoomId of the last used room.
     pub(crate) current_room: Rc<RefCell<Option<RoomId>>>,
     messages: Vec<(RoomId, Message)>,
+    pub(crate) me: Option<UserId>,
     send_msg: String,
     scroll_pos: usize,
     did_overflow: Option<Rc<Cell<bool>>>,
@@ -43,8 +46,16 @@ pub struct MessageWidget {
 
 impl MessageWidget {
     pub fn add_message(&mut self, msg: Message, room: RoomId) {
+        if let Some(idx) = self.messages.iter().position(|(_, m)| m.uuid == msg.uuid) {
+            self.messages[idx] = (room, msg);
+            return;
+        }
         self.messages.push((room, msg));
         // self.calculate_scroll_down();
+    }
+
+    pub fn clear_send_msg(&mut self) {
+        self.send_msg.clear();
     }
 
     fn process_message(&self) -> MsgType {
@@ -70,6 +81,43 @@ impl MessageWidget {
                 relates_to: None,
             })),
             _ => todo!("implement more sending messages"),
+        }
+    }
+
+    pub fn echo_sent_msg(
+        &mut self,
+        id: &RoomId,
+        name: String,
+        homeserver: &str,
+        uuid: Uuid,
+        content: MessageEventContent
+    ) {
+        match content {
+            MessageEventContent::Text(TextMessageEventContent {
+                body,
+                formatted_body,
+                ..
+            }) => {
+                let msg = if let Some(_fmted) = formatted_body {
+                    crate::widgets::utils::markdown_to_terminal(&body)
+                        .unwrap_or(body.clone())
+                } else {
+                    body.clone()
+                };
+                let now = chrono::Utc::now().timestamp_millis();
+                let timestamp = UInt::new(now as u64).unwrap();
+                let msg = Message {
+                    kind: MessageKind::Echo,
+                    text: msg,
+                    user: self.me.as_ref().unwrap().clone(),
+                    timestamp,
+                    name,
+                    event_id: EventId::new(homeserver).unwrap(),
+                    uuid,
+                };
+                self.add_message(msg, id.clone())
+            }
+            _ => {}
         }
     }
 

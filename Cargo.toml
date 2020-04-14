@@ -12,8 +12,8 @@ readme = "README.md"
 exclude = [ "resources" ]
 
 [dependencies]
-async-trait = "0.1.27"
-anyhow = "1.0.27"
+async-trait = "0.1.30"
+anyhow = "1.0.28"
 chrono = "0.4"
 comrak = "0.7.0"
 crossbeam-channel = "0.4.2"
@@ -40,6 +40,7 @@ tui = { git = "https://github.com/DevinR528/tui-rs/", branch = "tail-scroll" }
 unicode-width = "0.1.7"
 unicode-segmentation = "1.6.0"
 url = "2.1.1"
+uuid = { version = "0.8.1", features = ["v4"] }
 
 [dependencies.pulldown-cmark]
 version = "^0.7"

@@ -6,7 +6,6 @@ use matrix_sdk::{
     identifiers::{EventId, RoomId, UserId},
     EventEmitter, Room,
 };
-
 use matrix_sdk::events::{
     // call::{
     //     answer::AnswerEvent, candidates::CandidatesEvent, hangup::HangupEvent, invite::InviteEvent,
@@ -55,14 +54,22 @@ use matrix_sdk::events::{
 };
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
 #[derive(Clone, Debug)]
+pub enum MessageKind {
+    Echo,
+    Server,
+}
+#[derive(Clone, Debug)]
 pub struct Message {
+    pub kind: MessageKind,
     pub name: String,
     pub text: String,
     pub user: UserId,
     pub event_id: EventId,
     pub timestamp: js_int::UInt,
+    pub uuid: Uuid,
 }
 
 pub enum StateResult {
@@ -115,6 +122,7 @@ impl EventEmitter for EventStream {
             sender,
             event_id,
             origin_server_ts,
+            unsigned,
             ..
         } = ev;
 
@@ -135,15 +143,21 @@ impl EventEmitter for EventStream {
                 } else {
                     msg_body.clone()
                 };
+                let txn_id = unsigned.get("transaction_id").map(ToString::to_string).unwrap_or_default();
+                if !txn_id.is_empty() {
+                    // println!("{:?}", ev);
+                }
                 if let Err(e) = self
                     .send
                     .send(StateResult::Message(
                         Message {
+                            kind: MessageKind::Server,
                             name,
                             user: sender.clone(),
                             text: msg,
                             event_id: event_id.clone(),
                             timestamp: *origin_server_ts,
+                            uuid: Uuid::parse_str(&txn_id).unwrap_or(Uuid::new_v4()),
                         },
                         room_id.clone(),
                     ))

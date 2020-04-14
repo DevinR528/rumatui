@@ -9,6 +9,7 @@ use matrix_sdk::{
     api::r0::filter::{LazyLoadOptions, RoomEventFilter},
     api::r0::message::create_message_event,
     api::r0::message::get_message_events,
+    api::r0::session::login,
     events::room::message::MessageEventContent,
     identifiers::{RoomId, UserId},
     AsyncClient, AsyncClientConfig, Room, SyncSettings, Client as BaseClient,
@@ -16,6 +17,7 @@ use matrix_sdk::{
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 use url::Url;
+use uuid::Uuid;
 
 pub mod client_loop;
 pub mod event_stream;
@@ -72,14 +74,14 @@ impl MatrixClient {
         &mut self,
         username: String,
         password: String,
-    ) -> Result<HashMap<RoomId, Arc<Mutex<Room>>>> {
+    ) -> Result<(HashMap<RoomId, Arc<Mutex<Room>>>, login::Response)> {
         let res = self.inner.login(username, password, None, None).await?;
         self.user = Some(res.user_id.clone());
 
         let _response = self.inner.sync(SyncSettings::default().timeout(SYNC_TIMEOUT)).await?;
         self.next_batch = self.inner.sync_token().await;
 
-        Ok(self.inner.get_rooms().await)
+        Ok((self.inner.get_rooms().await, res))
     }
 
     pub(crate) async fn sync(&mut self) -> Result<()> {
@@ -106,9 +108,10 @@ impl MatrixClient {
         &mut self,
         id: &RoomId,
         msg: MessageEventContent,
+        uuid: Uuid,
     ) -> Result<create_message_event::Response> {
         self.inner
-            .room_send(&id, msg)
+            .room_send(&id, uuid, msg)
             .await
             .context("Message failed to send")
     }

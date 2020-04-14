@@ -9,18 +9,20 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
+use uuid::Uuid;
 
 use crate::client::event_stream::EventStream;
 use crate::client::MatrixClient;
 use matrix_sdk::api::r0::message::create_message_event;
 use matrix_sdk::api::r0::message::get_message_events;
+use matrix_sdk::api::r0::session::login;
 use matrix_sdk::events::{room::message::MessageEventContent, EventResult};
 use matrix_sdk::identifiers::RoomId;
 use matrix_sdk::{AsyncClient, AsyncClientConfig};
 
 pub enum UserRequest {
     Login(String, String),
-    SendMessage(RoomId, MessageEventContent),
+    SendMessage(RoomId, MessageEventContent, Uuid),
     RoomMsgs(RoomId),
     Sync,
     Quit,
@@ -31,7 +33,7 @@ impl fmt::Debug for UserRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Login(_, _) => write!(f, "failed login"),
-            Self::SendMessage(id, _) => write!(f, "failed sending message for {}", id),
+            Self::SendMessage(id, _, _) => write!(f, "failed sending message for {}", id),
             Self::RoomMsgs(id) => write!(f, "failed to get room messages for {}", id),
             Self::Sync => write!(f, "syncing filed"),
             Self::Quit => write!(f, "quitting filed"),
@@ -39,7 +41,7 @@ impl fmt::Debug for UserRequest {
     }
 }
 pub enum RequestResult {
-    Login(Result<HashMap<RoomId, Arc<Mutex<Room>>>>),
+    Login(Result<(HashMap<RoomId, Arc<Mutex<Room>>>, login::Response)>),
     SendMessage(Result<create_message_event::Response>),
     RoomMsgs(Result<get_message_events::IncomingResponse>),
     Error(anyhow::Error),
@@ -56,10 +58,9 @@ impl MatrixEventHandle {
         stream: EventStream,
         mut to_app: Sender<RequestResult>,
         exec_hndl: Handle,
+        homeserver: &str,
     ) -> (Self, Sender<UserRequest>) {
         let (app_sender, mut recv) = mpsc::channel(1024);
-
-        let homeserver = "http://matrix.org";
         
         let mut c = MatrixClient::new(homeserver).unwrap();
         c.inner.add_event_emitter(Arc::new(Mutex::new(Box::new(stream))))
@@ -84,9 +85,9 @@ impl MatrixEventHandle {
                             panic!("client event handler crashed {}", e)
                         }
                     }
-                    UserRequest::SendMessage(room, msg) => {
+                    UserRequest::SendMessage(room, msg, uuid) => {
                         let mut cli = client.lock().await;
-                        let res = cli.send_message(&room, msg).await;
+                        let res = cli.send_message(&room, msg, uuid).await;
                         if let Err(e) = to_app.send(RequestResult::SendMessage(res)).await {
                             panic!("client event handler crashed {}", e)
                         }
