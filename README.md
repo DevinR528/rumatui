@@ -1,12 +1,12 @@
 # RumaTui
-## A command line Matrix client.
-
-[![Build Status](https://travis-ci.com/DevinR528/forget.svg?branch=master)](https://travis-ci.com/DevinR528/rumatui)
-[![Latest Version](https://img.shields.io/crates/v/forget.svg)](https://crates.io/crates/rumatui)
+## A command-line Matrix client.
+<!-- 
+[![Build Status](https://travis-ci.com/DevinR528/rumatui.svg?branch=master)](https://travis-ci.com/DevinR528/rumatui)
+[![Latest Version](https://img.shields.io/crates/v/rumatui.svg)](https://crates.io/crates/rumatui) -->
 
 Work In Progress. A Matrix client written using [tui.rs](https://github.com/fdehau/tui-rs) and [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk) to provide a clickable cli to chat.
 
-<!-- ![forget-demo](https://github.com/DevinR528/forget/blob/master/resources/forget-demo.gif) -->
+![rumatui-demo](https://github.com/DevinR528/rumatui/blob/master/resources/rumatui.gif)
 
 # Install (not yet)
 ```bash
