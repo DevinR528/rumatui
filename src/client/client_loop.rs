@@ -1,13 +1,16 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 use anyhow::Result;
 use matrix_sdk::Room;
 use tokio::runtime::Handle;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
@@ -39,9 +42,9 @@ impl fmt::Debug for UserRequest {
     }
 }
 pub enum RequestResult {
-    Login(Result<(HashMap<RoomId, Arc<Mutex<Room>>>, login::Response)>),
+    Login(Result<(HashMap<RoomId, Arc<RwLock<Room>>>, login::Response)>),
     SendMessage(Result<create_message_event::Response>),
-    RoomMsgs(Result<get_message_events::IncomingResponse>),
+    RoomMsgs(Result<(get_message_events::IncomingResponse, Arc<RwLock<Room>>)>),
     Error(anyhow::Error),
 }
 unsafe impl Send for RequestResult {}
@@ -62,12 +65,11 @@ impl MatrixEventHandle {
         homeserver: &str,
     ) -> (Self, Sender<UserRequest>) {
         let (app_sender, mut recv) = mpsc::channel(1024);
-        
-        let mut client = MatrixClient::new(homeserver).unwrap();
-        client.inner.add_event_emitter(Arc::new(Mutex::new(Box::new(stream))))
-            .await;
 
-        let cli = client.inner.clone();
+        let mut client = MatrixClient::new(homeserver).unwrap();
+        client.inner.add_event_emitter(Box::new(stream)).await;
+
+        let mut cli = client.inner.clone();
         // when the ui loop logs in start_sync releases and starts `sync_forever`
         let start_sync = Arc::from(AtomicBool::from(false));
         let quit_flag = Arc::from(AtomicBool::from(false));
@@ -115,29 +117,26 @@ impl MatrixEventHandle {
                             panic!("client event handler crashed {}", e)
                         }
                     }
-                    UserRequest::RoomMsgs(room_id) => {
-                        match  client.get_messages(&room_id).await {
-                            Ok(mut res) => {
-                                let base = cli.base_client();
-                                let mut base = base.write().await;
-                                for mut event in &mut res.chunk {
-                                    base.receive_joined_timeline_event(&room_id, &mut event).await;
-                    
-                                    if let EventResult::Ok(e) = event {
-                                        base.emit_timeline_event(&room_id, e).await;
-                                    }
-                                }
-                                if let Err(e) = to_app.send(RequestResult::RoomMsgs(Ok(res))).await {
-                                    panic!("client event handler crashed {}", e)
-                                }
-                            }
-                            Err(get_msg_err) => {
-                                if let Err(e) = to_app.send(RequestResult::Error(get_msg_err)).await {
-                                    panic!("client event handler crashed {}", e)
-                                }
+                    UserRequest::RoomMsgs(room_id) => match client.get_messages(&room_id).await {
+                        Ok(res) => {
+                            if let Err(e) = to_app
+                                .send(RequestResult::RoomMsgs(Ok((
+                                    res,
+                                    Arc::clone(
+                                        client.inner.get_rooms().await.get(&room_id).unwrap(),
+                                    ),
+                                ))))
+                                .await
+                            {
+                                panic!("client event handler crashed {}", e)
                             }
                         }
-                    }
+                        Err(get_msg_err) => {
+                            if let Err(e) = to_app.send(RequestResult::Error(get_msg_err)).await {
+                                panic!("client event handler crashed {}", e)
+                            }
+                        }
+                    },
                 }
             }
         });

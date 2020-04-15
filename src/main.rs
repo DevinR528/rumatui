@@ -4,7 +4,7 @@ use std::io::{self};
 
 use std::time::Duration;
 
-use termion::event::{Event as TermEvent, Key, MouseEvent, MouseButton};
+use termion::event::{Event as TermEvent, Key, MouseButton, MouseEvent};
 use termion::input::MouseTerminal;
 use termion::raw::IntoRawMode;
 
@@ -65,7 +65,7 @@ fn main() -> Result<(), failure::Error> {
                     TermEvent::Mouse(m) => match m {
                         MouseEvent::Press(btn, x, y) if btn == MouseButton::WheelUp => {
                             app.on_scroll_up(x, y).await
-                        },
+                        }
                         MouseEvent::Press(btn, x, y) if btn == MouseButton::WheelDown => {
                             app.on_scroll_down(x, y)
                         }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::time::Duration;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use matrix_sdk::{
@@ -12,7 +12,7 @@ use matrix_sdk::{
     api::r0::session::login,
     events::room::message::MessageEventContent,
     identifiers::{RoomId, UserId},
-    AsyncClient, AsyncClientConfig, Room, SyncSettings, Client as BaseClient,
+    AsyncClient, AsyncClientConfig, Client as BaseClient, Room, SyncSettings,
 };
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
@@ -21,7 +21,6 @@ use uuid::Uuid;
 
 pub mod client_loop;
 pub mod event_stream;
-
 
 const SYNC_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -61,11 +60,6 @@ impl MatrixClient {
         Ok(client)
     }
 
-    /// Returns an Arc of the BaseClient
-    pub fn base_client(&self) -> Arc<RwLock<BaseClient>> {
-        self.inner.base_client()
-    }
-
     pub fn sync_token(&self) -> Option<String> {
         self.next_batch.clone()
     }
@@ -74,11 +68,14 @@ impl MatrixClient {
         &mut self,
         username: String,
         password: String,
-    ) -> Result<(HashMap<RoomId, Arc<Mutex<Room>>>, login::Response)> {
+    ) -> Result<(HashMap<RoomId, Arc<RwLock<Room>>>, login::Response)> {
         let res = self.inner.login(username, password, None, None).await?;
         self.user = Some(res.user_id.clone());
 
-        let _response = self.inner.sync(SyncSettings::default().timeout(SYNC_TIMEOUT)).await?;
+        let _response = self
+            .inner
+            .sync(SyncSettings::default().timeout(SYNC_TIMEOUT))
+            .await?;
         self.next_batch = self.inner.sync_token().await;
 
         Ok((self.inner.get_rooms().await, res))
@@ -87,9 +84,7 @@ impl MatrixClient {
     pub(crate) async fn sync(&mut self) -> Result<()> {
         let tkn = self.sync_token().unwrap();
 
-        self.settings = SyncSettings::new()
-            .token(tkn)
-            .timeout(SYNC_TIMEOUT);
+        self.settings = SyncSettings::new().token(tkn).timeout(SYNC_TIMEOUT);
         self.inner
             .sync(self.settings.to_owned())
             .await
@@ -111,7 +106,7 @@ impl MatrixClient {
         uuid: Uuid,
     ) -> Result<create_message_event::Response> {
         self.inner
-            .room_send(&id, uuid, msg)
+            .room_send(&id, msg, Some(uuid))
             .await
             .context("Message failed to send")
     }
@@ -119,11 +114,11 @@ impl MatrixClient {
     /// Gets the `RoomEvent`s backwards in time, when user scrolls up.
     ///
     /// This uses the current sync token to look backwards from that point.
-    /// 
+    ///
     /// # Arguments
     ///
     /// * id - A valid RoomId otherwise sending will fail.
-    /// 
+    ///
     pub(crate) async fn get_messages(
         &mut self,
         id: &RoomId,
@@ -146,15 +141,20 @@ impl MatrixClient {
             // }),
         };
 
-        match self.inner.send(request).await.map_err(|e| anyhow::Error::from(e)) {
+        match self
+            .inner
+            .room_messages(request)
+            .await
+            .map_err(|e| anyhow::Error::from(e))
+        {
             Ok(res) => {
                 self.last_scroll.insert(id.clone(), res.end.clone());
                 Ok(res)
-            },
+            }
             Err(err) => {
                 println!("{:#?}", err);
                 Err(err)
-            },
+            }
         }
     }
 }

@@ -1,12 +1,20 @@
 use std::io;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::Error;
-use tokio::runtime::Handle;
+use matrix_sdk::api::r0::message::get_message_events;
+use matrix_sdk::events::{
+    collections::all::RoomEvent,
+    room::message::{MessageEvent, MessageEventContent, TextMessageEventContent},
+    EventResult,
+};
+use matrix_sdk::Room;
 use termion::event::MouseButton;
-use tokio::sync::mpsc::{self};
+use tokio::runtime::Handle;
+use tokio::sync::{mpsc, RwLock};
 use tui::backend::Backend;
-use tui::layout::{Constraint, Layout, Rect, Alignment};
+use tui::layout::{Alignment, Constraint, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, Text};
 use tui::{Frame, Terminal};
@@ -16,7 +24,7 @@ use super::chat::ChatWidget;
 use super::error::ErrorWidget;
 use super::login::{Login, LoginSelect, LoginWidget};
 use crate::client::client_loop::{MatrixEventHandle, RequestResult, UserRequest};
-use crate::client::event_stream::{EventStream, StateResult};
+use crate::client::event_stream::{EventStream, Message, MessageKind, StateResult};
 
 pub trait RenderWidget {
     fn render<B>(&mut self, f: &mut Frame<B>, area: Rect)
@@ -104,14 +112,17 @@ impl AppWidget {
             if self.chat.msgs.on_scroll_up(x, y) {
                 if !self.scrolling {
                     self.scrolling = true;
-                    let room_id = self.chat.room.current_room.borrow().as_ref().unwrap().clone();
-                    if let Err(e) = self
-                            .send_jobs
-                            .send(UserRequest::RoomMsgs(room_id))
-                            .await
-                        {
-                            self.set_error(anyhow::Error::from(e))
-                        }
+                    let room_id = self
+                        .chat
+                        .room
+                        .current_room
+                        .borrow()
+                        .as_ref()
+                        .unwrap()
+                        .clone();
+                    if let Err(e) = self.send_jobs.send(UserRequest::RoomMsgs(room_id)).await {
+                        self.set_error(anyhow::Error::from(e))
+                    }
                 }
             }
         }
@@ -214,16 +225,22 @@ impl AppWidget {
                         Err(anyhow::Error::from(e))
                     } else {
                         if let Some(room) = self.chat.room.rooms.get(room_id) {
-                            let r = room.lock().await;
-                            let matrix_sdk::Room {
-                                members, ..
-                            } = r.deref();
-                            let name = if let Some(mem) = members.get(self.chat.msgs.me.as_ref().unwrap()) {
+                            let r = room.read().await;
+                            let matrix_sdk::Room { members, .. } = r.deref();
+                            let name = if let Some(mem) =
+                                members.get(self.chat.msgs.me.as_ref().unwrap())
+                            {
                                 mem.name.clone()
                             } else {
                                 self.chat.msgs.me.as_ref().unwrap().localpart().into()
                             };
-                            self.chat.msgs.echo_sent_msg(room_id, name, &self.homeserver, uuid, message);
+                            self.chat.msgs.echo_sent_msg(
+                                room_id,
+                                name,
+                                &self.homeserver,
+                                uuid,
+                                message,
+                            );
                         }
                         self.chat.msgs.clear_send_msg();
                         Ok(())
@@ -247,6 +264,7 @@ impl AppWidget {
     pub async fn on_tick(&mut self) {
         if self.login_w.logged_in && !self.sync_started {
             self.sync_started = true;
+            self.ev_loop.start_sync();
         }
         // this will login, send messages, and any other user initiated requests
         match self.ev_msgs.try_recv() {
@@ -265,9 +283,12 @@ impl AppWidget {
                 // TODO this has the EventId which we need to keep
                 RequestResult::SendMessage(Ok(_res)) => {
                     self.chat.sending_message = false;
-                },
+                }
                 RequestResult::SendMessage(Err(e)) => self.set_error(e),
-                RequestResult::RoomMsgs(Ok(_res)) => self.scrolling = false,
+                RequestResult::RoomMsgs(Ok((res, room))) => {
+                    self.process_room_events(res, room).await;
+                    self.scrolling = false
+                }
                 RequestResult::RoomMsgs(Err(e)) => self.set_error(e),
 
                 // sync error
@@ -283,14 +304,6 @@ impl AppWidget {
             },
             _ => {}
         }
-
-        let now = Instant::now();
-        if self.sync_started && now > self.last_sync + Duration::from_millis(500) {
-            self.last_sync = now;
-            if let Err(e) = self.send_jobs.send(UserRequest::Sync).await {
-                self.set_error(Error::from(e));
-            }
-        }
     }
 
     pub async fn on_quit(&mut self) {
@@ -299,6 +312,73 @@ impl AppWidget {
             // TODO what should happen when a send fails
             return;
         };
+    }
+
+    async fn process_room_events(
+        &mut self,
+        events: get_message_events::IncomingResponse,
+        room: Arc<RwLock<Room>>,
+    ) {
+        for ev in events.chunk {
+            if let EventResult::Ok(e) = ev {
+                match e {
+                    RoomEvent::RoomMessage(msg) => {
+                        let MessageEvent {
+                            content,
+                            sender,
+                            event_id,
+                            origin_server_ts,
+                            unsigned,
+                            ..
+                        } = msg;
+
+                        let name = {
+                            let m = room.read().await;
+                            m.members
+                                .get(&sender)
+                                .map(|m| m.name.to_string())
+                                .unwrap_or(sender.localpart().to_string())
+                        };
+
+                        match content {
+                            MessageEventContent::Text(TextMessageEventContent {
+                                body: msg_body,
+                                formatted_body,
+                                ..
+                            }) => {
+                                let msg = if let Some(_fmted) = formatted_body {
+                                    crate::widgets::utils::markdown_to_terminal(&msg_body)
+                                        .unwrap_or(msg_body.clone())
+                                } else {
+                                    msg_body.clone()
+                                };
+                                let txn_id = unsigned
+                                    .get("transaction_id")
+                                    .map(ToString::to_string)
+                                    .unwrap_or_default();
+                                if !txn_id.is_empty() {
+                                    // println!("{:?}", ev);
+                                }
+                                let msg = Message {
+                                    kind: MessageKind::Server,
+                                    name,
+                                    user: sender.clone(),
+                                    text: msg,
+                                    event_id: event_id.clone(),
+                                    timestamp: origin_server_ts,
+                                    uuid: Uuid::parse_str(&txn_id).unwrap_or(Uuid::new_v4()),
+                                };
+                                self.chat
+                                    .msgs
+                                    .add_message(msg, room.read().await.room_id.clone())
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
 }
 
@@ -310,24 +390,33 @@ impl DrawWidget for AppWidget {
                 .split(f.size());
 
             let text = if self.scrolling {
-                vec![ Text::styled("Loading previous messages", Style::new().fg(Color::Green)) ]
+                vec![Text::styled(
+                    "Loading previous messages",
+                    Style::new().fg(Color::Green),
+                )]
             } else if !self.login_w.logged_in {
-                vec![ Text::styled("Login to a Matrix Server", Style::new().fg(Color::Green)) ]
+                vec![Text::styled(
+                    "Login to a Matrix Server",
+                    Style::new().fg(Color::Green),
+                )]
             } else if self.chat.sending_message {
-                vec![ Text::styled("Sending message", Style::new().fg(Color::Green)) ]
+                vec![Text::styled(
+                    "Sending message",
+                    Style::new().fg(Color::Green),
+                )]
             } else if self.chat.main_screen {
-                vec![ Text::styled("Chatting", Style::new().fg(Color::Green)) ]
+                vec![Text::styled("Chatting", Style::new().fg(Color::Green))]
             } else {
-                vec![ Text::styled("", Style::new().fg(Color::Green)) ]
+                vec![Text::styled("", Style::new().fg(Color::Green))]
             };
             let para = Paragraph::new(text.iter())
-                .block(Block::default()
-                    .borders(Borders::ALL)
-                    .title(&self.title)
-                    .title_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(&self.title)
+                        .title_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD)),
                 )
                 .alignment(Alignment::Center);
-            
 
             f.render_widget(para, chunks[0]);
 

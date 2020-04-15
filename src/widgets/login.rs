@@ -143,7 +143,9 @@ impl RenderWidget for LoginWidget {
                 "*".repeat(self.waiting.count),
                 Style::default().fg(Color::Magenta),
             )];
-            let p = Paragraph::new(t.iter()).block(blk).alignment(Alignment::Center);
+            let p = Paragraph::new(t.iter())
+                .block(blk)
+                .alignment(Alignment::Center);
 
             f.render_widget(p, width_chunk1[1]);
         } else {

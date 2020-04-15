@@ -6,7 +6,7 @@ use std::sync::Arc;
 use matrix_sdk::identifiers::RoomId;
 use matrix_sdk::Room;
 use termion::event::MouseButton;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::Frame;
@@ -25,7 +25,7 @@ pub struct ChatWidget {
 }
 
 impl ChatWidget {
-    pub(crate) async fn set_room_state(&mut self, rooms: HashMap<RoomId, Arc<Mutex<Room>>>) {
+    pub(crate) async fn set_room_state(&mut self, rooms: HashMap<RoomId, Arc<RwLock<Room>>>) {
         self.room.populate_rooms(rooms).await;
         self.msgs.current_room = Rc::clone(&self.room.current_room);
         self.current_room = Rc::clone(&self.room.current_room);

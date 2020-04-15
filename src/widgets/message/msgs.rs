@@ -58,6 +58,7 @@ impl MessageWidget {
         self.send_msg.clear();
     }
 
+    // TODO im sure there is a way to do this like Riot or a matrix server
     fn process_message(&self) -> MsgType {
         if self.send_msg.contains('`') {
             MsgType::FormattedText
@@ -90,7 +91,7 @@ impl MessageWidget {
         name: String,
         homeserver: &str,
         uuid: Uuid,
-        content: MessageEventContent
+        content: MessageEventContent,
     ) {
         match content {
             MessageEventContent::Text(TextMessageEventContent {
@@ -99,8 +100,7 @@ impl MessageWidget {
                 ..
             }) => {
                 let msg = if let Some(_fmted) = formatted_body {
-                    crate::widgets::utils::markdown_to_terminal(&body)
-                        .unwrap_or(body.clone())
+                    crate::widgets::utils::markdown_to_terminal(&body).unwrap_or(body.clone())
                 } else {
                     body.clone()
                 };
@@ -146,7 +146,7 @@ impl MessageWidget {
                         }
                     } else {
                         self.scroll_pos += 1;
-                        return false
+                        return false;
                     }
                 } else {
                     return true;
@@ -198,7 +198,13 @@ impl RenderWidget for MessageWidget {
             (100 - send, send)
         };
         let chunks = Layout::default()
-            .constraints([Constraint::Percentage(msg_height), Constraint::Percentage(send_height)].as_ref())
+            .constraints(
+                [
+                    Constraint::Percentage(msg_height),
+                    Constraint::Percentage(send_height),
+                ]
+                .as_ref(),
+            )
             .direction(Direction::Vertical)
             .split(area);
 
@@ -238,10 +244,7 @@ impl RenderWidget for MessageWidget {
         f.render_widget(p, chunks[0]);
 
         let t2 = vec![
-            Text::styled(
-                &self.send_msg,
-                Style::default().fg(Color::Blue),
-            ),
+            Text::styled(&self.send_msg, Style::default().fg(Color::Blue)),
             Text::styled(
                 "<",
                 Style::default()

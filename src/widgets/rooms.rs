@@ -8,7 +8,7 @@ use matrix_sdk::identifiers::RoomId;
 use matrix_sdk::Room;
 use serde::{Deserialize, Serialize};
 use termion::event::MouseButton;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tui::backend::Backend;
 use tui::layout::Rect;
 use tui::style::{Color, Modifier, Style};
@@ -90,7 +90,7 @@ pub struct RoomsWidget {
     /// List of displayable room name and room id
     pub names: ListState<(String, RoomId)>,
     /// Map of room id and matrix_sdk::Room
-    pub(crate) rooms: HashMap<RoomId, Arc<Mutex<Room>>>,
+    pub(crate) rooms: HashMap<RoomId, Arc<RwLock<Room>>>,
 }
 
 impl RoomsWidget {
@@ -99,11 +99,11 @@ impl RoomsWidget {
     /// ## Arguments
     ///  * rooms - A `HashMap` of room_id to `Room`.
     ///  * current is the current room id controlled by the ChatWidget.
-    pub(crate) async fn populate_rooms(&mut self, rooms: HashMap<RoomId, Arc<Mutex<Room>>>) {
+    pub(crate) async fn populate_rooms(&mut self, rooms: HashMap<RoomId, Arc<RwLock<Room>>>) {
         self.rooms = rooms.clone();
         let mut items: Vec<(String, RoomId)> = Vec::default();
         for (id, room) in &rooms {
-            let r = room.lock().await;
+            let r = room.read().await;
             // TODO when RoomId impls AsRef<str> cleanup
             if items.iter().any(|(_name, rid)| id == rid) {
                 continue;
