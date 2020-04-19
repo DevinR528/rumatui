@@ -98,9 +98,12 @@ impl AppWidget {
         }
     }
 
-    pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {
+    pub async fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {
         if !self.login_w.logged_in {
             self.login_w.on_click(btn, x, y);
+        }
+        if self.chat.msgs.on_click(btn, x, y) {
+            self.on_send().await;
         }
 
         self.chat.room.on_click(btn, x, y)
@@ -124,6 +127,10 @@ impl AppWidget {
                         self.set_error(anyhow::Error::from(e))
                     }
                 }
+            } else {
+                if self.chat.room.on_scroll_up(x, y) {
+                    self.chat.msgs.reset_scroll();
+                }
             }
         }
     }
@@ -131,6 +138,10 @@ impl AppWidget {
     pub fn on_scroll_down(&mut self, x: u16, y: u16) {
         if self.chat.main_screen {
             self.chat.msgs.on_scroll_down(x, y);
+            // TODO make each widget's scroll method more similar
+            if self.chat.room.on_scroll_down(x, y) {
+                self.chat.msgs.reset_scroll();
+            }
         }
     }
 

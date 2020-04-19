@@ -4,6 +4,7 @@ use std::ops::{Index, IndexMut};
 use std::rc::Rc;
 use std::sync::Arc;
 
+use itertools::Itertools;
 use matrix_sdk::identifiers::RoomId;
 use matrix_sdk::Room;
 use serde::{Deserialize, Serialize};
@@ -103,12 +104,10 @@ impl RoomsWidget {
         self.rooms = rooms.clone();
         let mut items: Vec<(String, RoomId)> = Vec::default();
         for (id, room) in &rooms {
-            let r = room.read().await;
-            // TODO when RoomId impls AsRef<str> cleanup
             if items.iter().any(|(_name, rid)| id == rid) {
                 continue;
             }
-
+            let r = room.read().await;
             items.push((r.calculate_name(), id.clone()));
         }
 
@@ -119,8 +118,24 @@ impl RoomsWidget {
         self.names = ListState::new(items);
     }
 
-    pub fn on_click(&mut self, _btn: MouseButton, x: u16, y: u16) {
-        if self.area.intersects(Rect::new(x, y, 1, 1)) {}
+    pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {
+        if self.area.intersects(Rect::new(x, y, 1, 1)) { }
+    }
+
+    pub fn on_scroll_up(&mut self, x: u16, y: u16) -> bool {
+        if self.area.intersects(Rect::new(x, y, 1, 1)) {
+            self.select_previous();
+            return true
+        }
+        false
+    }
+
+    pub fn on_scroll_down(&mut self, x: u16, y: u16) -> bool {
+        if self.area.intersects(Rect::new(x, y, 1, 1)) {
+            self.select_next();
+            return true
+        }
+        false
     }
 
     /// Moves selection down the list
@@ -168,6 +183,7 @@ impl RenderWidget for RoomsWidget {
             .names
             .items
             .iter()
+            .unique_by(|(_, id)| id)
             .enumerate()
             .map(|(i, (name, _id))| {
                 if i == selected {

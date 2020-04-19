@@ -5,6 +5,7 @@ use itertools::Itertools;
 use js_int::UInt;
 use matrix_sdk::events::room::message::{MessageEventContent, TextMessageEventContent};
 use matrix_sdk::identifiers::{EventId, RoomId, UserId};
+use termion::event::MouseButton;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect, ScrollMode};
 use tui::style::{Color, Modifier, Style};
@@ -33,6 +34,7 @@ pub enum MsgType {
 #[derive(Clone, Debug, Default)]
 pub struct MessageWidget {
     msg_area: Rect,
+    send_area: Rect,
     // TODO save this to a local "database" somehow
     /// This is the RoomId of the last used room.
     pub(crate) current_room: Rc<RefCell<Option<RoomId>>>,
@@ -121,6 +123,15 @@ impl MessageWidget {
         }
     }
 
+    pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) -> bool {
+        if self.send_area.intersects(Rect::new(x, y, 1, 1)) {
+            if let MouseButton::Left = btn {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn reset_scroll(&mut self) {
         self.scroll_pos = 0;
         if let Some(over) = self.did_overflow.as_ref() {
@@ -130,7 +141,7 @@ impl MessageWidget {
             top.set(false);
         }
     }
-    // TODO when room is switched reset scroll
+
     pub fn on_scroll_up(&mut self, x: u16, y: u16) -> bool {
         let intersects = self.msg_area.intersects(Rect::new(x, y, 1, 1));
         if intersects {
@@ -263,5 +274,28 @@ impl RenderWidget for MessageWidget {
             .wrap(true);
 
         f.render_widget(p2, chunks[1]);
+
+        let btn = Layout::default()
+            .constraints(
+                [
+                    Constraint::Percentage(90),
+                    Constraint::Percentage(10),
+                ]
+                .as_ref(),
+            )
+            .direction(Direction::Horizontal)
+            .split(chunks[1]);
+
+        self.send_area = btn[1];
+
+        let btn_text = vec![ Text::styled("Send", Style::default().fg(Color::Blue)) ];
+        let button = Paragraph::new(btn_text.iter())
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
+                    .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
+            );
+        f.render_widget(button, btn[1]);
     }
 }
