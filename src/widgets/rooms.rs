@@ -9,7 +9,7 @@ use matrix_sdk::identifiers::RoomId;
 use matrix_sdk::Room;
 use serde::{Deserialize, Serialize};
 use termion::event::MouseButton;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use tui::backend::Backend;
 use tui::layout::Rect;
 use tui::style::{Color, Modifier, Style};
@@ -104,10 +104,15 @@ impl RoomsWidget {
         self.rooms = rooms.clone();
         let mut items: Vec<(String, RoomId)> = Vec::default();
         for (id, room) in &rooms {
+            // filter duplicate rooms
             if items.iter().any(|(_name, rid)| id == rid) {
                 continue;
             }
             let r = room.read().await;
+            // filter tombstoned rooms
+            if r.tombstone.is_some() {
+                continue;
+            }
             items.push((r.calculate_name(), id.clone()));
         }
 
@@ -118,14 +123,14 @@ impl RoomsWidget {
         self.names = ListState::new(items);
     }
 
-    pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {
-        if self.area.intersects(Rect::new(x, y, 1, 1)) { }
+    pub fn on_click(&mut self, _btn: MouseButton, x: u16, y: u16) {
+        if self.area.intersects(Rect::new(x, y, 1, 1)) {}
     }
 
     pub fn on_scroll_up(&mut self, x: u16, y: u16) -> bool {
         if self.area.intersects(Rect::new(x, y, 1, 1)) {
             self.select_previous();
-            return true
+            return true;
         }
         false
     }
@@ -133,7 +138,7 @@ impl RoomsWidget {
     pub fn on_scroll_down(&mut self, x: u16, y: u16) -> bool {
         if self.area.intersects(Rect::new(x, y, 1, 1)) {
             self.select_next();
-            return true
+            return true;
         }
         false
     }

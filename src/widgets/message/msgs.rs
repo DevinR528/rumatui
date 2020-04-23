@@ -41,6 +41,7 @@ pub struct MessageWidget {
     messages: Vec<(RoomId, Message)>,
     pub(crate) me: Option<UserId>,
     send_msg: String,
+    notifications: String,
     scroll_pos: usize,
     did_overflow: Option<Rc<Cell<bool>>>,
     at_top: Option<Rc<Cell<bool>>>,
@@ -54,6 +55,10 @@ impl MessageWidget {
         }
         self.messages.push((room, msg));
         // self.calculate_scroll_down();
+    }
+
+    pub fn add_notify(&mut self, notify: &str) {
+        self.notifications = notify.to_string();
     }
 
     pub fn clear_send_msg(&mut self) {
@@ -204,14 +209,16 @@ impl RenderWidget for MessageWidget {
         if lines <= 1 {
             lines = 2;
         }
-        let (msg_height, send_height) = {
-            let send = (lines * 5) as u16;
-            (100 - send, send)
+        let (msg_height, send_height, notify_height) = {
+            let send = ((lines + 1) * 5) as u16;
+            let notify = if area.height < 25 { 0 } else { 15 };
+            (100 - (send + 15), send, notify)
         };
         let chunks = Layout::default()
             .constraints(
                 [
                     Constraint::Percentage(msg_height),
+                    Constraint::Percentage(notify_height),
                     Constraint::Percentage(send_height),
                 ]
                 .as_ref(),
@@ -238,7 +245,7 @@ impl RenderWidget for MessageWidget {
             .flat_map(|(_, msg)| ctrl_char::process_text(msg))
             .collect::<Vec<_>>();
 
-        let p = Paragraph::new(text.iter())
+        let messages = Paragraph::new(text.iter())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -252,9 +259,24 @@ impl RenderWidget for MessageWidget {
             .did_overflow(Rc::clone(self.did_overflow.as_ref().unwrap()))
             .at_top(Rc::clone(self.at_top.as_ref().unwrap()));
 
-        f.render_widget(p, chunks[0]);
+        f.render_widget(messages, chunks[0]);
 
-        let t2 = vec![
+        let t2 = vec![Text::styled(
+            &self.notifications,
+            Style::default().fg(Color::Green),
+        )];
+        let notification = Paragraph::new(t2.iter())
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
+                    .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
+            )
+            .wrap(true);
+
+        f.render_widget(notification, chunks[1]);
+
+        let t3 = vec![
             Text::styled(&self.send_msg, Style::default().fg(Color::Blue)),
             Text::styled(
                 "<",
@@ -263,7 +285,7 @@ impl RenderWidget for MessageWidget {
                     .modifier(Modifier::RAPID_BLINK),
             ),
         ];
-        let p2 = Paragraph::new(t2.iter())
+        let text_box = Paragraph::new(t3.iter())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -273,29 +295,22 @@ impl RenderWidget for MessageWidget {
             )
             .wrap(true);
 
-        f.render_widget(p2, chunks[1]);
+        f.render_widget(text_box, chunks[2]);
 
         let btn = Layout::default()
-            .constraints(
-                [
-                    Constraint::Percentage(90),
-                    Constraint::Percentage(10),
-                ]
-                .as_ref(),
-            )
+            .constraints([Constraint::Percentage(90), Constraint::Percentage(10)].as_ref())
             .direction(Direction::Horizontal)
-            .split(chunks[1]);
+            .split(chunks[2]);
 
         self.send_area = btn[1];
 
-        let btn_text = vec![ Text::styled("Send", Style::default().fg(Color::Blue)) ];
-        let button = Paragraph::new(btn_text.iter())
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
-                    .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
-            );
+        let btn_text = vec![Text::styled("Send", Style::default().fg(Color::Blue))];
+        let button = Paragraph::new(btn_text.iter()).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
+                .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
+        );
         f.render_widget(button, btn[1]);
     }
 }

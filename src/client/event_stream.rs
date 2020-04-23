@@ -1,4 +1,3 @@
-use std::ops::Deref;
 use std::sync::Arc;
 
 use matrix_sdk::events::{
@@ -18,7 +17,9 @@ use matrix_sdk::events::{
         name::NameEvent,
         power_levels::PowerLevelsEvent,
         redaction::RedactionEvent,
+        tombstone::TombstoneEvent,
     },
+    typing::TypingEvent,
 };
 use matrix_sdk::{
     self,
@@ -48,6 +49,8 @@ pub struct Message {
 
 pub enum StateResult {
     Message(Message, RoomId),
+    FullyRead(EventId, RoomId),
+    Typing(String),
     Err,
 }
 unsafe impl Send for StateResult {}
@@ -145,6 +148,8 @@ impl EventEmitter for EventStream {
     async fn on_room_redaction(&self, _: Arc<RwLock<Room>>, _: &RedactionEvent) {}
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomPowerLevels` event.
     async fn on_room_power_levels(&self, _: Arc<RwLock<Room>>, _: &PowerLevelsEvent) {}
+    /// Fires when `AsyncClient` receives a `RoomEvent::RoomTombstone` event.
+    async fn on_room_tombstone(&self, _: Arc<RwLock<Room>>, _: &TombstoneEvent) {}
 
     // `RoomEvent`s from `IncomingState`
     /// Fires when `AsyncClient` receives a `StateEvent::RoomMember` event.
@@ -170,8 +175,45 @@ impl EventEmitter for EventStream {
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomCanonicalAlias` event.
     async fn on_account_push_rules(&self, _: Arc<RwLock<Room>>, _: &PushRulesEvent) {}
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomAliases` event.
-    async fn on_account_data_fully_read(&self, _: Arc<RwLock<Room>>, _event: &FullyReadEvent) {}
-
+    async fn on_account_data_fully_read(&self, room: Arc<RwLock<Room>>, event: &FullyReadEvent) {
+        if let Err(e) = self
+            .send
+            .lock()
+            .await
+            .send(StateResult::FullyRead(
+                event.content.event_id.clone(),
+                room.read().await.room_id.clone(),
+            ))
+            .await
+        {
+            panic!("{}", e)
+        }
+    }
+    /// Fires when `AsyncClient` receives a `NonRoomEvent::Typing` event.
+    async fn on_account_data_typing(&self, room: Arc<RwLock<Room>>, event: &TypingEvent) {
+        let typing = room.read()
+        .await
+        .members
+        .iter()
+        .filter(|(id, _)| event.content.user_ids.contains(id))
+        .map(|(_, mem)| mem.name.to_string())
+        .collect::<Vec<String>>();
+        if let Err(e) = self
+            .send
+            .lock()
+            .await
+            .send(StateResult::Typing(
+                if typing.is_empty() {
+                    String::default()
+                } else {
+                    format!("{} are typing...", typing.join(", "))
+                }
+            ))
+            .await
+        {
+            panic!("{}", e)
+        }
+    }
     // `PresenceEvent` is a struct so there is only the one method
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomAliases` event.
     async fn on_presence_event(&self, _: Arc<RwLock<Room>>, _event: &PresenceEvent) {}

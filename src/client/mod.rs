@@ -6,15 +6,17 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use matrix_sdk::{
     self,
-    api::r0::filter::{LazyLoadOptions, RoomEventFilter},
+    // api::r0::filter::{LazyLoadOptions, RoomEventFilter},
     api::r0::message::create_message_event,
     api::r0::message::get_message_events,
     api::r0::session::login,
     events::room::message::MessageEventContent,
     identifiers::{RoomId, UserId},
-    AsyncClient, AsyncClientConfig, Client as BaseClient, Room, SyncSettings,
+    AsyncClient,
+    AsyncClientConfig,
+    Room,
+    SyncSettings,
 };
-use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 use url::Url;
 use uuid::Uuid;
@@ -26,6 +28,7 @@ const SYNC_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Clone)]
 pub struct MatrixClient {
+    /// TODO once matrix-sdk `StateStore` is impled make this work
     pub inner: AsyncClient,
     homeserver: String,
     user: Option<UserId>,

@@ -10,7 +10,7 @@ use matrix_sdk::Room;
 use tokio::runtime::Handle;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
@@ -19,9 +19,8 @@ use crate::client::MatrixClient;
 use matrix_sdk::api::r0::message::create_message_event;
 use matrix_sdk::api::r0::message::get_message_events;
 use matrix_sdk::api::r0::session::login;
-use matrix_sdk::events::{room::message::MessageEventContent, EventResult};
+use matrix_sdk::events::room::message::MessageEventContent;
 use matrix_sdk::identifiers::RoomId;
-use matrix_sdk::{AsyncClient, AsyncClientConfig};
 
 pub enum UserRequest {
     Login(String, String),
@@ -69,7 +68,7 @@ impl MatrixEventHandle {
         let mut client = MatrixClient::new(homeserver).unwrap();
         client.inner.add_event_emitter(Box::new(stream)).await;
 
-        let mut cli = client.inner.clone();
+        let cli = client.inner.clone();
         // when the ui loop logs in start_sync releases and starts `sync_forever`
         let start_sync = Arc::from(AtomicBool::from(false));
         let quit_flag = Arc::from(AtomicBool::from(false));

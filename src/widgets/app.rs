@@ -311,6 +311,8 @@ impl AppWidget {
         match self.emitter_msgs.try_recv() {
             Ok(res) => match res {
                 StateResult::Message(msg, room) => self.chat.msgs.add_message(msg, room),
+                StateResult::FullyRead(ev_id, room_id) => self.chat.msgs.add_notify(""),
+                StateResult::Typing(msg) => self.chat.msgs.add_notify(&msg),
                 _ => {}
             },
             _ => {}
@@ -367,7 +369,7 @@ impl AppWidget {
                                     .get("transaction_id")
                                     .map(|id| serde_json::from_value::<String>(id.clone()).unwrap())
                                     .unwrap_or_default();
-                                
+
                                 let msg = Message {
                                     kind: MessageKind::Server,
                                     name,

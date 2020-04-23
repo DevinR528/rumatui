@@ -488,4 +488,29 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
         println!("{:#?}", parsed);
         let _text = parsed.into_text();
     }
+
+    fn failed_messages() {
+        let input = r#"TWIM: \n# Docker-matrix\n\nThe docker image for synapse v1.12.4rc1 is now on [mvgorcum/docker-matrix:v1.12.4rc1](https://hub.docker.com/r/mvgorcum/docker-matrix/tags)"#;
+
+        let mut options = Options::empty();
+        options.insert(Options::ENABLE_TASKLISTS);
+        options.insert(Options::ENABLE_STRIKETHROUGH);
+        let parser = Parser::new_ext(&input, options);
+        let syntax_set = SyntaxSet::load_defaults_nonewlines();
+
+        let mut w = Writter::default();
+        mdcat::push_tty(
+            &mut w,
+            &TerminalCapabilities::detect(),
+            TerminalSize::detect().unwrap(),
+            parser,
+            &std::path::Path::new("/"),
+            ResourceAccess::RemoteAllowed,
+            syntax_set,
+        )
+        .expect("failed");
+
+        let parsed = CtrlChars::parse(w.to_string());
+        print!("{:?}", parsed);
+    }
 }
