@@ -14,7 +14,9 @@ use matrix_sdk::{
     identifiers::{RoomId, UserId},
     AsyncClient,
     AsyncClientConfig,
+    JsonStore,
     Room,
+    StateStore,
     SyncSettings,
 };
 use tokio::sync::RwLock;
@@ -30,7 +32,7 @@ const SYNC_TIMEOUT: Duration = Duration::from_secs(5);
 pub struct MatrixClient {
     /// TODO once matrix-sdk `StateStore` is impled make this work
     pub inner: AsyncClient,
-    homeserver: String,
+    homeserver: Url,
     user: Option<UserId>,
     settings: SyncSettings,
     next_batch: Option<String>,
@@ -48,12 +50,11 @@ impl fmt::Debug for MatrixClient {
 
 impl MatrixClient {
     pub fn new(homeserver: &str) -> Result<Self, failure::Error> {
-        let _client_config = AsyncClientConfig::default();
-        let homeserver_url = Url::parse(&homeserver)?;
+        let homeserver = Url::parse(&homeserver)?;
 
         let client = Self {
-            inner: AsyncClient::new(homeserver_url, None)?,
-            homeserver: homeserver.into(),
+            inner: AsyncClient::new(homeserver.clone(), None)?,
+            homeserver,
             user: None,
             settings: SyncSettings::default(),
             next_batch: None,
@@ -72,6 +73,14 @@ impl MatrixClient {
         username: String,
         password: String,
     ) -> Result<(HashMap<RoomId, Arc<RwLock<Room>>>, login::Response)> {
+        let mut path = dirs::home_dir().ok_or(std::io::Error::new(std::io::ErrorKind::NotFound, "no home directory found"))?;
+        path.push(".rumatui");
+        path.push(format!("{}", username));
+        // reset the client with the state store with username as part of the store path
+        let client_config = AsyncClientConfig::default().state_store(Box::new(JsonStore::open(path)?));
+
+        self.inner = AsyncClient::new_with_config(self.homeserver.clone(), None, client_config)?;
+
         let res = self.inner.login(username, password, None, None).await?;
         self.user = Some(res.user_id.clone());
 
@@ -125,7 +134,7 @@ impl MatrixClient {
     pub(crate) async fn get_messages(
         &mut self,
         id: &RoomId,
-    ) -> Result<get_message_events::IncomingResponse> {
+    ) -> Result<get_message_events::Response> {
         let from = if let Some(scroll) = self.last_scroll.get(id) {
             scroll.clone()
         } else {
@@ -154,10 +163,7 @@ impl MatrixClient {
                 self.last_scroll.insert(id.clone(), res.end.clone());
                 Ok(res)
             }
-            Err(err) => {
-                println!("{:#?}", err);
-                Err(err)
-            }
+            err => err,
         }
     }
 }

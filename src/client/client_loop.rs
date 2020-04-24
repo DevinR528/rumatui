@@ -43,7 +43,7 @@ impl fmt::Debug for UserRequest {
 pub enum RequestResult {
     Login(Result<(HashMap<RoomId, Arc<RwLock<Room>>>, login::Response)>),
     SendMessage(Result<create_message_event::Response>),
-    RoomMsgs(Result<(get_message_events::IncomingResponse, Arc<RwLock<Room>>)>),
+    RoomMsgs(Result<(get_message_events::Response, Arc<RwLock<Room>>)>),
     Error(anyhow::Error),
 }
 unsafe impl Send for RequestResult {}

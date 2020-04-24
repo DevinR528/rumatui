@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use matrix_sdk::events::{
     fully_read::FullyReadEvent,
@@ -43,7 +44,7 @@ pub struct Message {
     pub text: String,
     pub user: UserId,
     pub event_id: EventId,
-    pub timestamp: js_int::UInt,
+    pub timestamp: SystemTime,
     pub uuid: Uuid,
 }
 

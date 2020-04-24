@@ -7,7 +7,7 @@ use matrix_sdk::api::r0::message::get_message_events;
 use matrix_sdk::events::{
     collections::all::RoomEvent,
     room::message::{MessageEvent, MessageEventContent, TextMessageEventContent},
-    EventResult,
+    EventJson,
 };
 use matrix_sdk::Room;
 use termion::event::MouseButton;
@@ -329,11 +329,11 @@ impl AppWidget {
 
     async fn process_room_events(
         &mut self,
-        events: get_message_events::IncomingResponse,
+        events: get_message_events::Response,
         room: Arc<RwLock<Room>>,
     ) {
         for ev in events.chunk {
-            if let EventResult::Ok(e) = ev {
+            if let Ok(e) = ev.deserialize() {
                 match e {
                     RoomEvent::RoomMessage(msg) => {
                         let MessageEvent {

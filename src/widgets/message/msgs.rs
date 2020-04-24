@@ -1,8 +1,8 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::time::SystemTime;
 
 use itertools::Itertools;
-use js_int::UInt;
 use matrix_sdk::events::room::message::{MessageEventContent, TextMessageEventContent};
 use matrix_sdk::identifiers::{EventId, RoomId, UserId};
 use termion::event::MouseButton;
@@ -112,7 +112,7 @@ impl MessageWidget {
                     body.clone()
                 };
                 let now = chrono::Utc::now().timestamp_millis();
-                let timestamp = UInt::new(now as u64).unwrap();
+                let timestamp = SystemTime::now();
                 let msg = Message {
                     kind: MessageKind::Echo,
                     text: msg,

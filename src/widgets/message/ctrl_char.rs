@@ -489,6 +489,7 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
         let _text = parsed.into_text();
     }
 
+    #[test]
     fn failed_messages() {
         let input = r#"TWIM: \n# Docker-matrix\n\nThe docker image for synapse v1.12.4rc1 is now on [mvgorcum/docker-matrix:v1.12.4rc1](https://hub.docker.com/r/mvgorcum/docker-matrix/tags)"#;
 
