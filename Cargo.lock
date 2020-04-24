@@ -961,7 +961,7 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 [[package]]
 name = "matrix-sdk"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk/?branch=rumatui#49980312e5b9092a935bf55fe8e2887ef19c79f8"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk/?branch=rumatui#ebef9fc51212391d1c9c8103a37dd7561b57918e"
 dependencies = [
  "async-trait",
  "atomic",

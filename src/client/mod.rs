@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use matrix_sdk::{
@@ -51,9 +52,13 @@ impl fmt::Debug for MatrixClient {
 impl MatrixClient {
     pub fn new(homeserver: &str) -> Result<Self, failure::Error> {
         let homeserver = Url::parse(&homeserver)?;
+        let mut path = dirs::home_dir().ok_or(std::io::Error::new(std::io::ErrorKind::NotFound, "no home directory found"))?;
+        path.push(".rumatui");
+        // reset the client with the state store with username as part of the store path
+        let client_config = AsyncClientConfig::default().state_store(Box::new(JsonStore::open(path)?));
 
         let client = Self {
-            inner: AsyncClient::new(homeserver.clone(), None)?,
+            inner: AsyncClient::new_with_config(homeserver.clone(), None, client_config)?,
             homeserver,
             user: None,
             settings: SyncSettings::default(),
@@ -73,13 +78,7 @@ impl MatrixClient {
         username: String,
         password: String,
     ) -> Result<(HashMap<RoomId, Arc<RwLock<Room>>>, login::Response)> {
-        let mut path = dirs::home_dir().ok_or(std::io::Error::new(std::io::ErrorKind::NotFound, "no home directory found"))?;
-        path.push(".rumatui");
-        path.push(format!("{}", username));
-        // reset the client with the state store with username as part of the store path
-        let client_config = AsyncClientConfig::default().state_store(Box::new(JsonStore::open(path)?));
-
-        self.inner = AsyncClient::new_with_config(self.homeserver.clone(), None, client_config)?;
+        self.inner.append_state_store_path(&PathBuf::from(format!("{}", username))).await;
 
         let res = self.inner.login(username, password, None, None).await?;
         self.user = Some(res.user_id.clone());
