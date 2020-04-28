@@ -74,6 +74,11 @@ impl LoginWidget {
             && !self.login.username.is_empty()
     }
 
+    pub(crate) fn clear_login(&mut self) {
+        // self.login.username.clear();
+        // self.login.password.clear();
+    }
+
     /// If right mouse button and clicked within the area of the username or
     /// password field the respective text box is selected.
     pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {

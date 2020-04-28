@@ -215,6 +215,7 @@ impl EventEmitter for EventStream {
             panic!("{}", e)
         }
     }
+    
     // `PresenceEvent` is a struct so there is only the one method
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomAliases` event.
     async fn on_presence_event(&self, _: Arc<RwLock<Room>>, _event: &PresenceEvent) {}

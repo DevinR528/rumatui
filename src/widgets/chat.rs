@@ -26,6 +26,7 @@ pub struct ChatWidget {
 
 impl ChatWidget {
     pub(crate) async fn set_room_state(&mut self, rooms: HashMap<RoomId, Arc<RwLock<Room>>>) {
+        self.msgs.populate_initial_msgs(&rooms).await;
         self.room.populate_rooms(rooms).await;
         self.msgs.current_room = Rc::clone(&self.room.current_room);
         self.current_room = Rc::clone(&self.room.current_room);

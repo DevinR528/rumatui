@@ -21,12 +21,13 @@ impl<'e> RenderWidget for ErrorWidget<'e> {
     where
         B: Backend,
     {
-        let _chunks = Layout::default()
+        let vert_chunks = Layout::default()
+            .direction(Direction::Vertical)
             .constraints(
                 [
-                    Constraint::Percentage(15),
-                    Constraint::Percentage(60),
-                    Constraint::Percentage(15),
+                    Constraint::Percentage(25),
+                    Constraint::Percentage(50),
+                    Constraint::Percentage(25),
                 ]
                 .as_ref(),
             )
@@ -36,13 +37,13 @@ impl<'e> RenderWidget for ErrorWidget<'e> {
             .direction(Direction::Horizontal)
             .constraints(
                 [
-                    Constraint::Percentage(15),
-                    Constraint::Percentage(60),
-                    Constraint::Percentage(15),
+                    Constraint::Percentage(30),
+                    Constraint::Percentage(40),
+                    Constraint::Percentage(30),
                 ]
                 .as_ref(),
             )
-            .split(f.size());
+            .split(vert_chunks[1]);
 
         let txt = [Text::styled(
             self.0.to_string(),

@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
-use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use matrix_sdk::{
@@ -17,7 +16,6 @@ use matrix_sdk::{
     AsyncClientConfig,
     JsonStore,
     Room,
-    StateStore,
     SyncSettings,
 };
 use tokio::sync::RwLock;
@@ -78,8 +76,6 @@ impl MatrixClient {
         username: String,
         password: String,
     ) -> Result<(HashMap<RoomId, Arc<RwLock<Room>>>, login::Response)> {
-        self.inner.append_state_store_path(&PathBuf::from(format!("{}", username))).await;
-
         let res = self.inner.login(username, password, None, None).await?;
         self.user = Some(res.user_id.clone());
 
@@ -90,17 +86,6 @@ impl MatrixClient {
         self.next_batch = self.inner.sync_token().await;
 
         Ok((self.inner.get_rooms().await, res))
-    }
-
-    pub(crate) async fn sync(&mut self) -> Result<()> {
-        let tkn = self.sync_token().unwrap();
-
-        self.settings = SyncSettings::new().token(tkn).timeout(SYNC_TIMEOUT);
-        self.inner
-            .sync(self.settings.to_owned())
-            .await
-            .map(|_res| ())
-            .map_err(|e| anyhow::Error::from(e))
     }
 
     /// Sends a MessageEvent to the specified room.

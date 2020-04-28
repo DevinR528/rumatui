@@ -7,7 +7,6 @@ use matrix_sdk::api::r0::message::get_message_events;
 use matrix_sdk::events::{
     collections::all::RoomEvent,
     room::message::{MessageEvent, MessageEventContent, TextMessageEventContent},
-    EventJson,
 };
 use matrix_sdk::Room;
 use termion::event::MouseButton;
@@ -177,27 +176,31 @@ impl AppWidget {
 
     async fn add_char(&mut self, c: char) {
         // TODO add homeserver_url sign in in client??
-        if !self.login_w.logged_in {
-            if c == '\n' && self.login_w.try_login() {
-                let Login {
-                    username, password, ..
-                } = &self.login_w.login;
-                self.login_w.logging_in = true;
-                if let Err(e) = self
-                    .send_jobs
-                    .send(UserRequest::Login(username.into(), password.into()))
-                    .await
-                {
-                    self.set_error(Error::from(e));
+        if self.error.is_none() {
+            if !self.login_w.logged_in {
+                if c == '\n' && self.login_w.try_login() {
+                    let Login {
+                        username, password, ..
+                    } = &self.login_w.login;
+                    self.login_w.logging_in = true;
+                    if let Err(e) = self
+                        .send_jobs
+                        .send(UserRequest::Login(username.into(), password.into()))
+                        .await
+                    {
+                        self.set_error(Error::from(e));
+                    } else {
+                        self.login_w.clear_login();
+                    }
                 }
+                if let LoginSelect::Username = self.login_w.login.selected {
+                    self.login_w.login.username.push(c);
+                } else {
+                    self.login_w.login.password.push(c);
+                }
+            } else if self.chat.main_screen {
+                self.chat.msgs.add_char(c);
             }
-            if let LoginSelect::Username = self.login_w.login.selected {
-                self.login_w.login.username.push(c);
-            } else {
-                self.login_w.login.password.push(c);
-            }
-        } else if self.chat.main_screen {
-            self.chat.msgs.add_char(c);
         }
     }
 
@@ -311,7 +314,7 @@ impl AppWidget {
         match self.emitter_msgs.try_recv() {
             Ok(res) => match res {
                 StateResult::Message(msg, room) => self.chat.msgs.add_message(msg, room),
-                StateResult::FullyRead(ev_id, room_id) => self.chat.msgs.add_notify(""),
+                StateResult::FullyRead(_ev_id, _room_id) => self.chat.msgs.add_notify(""),
                 StateResult::Typing(msg) => self.chat.msgs.add_notify(&msg),
                 _ => {}
             },

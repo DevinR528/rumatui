@@ -1,11 +1,18 @@
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::SystemTime;
+use std::sync::Arc;
 
 use itertools::Itertools;
-use matrix_sdk::events::room::message::{MessageEventContent, TextMessageEventContent};
+use matrix_sdk::events::{
+    collections::all::RoomEvent,
+    room::message::{MessageEvent, MessageEventContent, TextMessageEventContent}
+};
 use matrix_sdk::identifiers::{EventId, RoomId, UserId};
+use matrix_sdk::Room;
 use termion::event::MouseButton;
+use tokio::sync::RwLock;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect, ScrollMode};
 use tui::style::{Color, Modifier, Style};
@@ -48,6 +55,65 @@ pub struct MessageWidget {
 }
 
 impl MessageWidget {
+    pub async fn populate_initial_msgs(&mut self, rooms: &HashMap<RoomId, Arc<RwLock<Room>>>) {
+        for (_id, room) in rooms {
+            let room = room.read().await;
+            for msg in room.messages.iter() {
+                if let RoomEvent::RoomMessage(message) = msg {
+                    self.add_message_event(message, &room);
+                }
+            }
+        }
+    }
+
+    fn add_message_event(&mut self, event: &MessageEvent, room: &Room) {
+        let MessageEvent {
+            content,
+            sender,
+            event_id,
+            origin_server_ts,
+            unsigned,
+            ..
+        } = event;
+        let name = if let Some(mem) = room.members.get(&sender) {
+            mem.name.clone()
+        } else {
+            sender.localpart().into()
+        };
+        match content {
+            MessageEventContent::Text(TextMessageEventContent {
+                body: msg_body,
+                formatted_body,
+                ..
+            }) => {
+                let msg = if let Some(_fmted) = formatted_body {
+                    crate::widgets::utils::markdown_to_terminal(msg_body)
+                        .unwrap_or(msg_body.clone())
+                } else {
+                    msg_body.clone()
+                };
+                let txn_id = unsigned
+                    .get("transaction_id")
+                    .map(|id| serde_json::from_value::<String>(id.clone()).unwrap())
+                    .unwrap_or_default();
+
+                self.add_message(
+                    Message {
+                        kind: MessageKind::Server,
+                        name,
+                        user: sender.clone(),
+                        text: msg,
+                        event_id: event_id.clone(),
+                        timestamp: *origin_server_ts,
+                        uuid: Uuid::parse_str(&txn_id).unwrap_or(Uuid::new_v4()),
+                    },
+                    room.room_id.clone(),
+                );
+            }
+            _ => {}
+        }
+    }
+
     pub fn add_message(&mut self, msg: Message, room: RoomId) {
         if let Some(idx) = self.messages.iter().position(|(_, m)| m.uuid == msg.uuid) {
             self.messages[idx] = (room, msg);
@@ -111,7 +177,6 @@ impl MessageWidget {
                 } else {
                     body.clone()
                 };
-                let now = chrono::Utc::now().timestamp_millis();
                 let timestamp = SystemTime::now();
                 let msg = Message {
                     kind: MessageKind::Echo,
