@@ -83,6 +83,10 @@ impl<I> IndexMut<usize> for ListState<I> {
     }
 }
 
+// TODO split RoomsWidget into render and state halves. RoomRender has the methods to filter
+// and populate ListState using the rooms HashMap. RoomState or RoomData?? will populate and keep track of
+// state
+
 #[derive(Clone, Debug, Default)]
 pub struct RoomsWidget {
     area: Rect,
@@ -99,7 +103,6 @@ impl RoomsWidget {
     ///
     /// ## Arguments
     ///  * rooms - A `HashMap` of room_id to `Room`.
-    ///  * current is the current room id controlled by the ChatWidget.
     pub(crate) async fn populate_rooms(&mut self, rooms: HashMap<RoomId, Arc<RwLock<Room>>>) {
         self.rooms = rooms.clone();
         let mut items: Vec<(String, RoomId)> = Vec::default();

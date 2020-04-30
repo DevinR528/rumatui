@@ -33,7 +33,7 @@ unsafe impl Send for UserRequest {}
 impl fmt::Debug for UserRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Login(_, _) => write!(f, "failed login"),
+            Self::Login(name, _) => write!(f, "failed login for {}", name),
             Self::SendMessage(id, _, _) => write!(f, "failed sending message for {}", id),
             Self::RoomMsgs(id) => write!(f, "failed to get room messages for {}", id),
             Self::Quit => write!(f, "quitting filed"),

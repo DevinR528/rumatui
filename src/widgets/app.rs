@@ -23,7 +23,7 @@ use super::chat::ChatWidget;
 use super::error::ErrorWidget;
 use super::login::{Login, LoginSelect, LoginWidget};
 use crate::client::client_loop::{MatrixEventHandle, RequestResult, UserRequest};
-use crate::client::event_stream::{EventStream, Message, MessageKind, StateResult};
+use crate::client::event_stream::{EventStream, Message, StateResult};
 
 pub trait RenderWidget {
     fn render<B>(&mut self, f: &mut Frame<B>, area: Rect)
@@ -43,6 +43,9 @@ pub trait DrawWidget {
     }
 }
 
+// TODO split AppWidget into render and state halves. AppRender has the methods deal with rendering.
+// AppState or AppData?? will delegate to the state half of each widget.
+
 pub struct AppWidget {
     /// Title of the app "rumatui".
     pub title: String,
@@ -54,8 +57,6 @@ pub struct AppWidget {
     pub sync_started: bool,
     /// Have we started a scroll request.
     pub scrolling: bool,
-    /// The time since last sync.
-    pub last_sync: Instant,
     /// The login element. This knows how to render and also holds the state of logging in.
     pub login_w: LoginWidget,
     /// The main screen. Holds the state once a user is logged in.
@@ -72,8 +73,12 @@ pub struct AppWidget {
 }
 
 impl AppWidget {
-    pub async fn new(rt: Handle) -> Self {
-        let homeserver = "http://matrix.org";
+    pub async fn new(rt: Handle, homeserver: &str) -> Self {
+        let homeserver = if homeserver.is_empty() {
+            "http://matrix.org"
+        } else {
+            homeserver
+        };
 
         let (send, recv) = mpsc::channel(1024);
 
@@ -86,7 +91,6 @@ impl AppWidget {
             should_quit: false,
             sync_started: false,
             scrolling: false,
-            last_sync: Instant::now(),
             login_w: LoginWidget::default(),
             chat: ChatWidget::default(),
             ev_loop,
@@ -175,7 +179,6 @@ impl AppWidget {
     pub fn on_left(&mut self) {}
 
     async fn add_char(&mut self, c: char) {
-        // TODO add homeserver_url sign in in client??
         if self.error.is_none() {
             if !self.login_w.logged_in {
                 if c == '\n' && self.login_w.try_login() {
@@ -313,6 +316,12 @@ impl AppWidget {
 
         match self.emitter_msgs.try_recv() {
             Ok(res) => match res {
+                StateResult::Member {
+                    sender,
+                    receiver,
+                    room_id,
+                    membership,
+                } => {}
                 StateResult::Message(msg, room) => self.chat.msgs.add_message(msg, room),
                 StateResult::FullyRead(_ev_id, _room_id) => self.chat.msgs.add_notify(""),
                 StateResult::Typing(msg) => self.chat.msgs.add_notify(&msg),
@@ -374,7 +383,6 @@ impl AppWidget {
                                     .unwrap_or_default();
 
                                 let msg = Message {
-                                    kind: MessageKind::Server,
                                     name,
                                     user: sender.clone(),
                                     text: msg,

@@ -25,7 +25,7 @@ use uuid::Uuid;
 pub mod client_loop;
 pub mod event_stream;
 
-const SYNC_TIMEOUT: Duration = Duration::from_secs(5);
+const SYNC_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Clone)]
 pub struct MatrixClient {
@@ -50,10 +50,16 @@ impl fmt::Debug for MatrixClient {
 impl MatrixClient {
     pub fn new(homeserver: &str) -> Result<Self, failure::Error> {
         let homeserver = Url::parse(&homeserver)?;
-        let mut path = dirs::home_dir().ok_or(std::io::Error::new(std::io::ErrorKind::NotFound, "no home directory found"))?;
+        let mut path = dirs::home_dir().ok_or(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "no home directory found",
+        ))?;
         path.push(".rumatui");
         // reset the client with the state store with username as part of the store path
-        let client_config = AsyncClientConfig::default().state_store(Box::new(JsonStore::open(path)?));
+        let client_config = AsyncClientConfig::default()
+            // .proxy("http://localhost:8080")? // for mitmproxy
+            // .disable_ssl_verification()
+            .state_store(Box::new(JsonStore::open(path)?));
 
         let client = Self {
             inner: AsyncClient::new_with_config(homeserver.clone(), None, client_config)?,
@@ -79,12 +85,19 @@ impl MatrixClient {
         let res = self.inner.login(username, password, None, None).await?;
         self.user = Some(res.user_id.clone());
 
-        let _response = self
-            .inner
-            .sync(SyncSettings::default().timeout(SYNC_TIMEOUT))
-            .await?;
-        self.next_batch = self.inner.sync_token().await;
+        // if we can't sync with the "Db" then we must sync with the server
+        if !self.inner.sync_with_state_store().await? {
+            let _response = self
+                .inner
+                .sync(
+                    SyncSettings::default()
+                        .timeout(SYNC_TIMEOUT)
+                        .full_state(false),
+                )
+                .await?;
+        }
 
+        self.next_batch = self.inner.sync_token().await;
         Ok((self.inner.get_rooms().await, res))
     }
 

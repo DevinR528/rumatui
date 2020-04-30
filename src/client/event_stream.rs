@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -11,7 +12,7 @@ use matrix_sdk::events::{
         avatar::AvatarEvent,
         canonical_alias::CanonicalAliasEvent,
         join_rules::JoinRulesEvent,
-        member::MemberEvent,
+        member::{MemberEvent, MembershipChange},
         message::{
             feedback::FeedbackEvent, MessageEvent, MessageEventContent, TextMessageEventContent,
         },
@@ -32,14 +33,7 @@ use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
-pub enum MessageKind {
-    Echo,
-    Server,
-}
-
-#[derive(Clone, Debug)]
 pub struct Message {
-    pub kind: MessageKind,
     pub name: String,
     pub text: String,
     pub user: UserId,
@@ -48,7 +42,18 @@ pub struct Message {
     pub uuid: Uuid,
 }
 
+pub struct UserDisplay {
+    user_id: UserId,
+    name: String,
+}
+
 pub enum StateResult {
+    Member {
+        sender: UserDisplay,
+        receiver: UserDisplay,
+        room_id: RoomId,
+        membership: MembershipChange,
+    },
     Message(Message, RoomId),
     FullyRead(EventId, RoomId),
     Typing(String),
@@ -76,7 +81,54 @@ impl EventStream {
 
 #[async_trait::async_trait]
 impl EventEmitter for EventStream {
-    async fn on_room_member(&self, _: Arc<RwLock<Room>>, _: &MemberEvent) {}
+    async fn on_room_member(&self, room: Arc<RwLock<Room>>, event: &MemberEvent) {
+        let MemberEvent {
+            content,
+            sender,
+            state_key,
+            room_id,
+            ..
+        } = event;
+        let recipiant = UserId::try_from(state_key.as_str()).unwrap();
+        let sender = room
+            .read()
+            .await
+            .members
+            .get(&sender)
+            .map(|mem| UserDisplay {
+                user_id: event.sender.clone(),
+                name: mem.name.clone(),
+            });
+
+        let receiver = room
+            .read()
+            .await
+            .members
+            .get(&recipiant)
+            .map(|mem| UserDisplay {
+                user_id: recipiant,
+                name: mem.name.clone(),
+            });
+
+        let membership = event.membership_change();
+        let room_id = room.read().await.room_id.clone();
+        if let (Some(sender), Some(receiver)) = (sender, receiver) {
+            if let Err(e) = self
+                .send
+                .lock()
+                .await
+                .send(StateResult::Member {
+                    sender,
+                    receiver,
+                    room_id,
+                    membership,
+                })
+                .await
+            {
+                panic!("{}", e)
+            }
+        }
+    }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomName` event.
     async fn on_room_name(&self, _: Arc<RwLock<Room>>, _: &NameEvent) {}
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomCanonicalAlias` event.
@@ -125,7 +177,6 @@ impl EventEmitter for EventStream {
                     .await
                     .send(StateResult::Message(
                         Message {
-                            kind: MessageKind::Server,
                             name,
                             user: sender.clone(),
                             text: msg,
@@ -192,30 +243,33 @@ impl EventEmitter for EventStream {
     }
     /// Fires when `AsyncClient` receives a `NonRoomEvent::Typing` event.
     async fn on_account_data_typing(&self, room: Arc<RwLock<Room>>, event: &TypingEvent) {
-        let typing = room.read()
-        .await
-        .members
-        .iter()
-        .filter(|(id, _)| event.content.user_ids.contains(id))
-        .map(|(_, mem)| mem.name.to_string())
-        .collect::<Vec<String>>();
+        let typing = room
+            .read()
+            .await
+            .members
+            .iter()
+            .filter(|(id, _)| event.content.user_ids.contains(id))
+            .map(|(_, mem)| mem.name.to_string())
+            .collect::<Vec<String>>();
         if let Err(e) = self
             .send
             .lock()
             .await
-            .send(StateResult::Typing(
-                if typing.is_empty() {
-                    String::default()
-                } else {
-                    format!("{} are typing...", typing.join(", "))
-                }
-            ))
+            .send(StateResult::Typing(if typing.is_empty() {
+                String::default()
+            } else {
+                format!(
+                    "{} {} typing...",
+                    typing.join(", "),
+                    if typing.len() > 1 { "are" } else { "is" }
+                )
+            }))
             .await
         {
             panic!("{}", e)
         }
     }
-    
+
     // `PresenceEvent` is a struct so there is only the one method
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomAliases` event.
     async fn on_presence_event(&self, _: Arc<RwLock<Room>>, _event: &PresenceEvent) {}

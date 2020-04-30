@@ -1,8 +1,9 @@
+use std::fmt::{self, Display};
+use std::io::{self, Error, ErrorKind, Write};
+
 use comrak;
 use mdcat::{self, ResourceAccess, TerminalCapabilities, TerminalSize};
 use pulldown_cmark::{Options, Parser};
-use std::fmt::{self, Display};
-use std::io::{self, Error, ErrorKind, Write};
 use syntect::parsing::SyntaxSet;
 
 #[derive(Default)]
@@ -28,8 +29,6 @@ impl Display for Writter {
         }
     }
 }
-
-fn test_html_write() {}
 
 pub(crate) fn markdown_to_terminal(input: &str) -> Result<String, anyhow::Error> {
     let mut options = Options::empty();

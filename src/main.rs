@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use std::io::{self};
-
+use std::env;
+use std::io;
 use std::time::Duration;
 
 use termion::event::{Event as TermEvent, Key, MouseButton, MouseEvent};
@@ -18,10 +18,9 @@ mod widgets;
 use ui_loop::{Config, Event, UiEventHandle};
 use widgets::app::{AppWidget, DrawWidget};
 
-pub type RoomIdStr = String;
-pub type UserIdStr = String;
-
 fn main() -> Result<(), failure::Error> {
+    let server = env::args().nth(1).unwrap_or(String::default());
+
     let mut runtime = tokio::runtime::Builder::new()
         .basic_scheduler()
         .threaded_scheduler()
@@ -32,7 +31,7 @@ fn main() -> Result<(), failure::Error> {
     let executor = runtime.handle().clone();
 
     runtime.block_on(async {
-        let mut app = AppWidget::new(executor).await;
+        let mut app = AppWidget::new(executor, &server).await;
         let events = UiEventHandle::with_config(Config {
             tick_rate: Duration::from_millis(60),
             exit_key: termion::event::Key::Ctrl('q'),

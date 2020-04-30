@@ -1,13 +1,13 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::time::SystemTime;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use itertools::Itertools;
 use matrix_sdk::events::{
     collections::all::RoomEvent,
-    room::message::{MessageEvent, MessageEventContent, TextMessageEventContent}
+    room::message::{MessageEvent, MessageEventContent, TextMessageEventContent},
 };
 use matrix_sdk::identifiers::{EventId, RoomId, UserId};
 use matrix_sdk::Room;
@@ -21,7 +21,7 @@ use tui::Frame;
 use uuid::Uuid;
 
 use super::ctrl_char;
-use crate::client::event_stream::{Message, MessageKind};
+use crate::client::event_stream::Message;
 use crate::widgets::app::RenderWidget;
 use crate::widgets::utils::markdown_to_html;
 
@@ -37,6 +37,10 @@ pub enum MsgType {
     ServerNotice,
     Video,
 }
+
+// TODO split MessageWidget into render and state halves. MsgRender has the methods to filter
+// and populate messages using the messages Vec. MessageState or Data?? will populate and keep track of
+// state, add_message_event, get_sending_message, process and such are part of state/data
 
 #[derive(Clone, Debug, Default)]
 pub struct MessageWidget {
@@ -99,7 +103,6 @@ impl MessageWidget {
 
                 self.add_message(
                     Message {
-                        kind: MessageKind::Server,
                         name,
                         user: sender.clone(),
                         text: msg,
@@ -115,6 +118,8 @@ impl MessageWidget {
     }
 
     pub fn add_message(&mut self, msg: Message, room: RoomId) {
+        // remove the message echo when user sends a message and we display the text before
+        // the server responds
         if let Some(idx) = self.messages.iter().position(|(_, m)| m.uuid == msg.uuid) {
             self.messages[idx] = (room, msg);
             return;
@@ -178,13 +183,17 @@ impl MessageWidget {
                     body.clone()
                 };
                 let timestamp = SystemTime::now();
+                let domain = url::Url::parse(homeserver)
+                    .ok()
+                    .and_then(|url| url.domain().map(|s| s.to_string()))
+                    // this is probably an error at this point
+                    .unwrap_or(String::from("matrix.org"));
                 let msg = Message {
-                    kind: MessageKind::Echo,
                     text: msg,
                     user: self.me.as_ref().unwrap().clone(),
                     timestamp,
                     name,
-                    event_id: EventId::new(homeserver).unwrap(),
+                    event_id: EventId::new(&domain).unwrap(),
                     uuid,
                 };
                 self.add_message(msg, id.clone())
@@ -293,9 +302,10 @@ impl RenderWidget for MessageWidget {
 
         self.msg_area = chunks[0];
         let b = self.current_room.borrow();
-        let cmp_id = if let Some(id) = b.as_ref() {
+        let current_room_id = if let Some(id) = b.as_ref() {
             Some(id)
         } else {
+            // or take the first room in the list, this happens on login
             self.messages.first().map(|(id, _msg)| id)
         };
 
@@ -304,7 +314,7 @@ impl RenderWidget for MessageWidget {
         messages.sort_by(|(_, msg), (_, msg2)| msg.timestamp.cmp(&msg2.timestamp));
         let text = messages
             .iter()
-            .filter(|(id, _)| Some(id) == cmp_id)
+            .filter(|(id, _)| Some(id) == current_room_id)
             .unique_by(|(_id, msg)| &msg.event_id)
             .map(|x| x)
             .flat_map(|(_, msg)| ctrl_char::process_text(msg))
