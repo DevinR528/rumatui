@@ -11,7 +11,7 @@ use matrix_sdk::events::{
         avatar::AvatarEvent,
         canonical_alias::CanonicalAliasEvent,
         join_rules::JoinRulesEvent,
-        member::{MemberEvent, MembershipChange},
+        member::{MemberEvent, MembershipChange, MembershipState},
         message::{
             feedback::FeedbackEvent, MessageEvent, MessageEventContent, TextMessageEventContent,
         },
@@ -21,6 +21,10 @@ use matrix_sdk::events::{
         tombstone::TombstoneEvent,
     },
     typing::TypingEvent,
+    stripped::{
+        StrippedRoomMember, StrippedRoomName, StrippedRoomPowerLevels, StrippedRoomJoinRules, StrippedRoomCanonicalAlias,
+        StrippedRoomAvatar, StrippedRoomAliases,
+    }
 };
 use matrix_sdk::{
     self,
@@ -31,12 +35,12 @@ use tokio::sync::mpsc;
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
-use crate::widgets::{message::Message, UserDisplay};
+use crate::widgets::message::Message;
 
 pub enum StateResult {
     Member {
-        sender: UserDisplay,
-        receiver: UserDisplay,
+        sender: UserId,
+        receiver: UserId,
         room: Arc<RwLock<Room>>,
         membership: MembershipChange,
     },
@@ -72,37 +76,21 @@ impl EventEmitter for EventStream {
         let MemberEvent {
             sender, state_key, ..
         } = event;
-        let recipiant = UserId::try_from(state_key.as_str()).unwrap();
-        let sender = room
-            .read()
-            .await
-            .members
-            .get(&sender)
-            .map(|mem| UserDisplay::new(event.sender.clone(), mem.name.clone()));
-
-        let receiver = room
-            .read()
-            .await
-            .members
-            .get(&recipiant)
-            .map(|mem| UserDisplay::new(event.sender.clone(), mem.name.clone()));
-
+        let receiver = UserId::try_from(state_key.as_str()).unwrap();
         let membership = event.membership_change();
-        if let (Some(sender), Some(receiver)) = (sender, receiver) {
-            if let Err(e) = self
-                .send
-                .lock()
-                .await
-                .send(StateResult::Member {
-                    sender,
-                    receiver,
-                    room,
-                    membership,
-                })
-                .await
-            {
-                panic!("{}", e)
-            }
+        if let Err(e) = self
+            .send
+            .lock()
+            .await
+            .send(StateResult::Member {
+                sender: sender.clone(),
+                receiver,
+                room,
+                membership,
+            })
+            .await
+        {
+            panic!("{}", e)
         }
     }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomName` event.
@@ -195,6 +183,44 @@ impl EventEmitter for EventStream {
     /// Fires when `AsyncClient` receives a `StateEvent::RoomJoinRules` event.
     async fn on_state_join_rules(&self, _: Arc<RwLock<Room>>, _: &JoinRulesEvent) {}
 
+    // `AnyStrippedStateEvent`s
+    /// Fires when `AsyncClient` receives a `StateEvent::RoomMember` event.
+    async fn on_stripped_state_member(&self, room: Arc<RwLock<Room>>, event: &StrippedRoomMember) {
+        use std::ops::Deref;
+        let StrippedRoomMember {
+            sender, state_key, ..
+        } = event;
+
+        let receiver = UserId::try_from(state_key.as_str()).unwrap();
+        let membership = membership_change(event);
+        if let Err(e) = self
+            .send
+            .lock()
+            .await
+            .send(StateResult::Member {
+                sender: sender.clone(),
+                receiver: receiver.clone(),
+                room,
+                membership,
+            })
+            .await
+        {
+            panic!("{}", e)
+        }
+    }
+    /// Fires when `AsyncClient` receives a `StateEvent::RoomName` event.
+    async fn on_stripped_state_name(&self, _: Arc<RwLock<Room>>, _: &StrippedRoomName) {}
+    /// Fires when `AsyncClient` receives a `StateEvent::RoomCanonicalAlias` event.
+    async fn on_stripped_state_canonical_alias(&self, _: Arc<RwLock<Room>>, _: &StrippedRoomCanonicalAlias) {}
+    /// Fires when `AsyncClient` receives a `StateEvent::RoomAliases` event.
+    async fn on_stripped_state_aliases(&self, _: Arc<RwLock<Room>>, _: &StrippedRoomAliases) {}
+    /// Fires when `AsyncClient` receives a `StateEvent::RoomAvatar` event.
+    async fn on_stripped_state_avatar(&self, _: Arc<RwLock<Room>>, _: &StrippedRoomAvatar) {}
+    /// Fires when `AsyncClient` receives a `StateEvent::RoomPowerLevels` event.
+    async fn on_stripped_state_power_levels(&self, _: Arc<RwLock<Room>>, _: &StrippedRoomPowerLevels) {}
+    /// Fires when `AsyncClient` receives a `StateEvent::RoomJoinRules` event.
+    async fn on_stripped_state_join_rules(&self, _: Arc<RwLock<Room>>, _: &StrippedRoomJoinRules) {}
+
     // `NonRoomEvent` (this is a type alias from ruma_events) from `IncomingAccountData`
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomMember` event.
     async fn on_account_presence(&self, _: Arc<RwLock<Room>>, _: &PresenceEvent) {}
@@ -249,4 +275,40 @@ impl EventEmitter for EventStream {
     // `PresenceEvent` is a struct so there is only the one method
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomAliases` event.
     async fn on_presence_event(&self, _: Arc<RwLock<Room>>, _event: &PresenceEvent) {}
+}
+
+/// Helper function for membership change of StrippedRoomMember.
+///
+/// Check [the specification][spec] for details. [spec]: https://matrix.org/docs/spec/client_server/latest#m-room-member
+pub fn membership_change(member: &StrippedRoomMember) -> MembershipChange {
+    use MembershipState::*;
+    let prev_membership = MembershipState::Leave;
+    match (prev_membership, &member.content.membership) {
+        (Invite, Invite) | (Leave, Leave) | (Ban, Ban) => MembershipChange::None,
+        (Invite, Join) | (Leave, Join) => MembershipChange::Joined,
+        (Invite, Leave) => {
+            if member.sender == member.state_key {
+                MembershipChange::InvitationRevoked
+            } else {
+                MembershipChange::InvitationRejected
+            }
+        }
+        (Invite, Ban) | (Leave, Ban) => MembershipChange::Banned,
+        (Join, Invite) | (Ban, Invite) | (Ban, Join) => MembershipChange::Error,
+        (Join, Join) => MembershipChange::ProfileChanged,
+        (Join, Leave) => {
+            if member.sender == member.state_key {
+                MembershipChange::Left
+            } else {
+                MembershipChange::Kicked
+            }
+        }
+        (Join, Ban) => MembershipChange::KickedAndBanned,
+        (Leave, Invite) => MembershipChange::Invited,
+        (Ban, Leave) => MembershipChange::Unbanned,
+        (Knock, _) | (_, Knock) => MembershipChange::NotImplemented,
+        (__Nonexhaustive, _) | (_, __Nonexhaustive) => {
+            panic!("__Nonexhaustive enum variant is not intended for use.")
+        }
+    }
 }

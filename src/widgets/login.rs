@@ -111,7 +111,7 @@ impl RenderWidget for LoginWidget {
             .split(area);
         
         let server = self.homeserver.as_deref().unwrap_or("matrix.org");
-        let login = &format!("Log In to {}", server);
+        let login = &format!("Log in to {}", server);
         let blk = Block::default()
             .title(login)
             .title_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))

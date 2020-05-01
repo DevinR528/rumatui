@@ -1,6 +1,5 @@
 use std::io;
 
-use matrix_sdk::identifiers::UserId;
 use tui::backend::Backend;
 use tui::layout::Rect;
 use tui::{Frame, Terminal};
@@ -28,17 +27,5 @@ pub trait DrawWidget {
         B: Backend,
     {
         Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct UserDisplay {
-    user_id: UserId,
-    name: String,
-}
-
-impl UserDisplay {
-    pub(crate) fn new(user_id: UserId, name: String) -> Self {
-        Self { user_id, name }
     }
 }

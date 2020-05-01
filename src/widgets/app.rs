@@ -114,6 +114,7 @@ impl AppWidget {
                         .as_ref()
                         .unwrap()
                         .clone();
+
                     if let Err(e) = self.send_jobs.send(UserRequest::RoomMsgs(room_id)).await {
                         self.set_error(anyhow::Error::from(e))
                     }
@@ -310,58 +311,61 @@ impl AppWidget {
                     membership,
                 } => match membership {
                     MembershipChange::Joined => {
-                        if Some(receiver.user_id) == self.chat.msgs.me {
+                        if Some(&receiver) == self.chat.msgs.me.as_ref() {
                             self.chat.room.add_room(room).await;
                         } else {
                             self.chat
                                 .msgs
-                                .add_notify(&format!("{} joined the room", receiver.name))
+                                .add_notify(&format!("{} joined the room", receiver.localpart()))
                         }
                     }
                     MembershipChange::Invited => {
-                        if Some(&receiver.user_id) == self.chat.msgs.me.as_ref() {
+                        if Some(&receiver) == self.chat.msgs.me.as_ref() {
                             self.chat.room.invited(sender, room).await;
                         } else {
                             self.chat
                                 .msgs
-                                .add_notify(&format!("{} was invited to the room", receiver.name));
+                                .add_notify(&format!("{} was invited to the room", receiver.localpart()));
                         }
                     }
                     MembershipChange::Left => {
-                        if Some(receiver.user_id) == self.chat.msgs.me {
+                        if Some(&receiver) == self.chat.msgs.me.as_ref() {
                             self.chat
                                 .room
                                 .remove_room(room.read().await.room_id.clone())
                         } else {
                             self.chat
                                 .msgs
-                                .add_notify(&format!("{} left the room", receiver.name))
+                                .add_notify(&format!("{} left the room", receiver.localpart()))
                         }
                     }
                     MembershipChange::Banned => {
-                        if Some(receiver.user_id) == self.chat.msgs.me {
+                        if Some(&receiver) == self.chat.msgs.me.as_ref() {
                             self.chat
                                 .room
                                 .remove_room(room.read().await.room_id.clone())
                         } else {
                             self.chat
                                 .msgs
-                                .add_notify(&format!("{} was banned from the room", receiver.name))
+                                .add_notify(&format!("{} was banned from the room", receiver.localpart()))
                         }
                     }
                     MembershipChange::Kicked => {
-                        if Some(receiver.user_id) == self.chat.msgs.me {
+                        if Some(&receiver) == self.chat.msgs.me.as_ref() {
                             self.chat
                                 .room
                                 .remove_room(room.read().await.room_id.clone())
                         } else {
                             self.chat
                                 .msgs
-                                .add_notify(&format!("{} was kicked from the room", receiver.name))
+                                .add_notify(&format!("{} was kicked from the room", receiver.localpart()))
                         }
                     }
                     MembershipChange::ProfileChanged => {}
-                    _ => todo!("implement more membership changes"),
+                    MembershipChange::None => {},
+                    MembershipChange::Error => panic!("membership error"),
+                    MembershipChange::InvitationRejected => panic!("invite rejected"),
+                    mem => todo!("implement more membership changes {:?}", mem),
                 },
                 StateResult::Message(msg, room) => self.chat.msgs.add_message(msg, room),
                 StateResult::FullyRead(_ev_id, _room_id) => self.chat.msgs.add_notify(""),

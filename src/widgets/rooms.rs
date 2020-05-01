@@ -5,7 +5,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use itertools::Itertools;
-use matrix_sdk::identifiers::RoomId;
+use matrix_sdk::identifiers::{RoomId, UserId};
 use matrix_sdk::Room;
 use serde::{Deserialize, Serialize};
 use termion::event::MouseButton;
@@ -16,7 +16,7 @@ use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, List, Text, Paragraph};
 use tui::Frame;
 
-use crate::widgets::{RenderWidget, UserDisplay};
+use crate::widgets::RenderWidget;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ListState<I> {
@@ -86,7 +86,8 @@ impl<I> IndexMut<usize> for ListState<I> {
 #[derive(Clone, Debug)]
 pub struct Invitation {
     room_id: RoomId,
-    sender: UserDisplay,
+    room_name: String,
+    sender: UserId,
 
 }
 
@@ -156,12 +157,13 @@ impl RoomsWidget {
 
     pub(crate) async fn invited(
         &mut self,
-        sender: UserDisplay,
+        sender: UserId,
         room: Arc<RwLock<Room>>,
     ) {
         let r = room.read().await;
         let room_id = r.room_id.clone();
-        self.invite = Some(Invitation { sender, room_id, })
+        let room_name = r.calculate_name();
+        self.invite = Some(Invitation { sender, room_id, room_name, })
     }
 
     pub fn on_click(&mut self, _btn: MouseButton, x: u16, y: u16) {
@@ -272,6 +274,10 @@ impl RenderWidget for RoomsWidget {
         f.render_widget(list, chunks[0]);
 
         if let Some(invite) = self.invite.as_ref() {
+            let label_text = format!("Invited to {}", invite.room_name);
+            let label = Block::default().title(&label_text);
+            f.render_widget(label, chunks[1]);
+
             let height_chunk = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints(
@@ -300,7 +306,7 @@ impl RenderWidget for RoomsWidget {
             let yes = Block::default().title("Accept").borders(Borders::ALL);
             let no = Block::default().title("Decline").borders(Borders::ALL);
 
-                // password width using password height
+            // password width using password height
             let width_chunk2 = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints(
@@ -316,9 +322,8 @@ impl RenderWidget for RoomsWidget {
             self.yes_area = width_chunk1[1];
             self.no_area = width_chunk2[1];
             
-            let accept = format!("Accept invite to {}", invite.room_id.localpart());
             let t = [Text::styled(
-                &accept,
+                "Accept invite",
                 Style::default().fg(Color::Cyan),
             )];
             let ok = Paragraph::new(t.iter()).block(yes);
