@@ -5,7 +5,7 @@ use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, Text};
 use tui::Frame;
 
-use super::app::RenderWidget;
+use crate::widgets::RenderWidget;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Loading {
@@ -65,6 +65,7 @@ pub struct LoginWidget {
     pub logging_in: bool,
     pub logged_in: bool,
     pub waiting: Loading,
+    pub homeserver: Option<String>,
 }
 
 impl LoginWidget {
@@ -108,8 +109,13 @@ impl RenderWidget for LoginWidget {
                 .as_ref(),
             )
             .split(area);
-
-        let blk = Block::default().title("Log In").borders(Borders::ALL);
+        
+        let server = self.homeserver.as_deref().unwrap_or("matrix.org");
+        let login = &format!("Log In to {}", server);
+        let blk = Block::default()
+            .title(login)
+            .title_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
+            .borders(Borders::ALL);
         f.render_widget(blk, chunks[1]);
 
         let height_chunk = Layout::default()
@@ -172,16 +178,7 @@ impl RenderWidget for LoginWidget {
                 )
             };
 
-            // User name
-            let t = [Text::styled(
-                &self.login.username,
-                Style::default().fg(Color::Cyan),
-            )];
-            let p = Paragraph::new(t.iter()).block(high_user);
-
-            f.render_widget(p, width_chunk1[1]);
-
-            // Password from here down
+            // password width using password height
             let width_chunk2 = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints(
@@ -197,6 +194,16 @@ impl RenderWidget for LoginWidget {
             self.user_area = width_chunk1[1];
             self.password_area = width_chunk2[1];
 
+            // User name
+            let t = [Text::styled(
+                &self.login.username,
+                Style::default().fg(Color::Cyan),
+            )];
+            let p = Paragraph::new(t.iter()).block(high_user);
+
+            f.render_widget(p, width_chunk1[1]);
+
+            // Password from here down
             let t2 = [Text::styled(
                 "*".repeat(self.login.password.len()),
                 Style::default().fg(Color::Cyan),

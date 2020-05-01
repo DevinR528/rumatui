@@ -1,7 +1,44 @@
+use std::io;
+
+use matrix_sdk::identifiers::UserId;
+use tui::backend::Backend;
+use tui::layout::Rect;
+use tui::{Frame, Terminal};
+
 pub mod app;
 pub mod chat;
 pub mod error;
 pub mod login;
-mod message;
-mod rooms;
+pub mod message;
+pub mod rooms;
 pub mod utils;
+
+pub trait RenderWidget {
+    fn render<B>(&mut self, f: &mut Frame<B>, area: Rect)
+    where
+        B: Backend;
+}
+
+pub trait DrawWidget {
+    fn draw<B>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()>
+    where
+        B: Backend + Send;
+    fn draw_with<B>(&mut self, _terminal: &mut Terminal<B>, _area: Rect) -> io::Result<()>
+    where
+        B: Backend,
+    {
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct UserDisplay {
+    user_id: UserId,
+    name: String,
+}
+
+impl UserDisplay {
+    pub(crate) fn new(user_id: UserId, name: String) -> Self {
+        Self { user_id, name }
+    }
+}

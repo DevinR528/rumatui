@@ -11,12 +11,12 @@ use serde::{Deserialize, Serialize};
 use termion::event::MouseButton;
 use tokio::sync::RwLock;
 use tui::backend::Backend;
-use tui::layout::Rect;
+use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, List, Text};
+use tui::widgets::{Block, Borders, List, Text, Paragraph};
 use tui::Frame;
 
-use super::app::RenderWidget;
+use crate::widgets::{RenderWidget, UserDisplay};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ListState<I> {
@@ -83,6 +83,13 @@ impl<I> IndexMut<usize> for ListState<I> {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct Invitation {
+    room_id: RoomId,
+    sender: UserDisplay,
+
+}
+
 // TODO split RoomsWidget into render and state halves. RoomRender has the methods to filter
 // and populate ListState using the rooms HashMap. RoomState or RoomData?? will populate and keep track of
 // state
@@ -90,12 +97,17 @@ impl<I> IndexMut<usize> for ListState<I> {
 #[derive(Clone, Debug, Default)]
 pub struct RoomsWidget {
     area: Rect,
+    yes_area: Rect,
+    no_area: Rect,
     /// This is the RoomId of the last used room, the room to show on startup.
     pub(crate) current_room: Rc<RefCell<Option<RoomId>>>,
     /// List of displayable room name and room id
     pub names: ListState<(String, RoomId)>,
     /// Map of room id and matrix_sdk::Room
     pub(crate) rooms: HashMap<RoomId, Arc<RwLock<Room>>>,
+    /// When a user receives an invitation an alert pops up in the `RoomsWidget` pane
+    // this signals to show that pop up.
+    pub(crate) invite: Option<Invitation>,
 }
 
 impl RoomsWidget {
@@ -124,6 +136,32 @@ impl RoomsWidget {
         }
 
         self.names = ListState::new(items);
+    }
+
+    pub(crate) async fn add_room(&mut self, room: Arc<RwLock<Room>>) {
+        let r = room.read().await;
+        let name = r.calculate_name();
+        let room_id = r.room_id.clone();
+
+        self.rooms.insert(room_id.clone(), Arc::clone(&room));
+        self.names.items.push((name, room_id));
+    }
+
+    pub(crate) fn remove_room(&mut self, room_id: RoomId) {
+        self.rooms.remove(&room_id);
+        if let Some(idx) = self.names.items.iter().position(|(_, id)| &room_id == id) {
+            self.names.items.remove(idx);
+        }
+    }
+
+    pub(crate) async fn invited(
+        &mut self,
+        sender: UserDisplay,
+        room: Arc<RwLock<Room>>,
+    ) {
+        let r = room.read().await;
+        let room_id = r.room_id.clone();
+        self.invite = Some(Invitation { sender, room_id, })
     }
 
     pub fn on_click(&mut self, _btn: MouseButton, x: u16, y: u16) {
@@ -168,8 +206,29 @@ impl RenderWidget for RoomsWidget {
     where
         B: Backend,
     {
-        self.area = area;
-        let list_height = area.height as usize;
+        let chunks = if self.invite.is_some() {
+            Layout::default()
+                .constraints(
+                    [
+                        Constraint::Percentage(60),
+                        Constraint::Percentage(40),
+                    ]
+                    .as_ref(),
+                )
+                .split(area)
+        } else {
+            Layout::default()
+                .constraints(
+                    [
+                        Constraint::Percentage(100),
+                    ]
+                    .as_ref(),
+                )
+                .split(area)
+        };
+
+        self.area = chunks[0];
+        let list_height = self.area.height as usize;
 
         // Use highlight_style only if something is selected
         let selected = self.names.selected;
@@ -210,6 +269,70 @@ impl RenderWidget for RoomsWidget {
             .block(Block::default().borders(Borders::ALL).title("Rooms"))
             .style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD));
 
-        f.render_widget(list, area);
+        f.render_widget(list, chunks[0]);
+
+        if let Some(invite) = self.invite.as_ref() {
+            let height_chunk = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(
+                    [
+                        Constraint::Percentage(20),
+                        Constraint::Percentage(30),
+                        Constraint::Percentage(30),
+                        Constraint::Percentage(20),
+                    ]
+                    .as_ref(),
+                )
+                .split(chunks[1]);
+
+            let width_chunk1 = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints(
+                    [
+                        Constraint::Percentage(25),
+                        Constraint::Percentage(50),
+                        Constraint::Percentage(25),
+                    ]
+                    .as_ref(),
+                )
+                .split(height_chunk[1]);
+
+            let yes = Block::default().title("Accept").borders(Borders::ALL);
+            let no = Block::default().title("Decline").borders(Borders::ALL);
+
+                // password width using password height
+            let width_chunk2 = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints(
+                    [
+                        Constraint::Percentage(25),
+                        Constraint::Percentage(50),
+                        Constraint::Percentage(25),
+                    ]
+                    .as_ref(),
+                )
+                .split(height_chunk[2]);
+
+            self.yes_area = width_chunk1[1];
+            self.no_area = width_chunk2[1];
+            
+            let accept = format!("Accept invite to {}", invite.room_id.localpart());
+            let t = [Text::styled(
+                &accept,
+                Style::default().fg(Color::Cyan),
+            )];
+            let ok = Paragraph::new(t.iter()).block(yes);
+
+            f.render_widget(ok, width_chunk1[1]);
+
+            // Password from here down
+            let t2 = [Text::styled(
+                "Decline invite",
+                Style::default().fg(Color::Cyan),
+            )];
+            let nope = Paragraph::new(t2.iter()).block(no);
+
+            f.render_widget(nope, width_chunk2[1])
+        }
     }
 }

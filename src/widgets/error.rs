@@ -5,7 +5,7 @@ use tui::style::{Color, Style};
 use tui::widgets::{Block, Borders, Paragraph, Text};
 use tui::Frame;
 
-use super::app::RenderWidget;
+use crate::widgets::RenderWidget;
 
 #[derive(Debug)]
 pub struct ErrorWidget<'e>(pub &'e Error);

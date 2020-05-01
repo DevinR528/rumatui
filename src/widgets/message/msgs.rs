@@ -1,13 +1,12 @@
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use itertools::Itertools;
-use matrix_sdk::events::{
-    collections::all::RoomEvent,
-    room::message::{MessageEvent, MessageEventContent, TextMessageEventContent},
+use matrix_sdk::events::room::message::{
+    MessageEvent, MessageEventContent, TextMessageEventContent,
 };
 use matrix_sdk::identifiers::{EventId, RoomId, UserId};
 use matrix_sdk::Room;
@@ -20,10 +19,17 @@ use tui::widgets::{Block, Borders, Paragraph, Text};
 use tui::Frame;
 use uuid::Uuid;
 
-use super::ctrl_char;
-use crate::client::event_stream::Message;
-use crate::widgets::app::RenderWidget;
-use crate::widgets::utils::markdown_to_html;
+use crate::widgets::{message::ctrl_char, utils::markdown_to_html, RenderWidget};
+
+#[derive(Clone, Debug)]
+pub struct Message {
+    pub name: String,
+    pub text: String,
+    pub user: UserId,
+    pub event_id: EventId,
+    pub timestamp: SystemTime,
+    pub uuid: Uuid,
+}
 
 pub enum MsgType {
     PlainText,
@@ -52,7 +58,7 @@ pub struct MessageWidget {
     messages: Vec<(RoomId, Message)>,
     pub(crate) me: Option<UserId>,
     send_msg: String,
-    notifications: String,
+    notifications: VecDeque<(SystemTime, String)>,
     scroll_pos: usize,
     did_overflow: Option<Rc<Cell<bool>>>,
     at_top: Option<Rc<Cell<bool>>>,
@@ -63,9 +69,7 @@ impl MessageWidget {
         for (_id, room) in rooms {
             let room = room.read().await;
             for msg in room.messages.iter() {
-                if let RoomEvent::RoomMessage(message) = msg {
-                    self.add_message_event(message, &room);
-                }
+                self.add_message_event(msg, &room);
             }
         }
     }
@@ -129,7 +133,8 @@ impl MessageWidget {
     }
 
     pub fn add_notify(&mut self, notify: &str) {
-        self.notifications = notify.to_string();
+        self.notifications
+            .push_back((SystemTime::now(), notify.to_string()));
     }
 
     pub fn clear_send_msg(&mut self) {
@@ -336,8 +341,20 @@ impl RenderWidget for MessageWidget {
 
         f.render_widget(messages, chunks[0]);
 
+        // display each notification for 3 seconds
+        if let Some((time, _item)) = self.notifications.get(0) {
+            if let Ok(elapsed) = time.elapsed() {
+                if elapsed > Duration::from_secs(3) {
+                    let _ = self.notifications.pop_front();
+                }
+            }
+        }
+
         let t2 = vec![Text::styled(
-            &self.notifications,
+            self.notifications
+                .get(0)
+                .map(|(_time, item)| item.as_str())
+                .unwrap_or("Notifications..."),
             Style::default().fg(Color::Green),
         )];
         let notification = Paragraph::new(t2.iter())

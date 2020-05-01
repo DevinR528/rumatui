@@ -1,47 +1,35 @@
 use std::io;
 use std::sync::Arc;
-use std::time::Instant;
 
 use anyhow::Error;
 use matrix_sdk::api::r0::message::get_message_events;
 use matrix_sdk::events::{
     collections::all::RoomEvent,
-    room::message::{MessageEvent, MessageEventContent, TextMessageEventContent},
+    room::{
+        member::MembershipChange,
+        message::{MessageEvent, MessageEventContent, TextMessageEventContent},
+    },
 };
 use matrix_sdk::Room;
 use termion::event::MouseButton;
 use tokio::runtime::Handle;
 use tokio::sync::{mpsc, RwLock};
 use tui::backend::Backend;
-use tui::layout::{Alignment, Constraint, Layout, Rect};
+use tui::layout::{Alignment, Constraint, Layout};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, Text};
-use tui::{Frame, Terminal};
+use tui::Terminal;
 use uuid::Uuid;
 
-use super::chat::ChatWidget;
-use super::error::ErrorWidget;
-use super::login::{Login, LoginSelect, LoginWidget};
 use crate::client::client_loop::{MatrixEventHandle, RequestResult, UserRequest};
-use crate::client::event_stream::{EventStream, Message, StateResult};
-
-pub trait RenderWidget {
-    fn render<B>(&mut self, f: &mut Frame<B>, area: Rect)
-    where
-        B: Backend;
-}
-
-pub trait DrawWidget {
-    fn draw<B>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()>
-    where
-        B: Backend + Send;
-    fn draw_with<B>(&mut self, _terminal: &mut Terminal<B>, _area: Rect) -> io::Result<()>
-    where
-        B: Backend,
-    {
-        Ok(())
-    }
-}
+use crate::client::event_stream::{EventStream, StateResult};
+use crate::widgets::{
+    chat::ChatWidget,
+    error::ErrorWidget,
+    login::{Login, LoginSelect, LoginWidget},
+    message::Message,
+    DrawWidget, RenderWidget,
+};
 
 // TODO split AppWidget into render and state halves. AppRender has the methods deal with rendering.
 // AppState or AppData?? will delegate to the state half of each widget.
@@ -307,7 +295,6 @@ impl AppWidget {
                     self.scrolling = false
                 }
                 RequestResult::RoomMsgs(Err(e)) => self.set_error(e),
-
                 // sync error
                 RequestResult::Error(err) => self.set_error(err),
             },
@@ -319,9 +306,63 @@ impl AppWidget {
                 StateResult::Member {
                     sender,
                     receiver,
-                    room_id,
+                    room,
                     membership,
-                } => {}
+                } => match membership {
+                    MembershipChange::Joined => {
+                        if Some(receiver.user_id) == self.chat.msgs.me {
+                            self.chat.room.add_room(room).await;
+                        } else {
+                            self.chat
+                                .msgs
+                                .add_notify(&format!("{} joined the room", receiver.name))
+                        }
+                    }
+                    MembershipChange::Invited => {
+                        if Some(&receiver.user_id) == self.chat.msgs.me.as_ref() {
+                            self.chat.room.invited(sender, room).await;
+                        } else {
+                            self.chat
+                                .msgs
+                                .add_notify(&format!("{} was invited to the room", receiver.name));
+                        }
+                    }
+                    MembershipChange::Left => {
+                        if Some(receiver.user_id) == self.chat.msgs.me {
+                            self.chat
+                                .room
+                                .remove_room(room.read().await.room_id.clone())
+                        } else {
+                            self.chat
+                                .msgs
+                                .add_notify(&format!("{} left the room", receiver.name))
+                        }
+                    }
+                    MembershipChange::Banned => {
+                        if Some(receiver.user_id) == self.chat.msgs.me {
+                            self.chat
+                                .room
+                                .remove_room(room.read().await.room_id.clone())
+                        } else {
+                            self.chat
+                                .msgs
+                                .add_notify(&format!("{} was banned from the room", receiver.name))
+                        }
+                    }
+                    MembershipChange::Kicked => {
+                        if Some(receiver.user_id) == self.chat.msgs.me {
+                            self.chat
+                                .room
+                                .remove_room(room.read().await.room_id.clone())
+                        } else {
+                            self.chat
+                                .msgs
+                                .add_notify(&format!("{} was kicked from the room", receiver.name))
+                        }
+                    }
+                    MembershipChange::ProfileChanged => {}
+                    _ => todo!("implement more membership changes"),
+                },
                 StateResult::Message(msg, room) => self.chat.msgs.add_message(msg, room),
                 StateResult::FullyRead(_ev_id, _room_id) => self.chat.msgs.add_notify(""),
                 StateResult::Typing(msg) => self.chat.msgs.add_notify(&msg),
@@ -449,6 +490,14 @@ impl DrawWidget for AppWidget {
             if let Some(err) = self.error.as_ref() {
                 ErrorWidget::new(err).render(&mut f, chunks2[0])
             } else if !self.login_w.logged_in {
+                if self.login_w.homeserver.is_none() {
+                    let domain = url::Url::parse(&self.homeserver)
+                        .ok()
+                        .and_then(|url| url.domain().map(|s| s.to_string()))
+                        // this is probably an error at this point
+                        .unwrap_or(String::from("matrix.org"));
+                    self.login_w.homeserver = Some(domain);
+                }
                 self.login_w.render(&mut f, chunks2[0])
             } else {
                 self.chat.render(&mut f, chunks2[0])

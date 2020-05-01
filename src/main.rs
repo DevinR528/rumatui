@@ -16,9 +16,10 @@ mod ui_loop;
 mod widgets;
 
 use ui_loop::{Config, Event, UiEventHandle};
-use widgets::app::{AppWidget, DrawWidget};
+use widgets::{app::AppWidget, DrawWidget};
 
 fn main() -> Result<(), failure::Error> {
+    // when this is "" empty matrix.org is used
     let server = env::args().nth(1).unwrap_or(String::default());
 
     let mut runtime = tokio::runtime::Builder::new()

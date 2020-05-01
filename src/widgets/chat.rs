@@ -11,9 +11,7 @@ use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::Frame;
 
-use super::app::RenderWidget;
-use super::message::msgs::MessageWidget;
-use super::rooms::RoomsWidget;
+use crate::widgets::{message::MessageWidget, rooms::RoomsWidget, RenderWidget};
 
 #[derive(Clone, Debug, Default)]
 pub struct ChatWidget {

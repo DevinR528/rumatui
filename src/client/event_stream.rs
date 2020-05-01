@@ -1,6 +1,5 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
-use std::time::SystemTime;
 
 use matrix_sdk::events::{
     fully_read::FullyReadEvent,
@@ -32,26 +31,13 @@ use tokio::sync::mpsc;
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
-#[derive(Clone, Debug)]
-pub struct Message {
-    pub name: String,
-    pub text: String,
-    pub user: UserId,
-    pub event_id: EventId,
-    pub timestamp: SystemTime,
-    pub uuid: Uuid,
-}
-
-pub struct UserDisplay {
-    user_id: UserId,
-    name: String,
-}
+use crate::widgets::{message::Message, UserDisplay};
 
 pub enum StateResult {
     Member {
         sender: UserDisplay,
         receiver: UserDisplay,
-        room_id: RoomId,
+        room: Arc<RwLock<Room>>,
         membership: MembershipChange,
     },
     Message(Message, RoomId),
@@ -81,13 +67,10 @@ impl EventStream {
 
 #[async_trait::async_trait]
 impl EventEmitter for EventStream {
+    /// Send a membership change event to the ui thread.
     async fn on_room_member(&self, room: Arc<RwLock<Room>>, event: &MemberEvent) {
         let MemberEvent {
-            content,
-            sender,
-            state_key,
-            room_id,
-            ..
+            sender, state_key, ..
         } = event;
         let recipiant = UserId::try_from(state_key.as_str()).unwrap();
         let sender = room
@@ -95,23 +78,16 @@ impl EventEmitter for EventStream {
             .await
             .members
             .get(&sender)
-            .map(|mem| UserDisplay {
-                user_id: event.sender.clone(),
-                name: mem.name.clone(),
-            });
+            .map(|mem| UserDisplay::new(event.sender.clone(), mem.name.clone()));
 
         let receiver = room
             .read()
             .await
             .members
             .get(&recipiant)
-            .map(|mem| UserDisplay {
-                user_id: recipiant,
-                name: mem.name.clone(),
-            });
+            .map(|mem| UserDisplay::new(event.sender.clone(), mem.name.clone()));
 
         let membership = event.membership_change();
-        let room_id = room.read().await.room_id.clone();
         if let (Some(sender), Some(receiver)) = (sender, receiver) {
             if let Err(e) = self
                 .send
@@ -120,7 +96,7 @@ impl EventEmitter for EventStream {
                 .send(StateResult::Member {
                     sender,
                     receiver,
-                    room_id,
+                    room,
                     membership,
                 })
                 .await

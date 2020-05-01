@@ -1042,7 +1042,6 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 [[package]]
 name = "matrix-sdk"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk/?branch=rumatui#3b720d1a1b7d1777f9d731cb8af43e769bdb269b"
 dependencies = [
  "async-trait",
  "atomic",
@@ -1066,7 +1065,6 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-crypto"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk/?branch=rumatui#3b720d1a1b7d1777f9d731cb8af43e769bdb269b"
 dependencies = [
  "async-trait",
  "atomic",
@@ -1090,7 +1088,6 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-types"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk/?branch=rumatui#3b720d1a1b7d1777f9d731cb8af43e769bdb269b"
 dependencies = [
  "js_int",
  "ruma-api",

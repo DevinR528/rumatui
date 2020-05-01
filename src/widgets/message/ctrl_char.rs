@@ -2,7 +2,7 @@ use muncher::Muncher;
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::Text;
 
-use crate::client::event_stream::Message;
+use super::Message;
 
 #[derive(Clone, Debug, Default)]
 pub struct CtrlChunk {
