@@ -13,6 +13,11 @@ use tui::Frame;
 
 use crate::widgets::{message::MessageWidget, rooms::RoomsWidget, RenderWidget};
 
+// TODO make ChatWidget have all methods to delegate to widgets.
+// Once widgets are broken up into state/render ChatWidget will be
+// responsible for calling the needed method.
+// TODO remove field access of all widgets, use methods.
+
 #[derive(Clone, Debug, Default)]
 pub struct ChatWidget {
     pub current_room: Rc<RefCell<Option<RoomId>>>,

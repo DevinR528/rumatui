@@ -153,9 +153,6 @@ impl MatrixEventHandle {
                     },
                     UserRequest::AcceptInvite(room_id) => {
                         let res = client.join_room_by_id(&room_id).await;
-                        if let Err(e) = client.sync(None).await {
-                            panic!("TODO sync paniced when accepting invite {}", e);
-                        }
                         if let Err(e) = to_app.send(RequestResult::AcceptInvite(res)).await {
                             panic!("client event handler crashed {}", e)
                         }

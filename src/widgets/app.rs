@@ -302,32 +302,38 @@ impl AppWidget {
         // this will login, send messages, and any other user initiated requests
         match self.ev_msgs.try_recv() {
             Ok(res) => match res {
-                RequestResult::Login(Ok((rooms, resp))) => {
-                    self.login_w.logged_in = true;
-                    self.chat.main_screen = true;
-                    self.login_w.logging_in = false;
-                    self.chat.msgs.me = Some(resp.user_id.clone());
-                    self.chat.set_room_state(rooms).await;
-                }
-                RequestResult::Login(Err(e)) => {
-                    self.login_w.logging_in = false;
-                    self.set_error(e)
+                RequestResult::Login(res) => match res {
+                    Err(e) => {
+                        self.login_w.logging_in = false;
+                        self.set_error(e);
+                    }
+                    Ok((rooms, resp)) => {
+                        self.login_w.logged_in = true;
+                        self.chat.main_screen = true;
+                        self.login_w.logging_in = false;
+                        self.chat.msgs.me = Some(resp.user_id.clone());
+                        self.chat.set_room_state(rooms).await;
+                    }
                 }
                 // TODO this has the EventId which we need to keep
-                RequestResult::SendMessage(Ok(_res)) => {
-                    self.chat.sending_message = false;
+                RequestResult::SendMessage(res) => match res {
+                    Err(e) => self.set_error(e),
+                    Ok(_res) => self.chat.sending_message = false,
                 }
-                RequestResult::SendMessage(Err(e)) => self.set_error(e),
-                RequestResult::RoomMsgs(Ok((res, room))) => {
-                    self.process_room_events(res, room).await;
-                    self.scrolling = false
+                RequestResult::RoomMsgs(res) => match res {
+                    Err(e) => self.set_error(e),
+                    Ok((res, room)) => {
+                        self.process_room_events(res, room).await;
+                        self.scrolling = false
+                    },
                 }
-                RequestResult::RoomMsgs(Err(e)) => self.set_error(e),
-                RequestResult::AcceptInvite(res) => {
-                    if let Err(e) = res {
-                        self.set_error(e);
-                    } else {
+                RequestResult::AcceptInvite(res) => match res {
+                    Err(e) => self.set_error(e),
+                    Ok(res) => {
                         self.chat.joining_room = false;
+                        if let Err(e) = self.send_jobs.send(UserRequest::RoomMsgs(res.room_id)).await {
+                            self.set_error(anyhow::Error::from(e))
+                        }
                     }
                 }
                 RequestResult::DeclineInvite(res) => {
@@ -471,7 +477,7 @@ impl AppWidget {
                                 formatted_body,
                                 ..
                             }) => {
-                                let msg = if let Some(_fmted) = formatted_body {
+                                let msg = if formatted_body.is_some() {
                                     crate::widgets::utils::markdown_to_terminal(&msg_body)
                                         .unwrap_or(msg_body.clone())
                                 } else {
