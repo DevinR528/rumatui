@@ -37,6 +37,11 @@ use uuid::Uuid;
 
 use crate::widgets::message::Message;
 
+/// The events sent from the `EventEmitter` are represented by this
+/// enum.
+///
+/// Each variant represents an emitted event and is handled when sent
+/// every tick of the UI loop.
 pub enum StateResult {
     Member {
         sender: UserId,
@@ -73,24 +78,26 @@ impl EventStream {
 impl EventEmitter for EventStream {
     /// Send a membership change event to the ui thread.
     async fn on_room_member(&self, room: Arc<RwLock<Room>>, event: &MemberEvent) {
-        let MemberEvent {
-            sender, state_key, ..
-        } = event;
-        let receiver = UserId::try_from(state_key.as_str()).unwrap();
-        let membership = event.membership_change();
-        if let Err(e) = self
-            .send
-            .lock()
-            .await
-            .send(StateResult::Member {
-                sender: sender.clone(),
-                receiver,
-                room,
-                membership,
-            })
-            .await
-        {
-            panic!("{}", e)
+        if MembershipState::Join == event.content.membership {
+            let MemberEvent {
+                sender, state_key, ..
+            } = event;
+            let receiver = UserId::try_from(state_key.as_str()).unwrap();
+            let membership = event.membership_change();
+            if let Err(e) = self
+                .send
+                .lock()
+                .await
+                .send(StateResult::Member {
+                    sender: sender.clone(),
+                    receiver,
+                    room,
+                    membership,
+                })
+                .await
+                {
+                    panic!("{}", e)
+                }
         }
     }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomName` event.
@@ -186,7 +193,6 @@ impl EventEmitter for EventStream {
     // `AnyStrippedStateEvent`s
     /// Fires when `AsyncClient` receives a `StateEvent::RoomMember` event.
     async fn on_stripped_state_member(&self, room: Arc<RwLock<Room>>, event: &StrippedRoomMember) {
-        use std::ops::Deref;
         let StrippedRoomMember {
             sender, state_key, ..
         } = event;
@@ -199,7 +205,7 @@ impl EventEmitter for EventStream {
             .await
             .send(StateResult::Member {
                 sender: sender.clone(),
-                receiver: receiver.clone(),
+                receiver,
                 room,
                 membership,
             })

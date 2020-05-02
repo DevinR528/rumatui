@@ -20,6 +20,7 @@ pub struct ChatWidget {
     pub msgs: MessageWidget,
     pub main_screen: bool,
     pub sending_message: bool,
+    pub joining_room: bool,
 }
 
 impl ChatWidget {

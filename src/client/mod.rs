@@ -7,9 +7,13 @@ use anyhow::{Context, Result};
 use matrix_sdk::{
     self,
     // api::r0::filter::{LazyLoadOptions, RoomEventFilter},
-    api::r0::message::create_message_event,
-    api::r0::message::get_message_events,
+    api::r0::message::{create_message_event, get_message_events},
     api::r0::session::login,
+    api::r0::membership::{
+        ban_user, leave_room, kick_user, join_room_by_id, join_room_by_id_or_alias, forget_room,
+        invite_user::{self, InvitationRecipient},
+        Invite3pid,
+    },
     events::room::message::MessageEventContent,
     identifiers::{RoomId, UserId},
     AsyncClient,
@@ -162,5 +166,35 @@ impl MatrixClient {
             }
             err => err,
         }
+    }
+
+    /// Joins the specified room.
+    ///
+    /// # Arguments
+    ///
+    /// * room_id - A valid RoomId otherwise sending will fail.
+    pub(crate) async fn join_room_by_id(
+        &mut self,
+        room_id: &RoomId,
+    ) -> Result<join_room_by_id::Response> {
+        self.inner
+            .join_room_by_id(room_id)
+            .await
+            .context("Message failed to send")
+    }
+
+    /// Forgets the specified room.
+    ///
+    /// # Arguments
+    ///
+    /// * room_id - A valid RoomId otherwise sending will fail.
+    pub(crate) async fn forget_room_by_id(
+        &mut self,
+        room_id: &RoomId,
+    ) -> Result<forget_room::Response> {
+        self.inner
+            .forget_room_by_id(room_id)
+            .await
+            .context("Message failed to send")
     }
 }

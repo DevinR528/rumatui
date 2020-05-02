@@ -16,16 +16,21 @@ use uuid::Uuid;
 
 use crate::client::event_stream::EventStream;
 use crate::client::MatrixClient;
-use matrix_sdk::api::r0::message::create_message_event;
-use matrix_sdk::api::r0::message::get_message_events;
+use matrix_sdk::api::r0::message::{create_message_event, get_message_events};
+use matrix_sdk::api::r0::membership::{join_room_by_id, forget_room};
 use matrix_sdk::api::r0::session::login;
 use matrix_sdk::events::room::message::MessageEventContent;
 use matrix_sdk::identifiers::RoomId;
 
+/// Requests sent from the UI portion of the app.
+///
+/// Each request is sent in response to some user input.
 pub enum UserRequest {
     Login(String, String),
     SendMessage(RoomId, MessageEventContent, Uuid),
     RoomMsgs(RoomId),
+    AcceptInvite(RoomId),
+    DeclineInvite(RoomId),
     Quit,
 }
 unsafe impl Send for UserRequest {}
@@ -36,18 +41,28 @@ impl fmt::Debug for UserRequest {
             Self::Login(name, _) => write!(f, "failed login for {}", name),
             Self::SendMessage(id, _, _) => write!(f, "failed sending message for {}", id),
             Self::RoomMsgs(id) => write!(f, "failed to get room messages for {}", id),
+            Self::AcceptInvite(id) => write!(f, "failed to join {}", id),
+            Self::DeclineInvite(id) => write!(f, "failed to decline {}", id),
             Self::Quit => write!(f, "quitting filed"),
         }
     }
 }
+
+/// Either a `UserRequest` succeeds or fails with the given result.
 pub enum RequestResult {
     Login(Result<(HashMap<RoomId, Arc<RwLock<Room>>>, login::Response)>),
     SendMessage(Result<create_message_event::Response>),
     RoomMsgs(Result<(get_message_events::Response, Arc<RwLock<Room>>)>),
+    AcceptInvite(Result<join_room_by_id::Response>),
+    DeclineInvite(Result<forget_room::Response>),
     Error(anyhow::Error),
 }
+
 unsafe impl Send for RequestResult {}
 
+/// The main task event loop.
+///
+/// `MatrixEventHandle` controls the `sync_forever` and user request loop.
 pub struct MatrixEventHandle {
     cli_jobs: JoinHandle<Result<()>>,
     sync_jobs: JoinHandle<Result<()>>,
@@ -135,7 +150,19 @@ impl MatrixEventHandle {
                                 panic!("client event handler crashed {}", e)
                             }
                         }
-                    },
+                    }
+                    UserRequest::AcceptInvite(room_id) => {
+                        let res = client.join_room_by_id(&room_id).await;
+                        if let Err(e) = to_app.send(RequestResult::AcceptInvite(res)).await {
+                            panic!("client event handler crashed {}", e)
+                        }
+                    }
+                    UserRequest::DeclineInvite(room_id) => {
+                        let res = client.forget_room_by_id(&room_id).await;
+                        if let Err(e) = to_app.send(RequestResult::DeclineInvite(res)).await {
+                            panic!("client event handler crashed {}", e)
+                        }
+                    }
                 }
             }
         });

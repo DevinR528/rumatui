@@ -21,6 +21,8 @@ use uuid::Uuid;
 
 use crate::widgets::{message::ctrl_char, utils::markdown_to_html, RenderWidget};
 
+/// A wrapper to abstract a `RoomEvent::RoomMessage` and the MessageEvent queue
+/// from `matrix_sdk::Room`.
 #[derive(Clone, Debug)]
 pub struct Message {
     pub name: String,
@@ -141,7 +143,7 @@ impl MessageWidget {
         self.send_msg.clear();
     }
 
-    // TODO im sure there is a way to do this like Riot or a matrix server
+    // TODO Im sure there is an actual way to do this like Riot or a matrix server
     fn process_message(&self) -> MsgType {
         if self.send_msg.contains('`') {
             MsgType::FormattedText
@@ -344,7 +346,7 @@ impl RenderWidget for MessageWidget {
         // display each notification for 3 seconds
         if let Some((time, _item)) = self.notifications.get(0) {
             if let Ok(elapsed) = time.elapsed() {
-                if elapsed > Duration::from_secs(3) {
+                if elapsed > Duration::from_secs(8) {
                     let _ = self.notifications.pop_front();
                 }
             }

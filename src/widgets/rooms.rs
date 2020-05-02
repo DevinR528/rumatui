@@ -85,12 +85,16 @@ impl<I> IndexMut<usize> for ListState<I> {
 
 #[derive(Clone, Debug)]
 pub struct Invitation {
-    room_id: RoomId,
+    pub(crate) room_id: RoomId,
     room_name: String,
     sender: UserId,
-
 }
 
+pub enum Invite {
+    Accept,
+    Decline,
+    NoClick,
+}
 // TODO split RoomsWidget into render and state halves. RoomRender has the methods to filter
 // and populate ListState using the rooms HashMap. RoomState or RoomData?? will populate and keep track of
 // state
@@ -163,11 +167,21 @@ impl RoomsWidget {
         let r = room.read().await;
         let room_id = r.room_id.clone();
         let room_name = r.calculate_name();
-        self.invite = Some(Invitation { sender, room_id, room_name, })
+        self.invite = Some(Invitation { sender, room_id, room_name, });
     }
 
-    pub fn on_click(&mut self, _btn: MouseButton, x: u16, y: u16) {
-        if self.area.intersects(Rect::new(x, y, 1, 1)) {}
+    pub(crate) fn remove_invite(&mut self) {
+        self.invite.take();
+    }
+
+    pub fn on_click(&mut self, _btn: MouseButton, x: u16, y: u16) -> Invite {
+        if self.yes_area.intersects(Rect::new(x, y, 1, 1)) {
+            return Invite::Accept;
+        }
+        if self.no_area.intersects(Rect::new(x, y, 1, 1)) {
+            return Invite::Decline;
+        }
+        Invite::NoClick
     }
 
     pub fn on_scroll_up(&mut self, x: u16, y: u16) -> bool {
@@ -327,7 +341,6 @@ impl RenderWidget for RoomsWidget {
                 Style::default().fg(Color::Cyan),
             )];
             let ok = Paragraph::new(t.iter()).block(yes);
-
             f.render_widget(ok, width_chunk1[1]);
 
             // Password from here down
@@ -336,7 +349,6 @@ impl RenderWidget for RoomsWidget {
                 Style::default().fg(Color::Cyan),
             )];
             let nope = Paragraph::new(t2.iter()).block(no);
-
             f.render_widget(nope, width_chunk2[1])
         }
     }
