@@ -20,11 +20,11 @@ use matrix_sdk::events::{
         redaction::RedactionEvent,
         tombstone::TombstoneEvent,
     },
-    typing::TypingEvent,
     stripped::{
-        StrippedRoomMember, StrippedRoomName, StrippedRoomPowerLevels, StrippedRoomJoinRules, StrippedRoomCanonicalAlias,
-        StrippedRoomAvatar, StrippedRoomAliases,
-    }
+        StrippedRoomAliases, StrippedRoomAvatar, StrippedRoomCanonicalAlias, StrippedRoomJoinRules,
+        StrippedRoomMember, StrippedRoomName, StrippedRoomPowerLevels,
+    },
+    typing::TypingEvent,
 };
 use matrix_sdk::{
     self,
@@ -95,9 +95,9 @@ impl EventEmitter for EventStream {
                     membership,
                 })
                 .await
-                {
-                    panic!("{}", e)
-                }
+            {
+                panic!("{}", e)
+            }
         }
     }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomName` event.
@@ -217,13 +217,23 @@ impl EventEmitter for EventStream {
     /// Fires when `AsyncClient` receives a `StateEvent::RoomName` event.
     async fn on_stripped_state_name(&self, _: Arc<RwLock<Room>>, _: &StrippedRoomName) {}
     /// Fires when `AsyncClient` receives a `StateEvent::RoomCanonicalAlias` event.
-    async fn on_stripped_state_canonical_alias(&self, _: Arc<RwLock<Room>>, _: &StrippedRoomCanonicalAlias) {}
+    async fn on_stripped_state_canonical_alias(
+        &self,
+        _: Arc<RwLock<Room>>,
+        _: &StrippedRoomCanonicalAlias,
+    ) {
+    }
     /// Fires when `AsyncClient` receives a `StateEvent::RoomAliases` event.
     async fn on_stripped_state_aliases(&self, _: Arc<RwLock<Room>>, _: &StrippedRoomAliases) {}
     /// Fires when `AsyncClient` receives a `StateEvent::RoomAvatar` event.
     async fn on_stripped_state_avatar(&self, _: Arc<RwLock<Room>>, _: &StrippedRoomAvatar) {}
     /// Fires when `AsyncClient` receives a `StateEvent::RoomPowerLevels` event.
-    async fn on_stripped_state_power_levels(&self, _: Arc<RwLock<Room>>, _: &StrippedRoomPowerLevels) {}
+    async fn on_stripped_state_power_levels(
+        &self,
+        _: Arc<RwLock<Room>>,
+        _: &StrippedRoomPowerLevels,
+    ) {
+    }
     /// Fires when `AsyncClient` receives a `StateEvent::RoomJoinRules` event.
     async fn on_stripped_state_join_rules(&self, _: Arc<RwLock<Room>>, _: &StrippedRoomJoinRules) {}
 

@@ -12,6 +12,7 @@ use tui::backend::TermionBackend;
 use tui::Terminal;
 
 mod client;
+mod error;
 mod ui_loop;
 mod widgets;
 

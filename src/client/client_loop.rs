@@ -16,8 +16,8 @@ use uuid::Uuid;
 
 use crate::client::event_stream::EventStream;
 use crate::client::MatrixClient;
+use matrix_sdk::api::r0::membership::{forget_room, join_room_by_id};
 use matrix_sdk::api::r0::message::{create_message_event, get_message_events};
-use matrix_sdk::api::r0::membership::{join_room_by_id, forget_room};
 use matrix_sdk::api::r0::session::login;
 use matrix_sdk::events::room::message::MessageEventContent;
 use matrix_sdk::identifiers::RoomId;
@@ -150,9 +150,12 @@ impl MatrixEventHandle {
                                 panic!("client event handler crashed {}", e)
                             }
                         }
-                    }
+                    },
                     UserRequest::AcceptInvite(room_id) => {
                         let res = client.join_room_by_id(&room_id).await;
+                        if let Err(e) = client.sync(None).await {
+                            panic!("TODO sync paniced when accepting invite {}", e);
+                        }
                         if let Err(e) = to_app.send(RequestResult::AcceptInvite(res)).await {
                             panic!("client event handler crashed {}", e)
                         }

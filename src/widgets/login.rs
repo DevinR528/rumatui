@@ -109,7 +109,7 @@ impl RenderWidget for LoginWidget {
                 .as_ref(),
             )
             .split(area);
-        
+
         let server = self.homeserver.as_deref().unwrap_or("matrix.org");
         let login = &format!("Log in to {}", server);
         let blk = Block::default()

@@ -13,7 +13,7 @@ use tokio::sync::RwLock;
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, List, Text, Paragraph};
+use tui::widgets::{Block, Borders, List, Paragraph, Text};
 use tui::Frame;
 
 use crate::widgets::RenderWidget;
@@ -159,15 +159,15 @@ impl RoomsWidget {
         }
     }
 
-    pub(crate) async fn invited(
-        &mut self,
-        sender: UserId,
-        room: Arc<RwLock<Room>>,
-    ) {
+    pub(crate) async fn invited(&mut self, sender: UserId, room: Arc<RwLock<Room>>) {
         let r = room.read().await;
         let room_id = r.room_id.clone();
         let room_name = r.calculate_name();
-        self.invite = Some(Invitation { sender, room_id, room_name, });
+        self.invite = Some(Invitation {
+            sender,
+            room_id,
+            room_name,
+        });
     }
 
     pub(crate) fn remove_invite(&mut self) {
@@ -224,22 +224,11 @@ impl RenderWidget for RoomsWidget {
     {
         let chunks = if self.invite.is_some() {
             Layout::default()
-                .constraints(
-                    [
-                        Constraint::Percentage(60),
-                        Constraint::Percentage(40),
-                    ]
-                    .as_ref(),
-                )
+                .constraints([Constraint::Percentage(60), Constraint::Percentage(40)].as_ref())
                 .split(area)
         } else {
             Layout::default()
-                .constraints(
-                    [
-                        Constraint::Percentage(100),
-                    ]
-                    .as_ref(),
-                )
+                .constraints([Constraint::Percentage(100)].as_ref())
                 .split(area)
         };
 
@@ -335,7 +324,7 @@ impl RenderWidget for RoomsWidget {
 
             self.yes_area = width_chunk1[1];
             self.no_area = width_chunk2[1];
-            
+
             let t = [Text::styled(
                 "Accept invite",
                 Style::default().fg(Color::Cyan),

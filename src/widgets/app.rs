@@ -32,7 +32,7 @@ use crate::widgets::{
     DrawWidget, RenderWidget,
 };
 
-// TODO split AppWidget into render and state halves. AppRender has the methods deal with rendering.
+// TODO split AppWidget into render and state halves. AppRender has the methods to deal with rendering.
 // AppState or AppData?? will delegate to the state half of each widget.
 
 pub struct AppWidget {
@@ -99,21 +99,32 @@ impl AppWidget {
         }
         if let Some(room_id) = self.chat.room.invite.as_ref().map(|i| i.room_id.clone()) {
             match self.chat.room.on_click(btn, x, y) {
-                Invite::Accept => if let Err(e) = self.send_jobs.send(UserRequest::AcceptInvite(room_id)).await {
-                    self.set_error(anyhow::Error::from(e))
-                } else {
-                    self.chat.joining_room = true;
-                    self.chat.room.remove_invite();
-                },
-                Invite::Decline => if let Err(e) = self.send_jobs.send(UserRequest::DeclineInvite(room_id)).await {
-                    self.set_error(anyhow::Error::from(e))
-                } else {
-                    self.chat.room.remove_invite();
-                },
-                Invite::NoClick => {},
+                Invite::Accept => {
+                    if let Err(e) = self
+                        .send_jobs
+                        .send(UserRequest::AcceptInvite(room_id))
+                        .await
+                    {
+                        self.set_error(anyhow::Error::from(e))
+                    } else {
+                        self.chat.joining_room = true;
+                        self.chat.room.remove_invite();
+                    }
+                }
+                Invite::Decline => {
+                    if let Err(e) = self
+                        .send_jobs
+                        .send(UserRequest::DeclineInvite(room_id))
+                        .await
+                    {
+                        self.set_error(anyhow::Error::from(e))
+                    } else {
+                        self.chat.room.remove_invite();
+                    }
+                }
+                Invite::NoClick => {}
             }
         }
-        
     }
 
     /// TODO limit scrolling for older messages by time
@@ -312,14 +323,18 @@ impl AppWidget {
                     self.scrolling = false
                 }
                 RequestResult::RoomMsgs(Err(e)) => self.set_error(e),
-                RequestResult::AcceptInvite(res) => if let Err(e) = res {
-                    self.set_error(e);
-                } else {
-                    self.chat.joining_room = false;
+                RequestResult::AcceptInvite(res) => {
+                    if let Err(e) = res {
+                        self.set_error(e);
+                    } else {
+                        self.chat.joining_room = false;
+                    }
                 }
-                RequestResult::DeclineInvite(res) => if let Err(e) = res {
-                    self.set_error(e);
-                },
+                RequestResult::DeclineInvite(res) => {
+                    if let Err(e) = res {
+                        self.set_error(e);
+                    }
+                }
                 // sync error
                 RequestResult::Error(err) => self.set_error(err),
             },
@@ -339,7 +354,8 @@ impl AppWidget {
                             self.chat
                                 .msgs
                                 .add_notify(&format!("{} joined the room", sender.localpart()));
-                            *self.chat.current_room.borrow_mut() = Some(room.read().await.room_id.clone());
+                            *self.chat.current_room.borrow_mut() =
+                                Some(room.read().await.room_id.clone());
                             self.chat.room.add_room(room).await;
                         } else {
                             self.chat
@@ -349,14 +365,16 @@ impl AppWidget {
                     }
                     MembershipChange::Invited => {
                         if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                            self.chat
-                                .msgs
-                                .add_notify(&format!("{} was invited to the room", receiver.localpart()));
+                            self.chat.msgs.add_notify(&format!(
+                                "{} was invited to the room",
+                                receiver.localpart()
+                            ));
                             self.chat.room.invited(sender, room).await;
                         } else {
-                            self.chat
-                                .msgs
-                                .add_notify(&format!("{} was invited to the room", receiver.localpart()));
+                            self.chat.msgs.add_notify(&format!(
+                                "{} was invited to the room",
+                                receiver.localpart()
+                            ));
                         }
                     }
                     MembershipChange::Left => {
@@ -372,13 +390,18 @@ impl AppWidget {
                     }
                     MembershipChange::Banned => {
                         if Some(&receiver) == self.chat.msgs.me.as_ref() {
+                            self.chat.msgs.add_notify(&format!(
+                                "{} was banned from the room",
+                                receiver.localpart()
+                            ));
                             self.chat
                                 .room
                                 .remove_room(room.read().await.room_id.clone())
                         } else {
-                            self.chat
-                                .msgs
-                                .add_notify(&format!("{} was banned from the room", receiver.localpart()))
+                            self.chat.msgs.add_notify(&format!(
+                                "{} was banned from the room",
+                                receiver.localpart()
+                            ))
                         }
                     }
                     MembershipChange::Kicked => {
@@ -387,13 +410,14 @@ impl AppWidget {
                                 .room
                                 .remove_room(room.read().await.room_id.clone())
                         } else {
-                            self.chat
-                                .msgs
-                                .add_notify(&format!("{} was kicked from the room", receiver.localpart()))
+                            self.chat.msgs.add_notify(&format!(
+                                "{} was kicked from the room",
+                                receiver.localpart()
+                            ))
                         }
                     }
                     MembershipChange::ProfileChanged => {}
-                    MembershipChange::None => {},
+                    MembershipChange::None => {}
                     MembershipChange::Error => panic!("membership error"),
                     MembershipChange::InvitationRejected => panic!("invite rejected"),
                     mem => todo!("implement more membership changes {:?}", mem),
@@ -498,10 +522,7 @@ impl DrawWidget for AppWidget {
                     Style::new().fg(Color::Green),
                 )]
             } else if self.chat.joining_room {
-                vec![Text::styled(
-                    "Joining room",
-                    Style::new().fg(Color::Green),
-                )]
+                vec![Text::styled("Joining room", Style::new().fg(Color::Green))]
             } else if self.chat.sending_message {
                 vec![Text::styled(
                     "Sending message",

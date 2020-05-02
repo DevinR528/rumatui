@@ -6,14 +6,14 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use matrix_sdk::{
     self,
+    api::r0::membership::{
+        ban_user, forget_room,
+        invite_user::{self, InvitationRecipient},
+        join_room_by_id, join_room_by_id_or_alias, kick_user, leave_room, Invite3pid,
+    },
     // api::r0::filter::{LazyLoadOptions, RoomEventFilter},
     api::r0::message::{create_message_event, get_message_events},
     api::r0::session::login,
-    api::r0::membership::{
-        ban_user, leave_room, kick_user, join_room_by_id, join_room_by_id_or_alias, forget_room,
-        invite_user::{self, InvitationRecipient},
-        Invite3pid,
-    },
     events::room::message::MessageEventContent,
     identifiers::{RoomId, UserId},
     AsyncClient,
@@ -61,8 +61,8 @@ impl MatrixClient {
         path.push(".rumatui");
         // reset the client with the state store with username as part of the store path
         let client_config = AsyncClientConfig::default()
-            .proxy("http://localhost:8080")? // for mitmproxy
-            .disable_ssl_verification()
+            // .proxy("http://localhost:8080")? // for mitmproxy
+            // .disable_ssl_verification()
             .state_store(Box::new(JsonStore::open(path)?));
 
         let client = Self {
@@ -81,6 +81,7 @@ impl MatrixClient {
         self.next_batch.clone()
     }
 
+    /// Log in to as the specified user.
     pub(crate) async fn login(
         &mut self,
         username: String,
@@ -103,6 +104,21 @@ impl MatrixClient {
 
         self.next_batch = self.inner.sync_token().await;
         Ok((self.inner.get_rooms().await, res))
+    }
+
+    /// Manually sync state, provides a default sync token if None is given.
+    ///
+    /// This can be useful when joining a room, we need the state from before our sync_token.
+    pub(crate) async fn sync(&mut self, setting: Option<SyncSettings>) -> Result<()> {
+        let settings = setting.unwrap_or(
+            SyncSettings::default()
+                .timeout(SYNC_TIMEOUT)
+                .full_state(false)
+        );
+        let _response = self.inner.sync(settings).await?;
+
+        self.next_batch = self.inner.sync_token().await;
+        Ok(())
     }
 
     /// Sends a MessageEvent to the specified room.
@@ -180,7 +196,7 @@ impl MatrixClient {
         self.inner
             .join_room_by_id(room_id)
             .await
-            .context("Message failed to send")
+            .context(format!("Joining room {} failed", room_id))
     }
 
     /// Forgets the specified room.
@@ -195,6 +211,6 @@ impl MatrixClient {
         self.inner
             .forget_room_by_id(room_id)
             .await
-            .context("Message failed to send")
+            .context(format!("Forgetting room {} failed", room_id))
     }
 }
