@@ -153,9 +153,15 @@ impl RoomsWidget {
     }
 
     pub(crate) fn remove_room(&mut self, room_id: RoomId) {
-        self.rooms.remove(&room_id);
+        // self.rooms.remove(&room_id);
         if let Some(idx) = self.names.items.iter().position(|(_, id)| &room_id == id) {
             self.names.items.remove(idx);
+        }
+    }
+
+    pub(crate) fn update_room(&mut self, name: String, room_id: RoomId) {
+        if let Some(idx) = self.names.items.iter().position(|(_, id)| &room_id == id) {
+            self.names.items[idx] = (name, room_id);
         }
     }
 
@@ -271,7 +277,14 @@ impl RenderWidget for RoomsWidget {
             })
             .skip(offset as usize);
         let list = List::new(items)
-            .block(Block::default().borders(Borders::ALL).title("Rooms"))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Rooms")
+                    .border_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
+                    .title("Messages")
+                    .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
+            )
             .style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD));
 
         f.render_widget(list, chunks[0]);

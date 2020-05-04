@@ -48,8 +48,11 @@ pub enum StateResult {
         receiver: UserId,
         room: Arc<RwLock<Room>>,
         membership: MembershipChange,
+        timeline_event: bool,
+        member: MembershipState,
     },
     Message(Message, RoomId),
+    Name(String, RoomId),
     FullyRead(EventId, RoomId),
     Typing(String),
     Err,
@@ -78,37 +81,49 @@ impl EventStream {
 impl EventEmitter for EventStream {
     /// Send a membership change event to the ui thread.
     async fn on_room_member(&self, room: Arc<RwLock<Room>>, event: &MemberEvent) {
-        if MembershipState::Join == event.content.membership {
-            let MemberEvent {
-                sender, state_key, ..
-            } = event;
-            let receiver = UserId::try_from(state_key.as_str()).unwrap();
-            let membership = event.membership_change();
-            if let Err(e) = self
-                .send
-                .lock()
-                .await
-                .send(StateResult::Member {
-                    sender: sender.clone(),
-                    receiver,
-                    room,
-                    membership,
-                })
-                .await
-            {
-                panic!("{}", e)
-            }
+        let MemberEvent {
+            sender, state_key, ..
+        } = event;
+        let receiver = UserId::try_from(state_key.as_str()).unwrap();
+        let membership = event.membership_change();
+        if let Err(e) = self
+            .send
+            .lock()
+            .await
+            .send(StateResult::Member {
+                sender: sender.clone(),
+                receiver,
+                room,
+                membership,
+                timeline_event: true,
+                member: event.content.membership,
+            })
+            .await
+        {
+            panic!("{}", e)
         }
     }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomName` event.
-    async fn on_room_name(&self, _: Arc<RwLock<Room>>, _: &NameEvent) {}
+    async fn on_room_name(&self, room: Arc<RwLock<Room>>, _: &NameEvent) {
+        if let Err(e) = self
+            .send
+            .lock()
+            .await
+            .send(StateResult::Name(
+                room.read().await.calculate_name(),
+                room.read().await.room_id.clone(),
+            ))
+            .await
+        {
+            panic!("{}", e)
+        }
+    }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomCanonicalAlias` event.
     async fn on_room_canonical_alias(&self, _: Arc<RwLock<Room>>, _: &CanonicalAliasEvent) {}
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomAliases` event.
     async fn on_room_aliases(&self, _: Arc<RwLock<Room>>, _: &AliasesEvent) {}
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomAvatar` event.
     async fn on_room_avatar(&self, _: Arc<RwLock<Room>>, _: &AvatarEvent) {}
-    /// Fires when `AsyncClient` receives a `RoomEvent::RoomMessage` event.
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomMessage` event.
     async fn on_room_message(&self, room: Arc<RwLock<Room>>, event: &MessageEvent) {
         let MessageEvent {
@@ -138,8 +153,9 @@ impl EventEmitter for EventStream {
                     msg_body.clone()
                 };
                 let txn_id = unsigned
-                    .get("transaction_id")
-                    .map(|id| serde_json::from_value::<String>(id.clone()).unwrap())
+                    .transaction_id
+                    .as_ref()
+                    .map(|id| id.clone())
                     .unwrap_or_default();
 
                 if let Err(e) = self
@@ -154,6 +170,8 @@ impl EventEmitter for EventStream {
                             event_id: event_id.clone(),
                             timestamp: *origin_server_ts,
                             uuid: Uuid::parse_str(&txn_id).unwrap_or(Uuid::new_v4()),
+                            read: false,
+                            sent_receipt: false,
                         },
                         room.read().await.room_id.clone(),
                     ))
@@ -208,6 +226,8 @@ impl EventEmitter for EventStream {
                 receiver,
                 room,
                 membership,
+                timeline_event: false,
+                member: event.content.membership,
             })
             .await
         {
@@ -323,8 +343,5 @@ pub fn membership_change(member: &StrippedRoomMember) -> MembershipChange {
         (Leave, Invite) => MembershipChange::Invited,
         (Ban, Leave) => MembershipChange::Unbanned,
         (Knock, _) | (_, Knock) => MembershipChange::NotImplemented,
-        (__Nonexhaustive, _) | (_, __Nonexhaustive) => {
-            panic!("__Nonexhaustive enum variant is not intended for use.")
-        }
     }
 }

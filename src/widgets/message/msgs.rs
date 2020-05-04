@@ -4,7 +4,6 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use itertools::Itertools;
 use matrix_sdk::events::room::message::{
     MessageEvent, MessageEventContent, TextMessageEventContent,
 };
@@ -29,6 +28,13 @@ pub struct Message {
     pub text: String,
     pub user: UserId,
     pub event_id: EventId,
+    /// Has this `Message` been seen.
+    ///
+    /// This is true when the user is active and the message appears in the
+    /// `MessageWidget` window.
+    pub read: bool,
+    /// Has the read_receipt been sent.
+    pub sent_receipt: bool,
     pub timestamp: SystemTime,
     pub uuid: Uuid,
 }
@@ -60,7 +66,7 @@ pub struct MessageWidget {
     messages: Vec<(RoomId, Message)>,
     pub(crate) me: Option<UserId>,
     send_msg: String,
-    notifications: VecDeque<(SystemTime, String)>,
+    notifications: VecDeque<(Option<SystemTime>, String)>,
     scroll_pos: usize,
     did_overflow: Option<Rc<Cell<bool>>>,
     at_top: Option<Rc<Cell<bool>>>,
@@ -76,6 +82,7 @@ impl MessageWidget {
         }
     }
 
+    // TODO factor out with AppWidget::process_room_events and MessageWidget::echo_sent_msg
     fn add_message_event(&mut self, event: &MessageEvent, room: &Room) {
         let MessageEvent {
             content,
@@ -103,8 +110,9 @@ impl MessageWidget {
                     msg_body.clone()
                 };
                 let txn_id = unsigned
-                    .get("transaction_id")
-                    .map(|id| serde_json::from_value::<String>(id.clone()).unwrap())
+                    .transaction_id
+                    .as_ref()
+                    .map(|id| id.clone())
                     .unwrap_or_default();
 
                 self.add_message(
@@ -115,6 +123,8 @@ impl MessageWidget {
                         event_id: event_id.clone(),
                         timestamp: *origin_server_ts,
                         uuid: Uuid::parse_str(&txn_id).unwrap_or(Uuid::new_v4()),
+                        read: false,
+                        sent_receipt: false,
                     },
                     room.room_id.clone(),
                 );
@@ -135,8 +145,7 @@ impl MessageWidget {
     }
 
     pub fn add_notify(&mut self, notify: &str) {
-        self.notifications
-            .push_back((SystemTime::now(), notify.to_string()));
+        self.notifications.push_back((None, notify.to_string()));
     }
 
     pub fn clear_send_msg(&mut self) {
@@ -202,10 +211,26 @@ impl MessageWidget {
                     name,
                     event_id: EventId::new(&domain).unwrap(),
                     uuid,
+                    read: true,
+                    sent_receipt: true,
                 };
                 self.add_message(msg, id.clone())
             }
             _ => {}
+        }
+    }
+
+    pub(crate) fn read_receipt(
+        &mut self,
+        last_interaction: SystemTime,
+    ) -> Option<(EventId, RoomId)> {
+        if last_interaction.elapsed().ok()? < Duration::from_secs(60) {
+            self.messages
+                .iter()
+                .find(|(_id, msg)| msg.read && !msg.sent_receipt)
+                .map(|(id, msg)| (msg.event_id.clone(), id.clone()))
+        } else {
+            None
         }
     }
 
@@ -280,6 +305,8 @@ impl MessageWidget {
 
 impl RenderWidget for MessageWidget {
     fn render<B: Backend>(&mut self, f: &mut Frame<B>, area: Rect) {
+        use itertools::Itertools;
+
         if let None = self.did_overflow {
             self.did_overflow = Some(Rc::new(Cell::new(false)));
         }
@@ -323,9 +350,17 @@ impl RenderWidget for MessageWidget {
             .iter()
             .filter(|(id, _)| Some(id) == current_room_id)
             .unique_by(|(_id, msg)| &msg.event_id)
-            .map(|x| x)
             .flat_map(|(_, msg)| ctrl_char::process_text(msg))
             .collect::<Vec<_>>();
+
+        // make sure the messages we have seen are marked read.
+        if !text.is_empty() {
+            for idx in 0..text.len() - 1 {
+                if let Some((_, msg)) = self.messages.get_mut(idx) {
+                    msg.read = true;
+                }
+            }
+        }
 
         let messages = Paragraph::new(text.iter())
             .block(
@@ -343,12 +378,16 @@ impl RenderWidget for MessageWidget {
 
         f.render_widget(messages, chunks[0]);
 
-        // display each notification for 3 seconds
-        if let Some((time, _item)) = self.notifications.get(0) {
-            if let Ok(elapsed) = time.elapsed() {
-                if elapsed > Duration::from_secs(8) {
-                    let _ = self.notifications.pop_front();
+        // display each notification for 8 seconds
+        if let Some((time, _item)) = self.notifications.get_mut(0) {
+            if let Some(time) = time {
+                if let Ok(elapsed) = time.elapsed() {
+                    if elapsed > Duration::from_secs(8) {
+                        let _ = self.notifications.pop_front();
+                    }
                 }
+            } else {
+                *time = Some(SystemTime::now());
             }
         }
 

@@ -7,15 +7,15 @@ use anyhow::{Context, Result};
 use matrix_sdk::{
     self,
     api::r0::membership::{
-        ban_user, forget_room,
-        invite_user::{self, InvitationRecipient},
-        join_room_by_id, join_room_by_id_or_alias, kick_user, leave_room, Invite3pid,
+        forget_room, join_room_by_id, kick_user, leave_room,
     },
     // api::r0::filter::{LazyLoadOptions, RoomEventFilter},
     api::r0::message::{create_message_event, get_message_events},
     api::r0::session::login,
+    api::r0::typing::create_typing_event,
+    api::r0::receipt::create_receipt,
     events::room::message::MessageEventContent,
-    identifiers::{RoomId, UserId},
+    identifiers::{EventId, RoomId, UserId},
     AsyncClient,
     AsyncClientConfig,
     JsonStore,
@@ -61,8 +61,8 @@ impl MatrixClient {
         path.push(".rumatui");
         // reset the client with the state store with username as part of the store path
         let client_config = AsyncClientConfig::default()
-            // .proxy("http://localhost:8080")? // for mitmproxy
-            // .disable_ssl_verification()
+            .proxy("http://localhost:8080")? // for mitmproxy
+            .disable_ssl_verification()
             .state_store(Box::new(JsonStore::open(path)?));
 
         let client = Self {
@@ -79,6 +79,18 @@ impl MatrixClient {
 
     pub fn sync_token(&self) -> Option<String> {
         self.next_batch.clone()
+    }
+
+    /// Joins the specified room.
+    ///
+    /// # Arguments
+    ///
+    /// * room_id - A valid RoomId otherwise sending will fail.
+    pub(crate) async fn store_room_state(&self, room_id: &RoomId) -> Result<()> {
+        self.inner
+            .store_room_state(room_id)
+            .await
+            .context(format!("Storing state of room {} failed", room_id))
     }
 
     /// Log in to as the specified user.
@@ -113,7 +125,7 @@ impl MatrixClient {
         let settings = setting.unwrap_or(
             SyncSettings::default()
                 .timeout(SYNC_TIMEOUT)
-                .full_state(false)
+                .full_state(false),
         );
         let _response = self.inner.sync(settings).await?;
 
@@ -129,7 +141,7 @@ impl MatrixClient {
     /// * msg - `MessageEventContent`s is an enum that can handle all the types
     /// of messages eg. `Text`, `Audio`, `Video` ect.
     pub(crate) async fn send_message(
-        &mut self,
+        &self,
         id: &RoomId,
         msg: MessageEventContent,
         uuid: Uuid,
@@ -190,7 +202,7 @@ impl MatrixClient {
     ///
     /// * room_id - A valid RoomId otherwise sending will fail.
     pub(crate) async fn join_room_by_id(
-        &mut self,
+        &self,
         room_id: &RoomId,
     ) -> Result<join_room_by_id::Response> {
         self.inner
@@ -205,12 +217,95 @@ impl MatrixClient {
     ///
     /// * room_id - A valid RoomId otherwise sending will fail.
     pub(crate) async fn forget_room_by_id(
-        &mut self,
+        &self,
         room_id: &RoomId,
     ) -> Result<forget_room::Response> {
         self.inner
             .forget_room_by_id(room_id)
             .await
             .context(format!("Forgetting room {} failed", room_id))
+    }
+
+    /// Leaves the specified room.
+    ///
+    /// # Arguments
+    ///
+    /// * room_id - A valid RoomId otherwise sending will fail.
+    pub(crate) async fn leave_room(&self, room_id: &RoomId) -> Result<leave_room::Response> {
+        self.inner
+            .leave_room(room_id)
+            .await
+            .context(format!("Leaving room {} failed", room_id))
+    }
+
+    /// Kicks the specified user from the room.
+    ///
+    /// # Arguments
+    ///
+    /// * room_id - The `RoomId` of the room the user should be kicked out of.
+    ///
+    /// * user_id - The `UserId` of the user that should be kicked out of the room.
+    ///
+    /// * reason - Optional reason why the room member is being kicked out.
+    pub(crate) async fn kick_user(
+        &self,
+        room_id: &RoomId,
+        user_id: &UserId,
+        reason: Option<String>,
+    ) -> Result<kick_user::Response> {
+        self.inner
+            .kick_user(room_id, user_id, reason)
+            .await
+            .context(format!("Leaving room {} failed", room_id))
+    }
+
+    /// Send a request to notify the room of a user typing.
+    ///
+    /// Returns a `create_typing_event::Response`, an empty response.
+    ///
+    /// # Arguments
+    ///
+    /// * room_id - The `RoomId` the user is typing in.
+    ///
+    /// * user_id - The `UserId` of the user that is typing.
+    ///
+    /// * typing - Whether the user is typing, if false `timeout` is not needed.
+    ///
+    /// * timeout - Length of time in milliseconds to mark user is typing.
+    pub async fn typing_notice(
+        &self,
+        room_id: &RoomId,
+        user_id: &UserId,
+        typing: bool,
+        timeout: Option<Duration>,
+    ) -> Result<create_typing_event::Response> {
+        self.inner
+            .typing_notice(room_id, user_id, typing, timeout)
+            .await
+            .context(format!("failed to send typing notification to {}", room_id))
+    }
+
+    /// Send a request to notify the room of a user typing.
+    ///
+    /// Returns a `create_typing_event::Response`, an empty response.
+    ///
+    /// # Arguments
+    ///
+    /// * room_id - The `RoomId` the user is typing in.
+    ///
+    /// * event_id - The `UserId` of the user that is typing.
+    ///
+    /// * typing - Whether the user is typing, if false `timeout` is not needed.
+    ///
+    /// * timeout - Length of time in milliseconds to mark user is typing.
+    pub async fn read_receipt(
+        &self,
+        room_id: &RoomId,
+        event_id: &EventId,
+    ) -> Result<create_receipt::Response> {
+        self.inner
+            .read_receipt(room_id, event_id)
+            .await
+            .context(format!("failed to send read_receipt to {}", room_id))
     }
 }

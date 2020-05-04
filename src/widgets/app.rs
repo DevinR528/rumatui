@@ -1,5 +1,7 @@
 use std::io;
+use std::ops::Deref;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use anyhow::Error;
 use matrix_sdk::api::r0::message::get_message_events;
@@ -46,6 +48,10 @@ pub struct AppWidget {
     pub sync_started: bool,
     /// Have we started a scroll request.
     pub scrolling: bool,
+    /// The client is sending a typing notice to the server.
+    pub typing_notice: bool,
+    /// The last interaction the user had with the app.
+    pub last_interaction: SystemTime,
     /// The login element. This knows how to render and also holds the state of logging in.
     pub login_w: LoginWidget,
     /// The main screen. Holds the state once a user is logged in.
@@ -80,6 +86,8 @@ impl AppWidget {
             should_quit: false,
             sync_started: false,
             scrolling: false,
+            typing_notice: false,
+            last_interaction: SystemTime::now(),
             login_w: LoginWidget::default(),
             chat: ChatWidget::default(),
             ev_loop,
@@ -127,7 +135,6 @@ impl AppWidget {
         }
     }
 
-    /// TODO limit scrolling for older messages by time
     pub async fn on_scroll_up(&mut self, x: u16, y: u16) {
         if self.chat.main_screen {
             if self.chat.msgs.on_scroll_up(x, y) {
@@ -218,6 +225,21 @@ impl AppWidget {
                     self.login_w.login.password.push(c);
                 }
             } else if self.chat.main_screen {
+                // send typing notice to the server
+                let room_id = {
+                    let id = self.chat.current_room.borrow();
+                    id.deref().clone()
+                };
+                if !self.typing_notice {
+                    self.typing_notice = true;
+                    if let (Some(me), Some(room_id)) = (self.chat.me.clone(), room_id) {
+                        if let Err(e) = self.send_jobs.send(UserRequest::Typing(room_id, me)).await
+                        {
+                            self.set_error(Error::from(e));
+                        }
+                    }
+                }
+
                 self.chat.msgs.add_char(c);
             }
         }
@@ -242,7 +264,6 @@ impl AppWidget {
     pub fn on_delete(&mut self) {}
 
     pub async fn on_send(&mut self) {
-        use std::ops::Deref;
         // unfortunately we have to do it this way or we have a mutable borrow in the scope of immutable
         let res = if let Some(room_id) = self.chat.current_room.borrow().as_ref() {
             match self.chat.msgs.get_sending_message() {
@@ -312,31 +333,52 @@ impl AppWidget {
                         self.chat.main_screen = true;
                         self.login_w.logging_in = false;
                         self.chat.msgs.me = Some(resp.user_id.clone());
+                        self.chat.me = Some(resp.user_id.clone());
                         self.chat.set_room_state(rooms).await;
                     }
-                }
+                },
                 // TODO this has the EventId which we need to keep
                 RequestResult::SendMessage(res) => match res {
                     Err(e) => self.set_error(e),
                     Ok(_res) => self.chat.sending_message = false,
-                }
+                },
                 RequestResult::RoomMsgs(res) => match res {
-                    Err(e) => self.set_error(e),
+                    Err(e) => {
+                        // TODO recover from requesting room not currently joined
+                        // this should be fixed once MembershipState::Leave is working
+                        self.set_error(e)
+                    }
                     Ok((res, room)) => {
                         self.process_room_events(res, room).await;
                         self.scrolling = false
-                    },
-                }
+                    }
+                },
                 RequestResult::AcceptInvite(res) => match res {
                     Err(e) => self.set_error(e),
                     Ok(res) => {
                         self.chat.joining_room = false;
-                        if let Err(e) = self.send_jobs.send(UserRequest::RoomMsgs(res.room_id)).await {
+                        if let Err(e) = self
+                            .send_jobs
+                            .send(UserRequest::RoomMsgs(res.room_id))
+                            .await
+                        {
                             self.set_error(anyhow::Error::from(e))
                         }
                     }
+                },
+                RequestResult::DeclineInvite(res, room_id) => {
+                    if let Err(e) = res {
+                        self.set_error(e);
+                    }
+                    self.chat.room.remove_room(room_id)
                 }
-                RequestResult::DeclineInvite(res) => {
+                RequestResult::Typing(res) => {
+                    if let Err(e) = res {
+                        self.set_error(e);
+                    }
+                    self.typing_notice = false;
+                }
+                RequestResult::ReadReceipt(res) => {
                     if let Err(e) = res {
                         self.set_error(e);
                     }
@@ -349,17 +391,17 @@ impl AppWidget {
 
         match self.emitter_msgs.try_recv() {
             Ok(res) => match res {
+                // TODO make the MembershipState::Leave events work
                 StateResult::Member {
                     sender,
                     receiver,
                     room,
                     membership,
+                    timeline_event,
+                    member,
                 } => match membership {
                     MembershipChange::Joined => {
                         if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                            self.chat
-                                .msgs
-                                .add_notify(&format!("{} joined the room", sender.localpart()));
                             *self.chat.current_room.borrow_mut() =
                                 Some(room.read().await.room_id.clone());
                             self.chat.room.add_room(room).await;
@@ -371,11 +413,10 @@ impl AppWidget {
                     }
                     MembershipChange::Invited => {
                         if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                            self.chat.msgs.add_notify(&format!(
-                                "{} was invited to the room",
-                                receiver.localpart()
-                            ));
-                            self.chat.room.invited(sender, room).await;
+                            // if this is a RoomEvent from the joined rooms timeline don't respond
+                            if !timeline_event {
+                                self.chat.room.invited(sender, room).await;
+                            }
                         } else {
                             self.chat.msgs.add_notify(&format!(
                                 "{} was invited to the room",
@@ -385,9 +426,11 @@ impl AppWidget {
                     }
                     MembershipChange::Left => {
                         if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                            self.chat
-                                .room
-                                .remove_room(room.read().await.room_id.clone())
+                            // TODO delete the room file generated by our database
+                            self.chat.msgs.add_notify("you left the room");
+                        // self.chat
+                        //     .room
+                        //     .remove_room(room.read().await.room_id.clone());
                         } else {
                             self.chat
                                 .msgs
@@ -396,10 +439,8 @@ impl AppWidget {
                     }
                     MembershipChange::Banned => {
                         if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                            self.chat.msgs.add_notify(&format!(
-                                "{} was banned from the room",
-                                receiver.localpart()
-                            ));
+                            // TODO delete the room file generated by our database
+                            self.chat.msgs.add_notify("you were banned from the room");
                             self.chat
                                 .room
                                 .remove_room(room.read().await.room_id.clone())
@@ -412,6 +453,8 @@ impl AppWidget {
                     }
                     MembershipChange::Kicked => {
                         if Some(&receiver) == self.chat.msgs.me.as_ref() {
+                            // TODO delete the room file generated by our database
+                            self.chat.msgs.add_notify("you were kicked from the room");
                             self.chat
                                 .room
                                 .remove_room(room.read().await.room_id.clone())
@@ -422,13 +465,31 @@ impl AppWidget {
                             ))
                         }
                     }
-                    MembershipChange::ProfileChanged => {}
-                    MembershipChange::None => {}
+                    MembershipChange::ProfileChanged => {
+                        self.chat.msgs.add_notify("PROFILE PROFILE");
+                    }
+                    MembershipChange::None => {
+                        self.chat
+                            .msgs
+                            .add_notify(&format!("NONE NONE {:?}", member));
+                    }
                     MembershipChange::Error => panic!("membership error"),
                     MembershipChange::InvitationRejected => panic!("invite rejected"),
                     mem => todo!("implement more membership changes {:?}", mem),
                 },
-                StateResult::Message(msg, room) => self.chat.msgs.add_message(msg, room),
+                StateResult::Name(name, room_id) => self.chat.room.update_room(name, room_id),
+                StateResult::Message(msg, room) => {
+                    self.chat.msgs.add_message(msg, room);
+                    if let Some((event, room)) = self.chat.msgs.read_receipt(self.last_interaction) {
+                        if let Err(e) = self
+                            .send_jobs
+                            .send(UserRequest::ReadReceipt(room, event))
+                            .await
+                        {
+                            self.set_error(Error::from(e));
+                        }
+                    }
+                }
                 StateResult::FullyRead(_ev_id, _room_id) => self.chat.msgs.add_notify(""),
                 StateResult::Typing(msg) => self.chat.msgs.add_notify(&msg),
                 _ => {}
@@ -452,6 +513,11 @@ impl AppWidget {
     ) {
         for ev in events.chunk {
             if let Ok(e) = ev.deserialize() {
+                // matrix-sdk does not mutate the room on past events
+                // rooms are only mutated for present events, so we must handle the past
+                // events so when saved to the database the room is accurate with the current state
+                room.write().await.receive_timeline_event(&e);
+
                 match e {
                     RoomEvent::RoomMessage(msg) => {
                         let MessageEvent {
@@ -484,8 +550,9 @@ impl AppWidget {
                                     msg_body.clone()
                                 };
                                 let txn_id = unsigned
-                                    .get("transaction_id")
-                                    .map(|id| serde_json::from_value::<String>(id.clone()).unwrap())
+                                    .transaction_id
+                                    .as_ref()
+                                    .map(|id| id.clone())
                                     .unwrap_or_default();
 
                                 let msg = Message {
@@ -495,6 +562,8 @@ impl AppWidget {
                                     event_id: event_id.clone(),
                                     timestamp: origin_server_ts,
                                     uuid: Uuid::parse_str(&txn_id).unwrap_or(Uuid::new_v4()),
+                                    read: false,
+                                    sent_receipt: false,
                                 };
                                 self.chat
                                     .msgs
@@ -543,8 +612,9 @@ impl DrawWidget for AppWidget {
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
                         .title(&self.title)
-                        .title_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD)),
+                        .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
                 )
                 .alignment(Alignment::Center);
 

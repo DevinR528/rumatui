@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use matrix_sdk::identifiers::RoomId;
+use matrix_sdk::identifiers::{RoomId, UserId};
 use matrix_sdk::Room;
 use termion::event::MouseButton;
 use tokio::sync::RwLock;
@@ -21,6 +21,7 @@ use crate::widgets::{message::MessageWidget, rooms::RoomsWidget, RenderWidget};
 #[derive(Clone, Debug, Default)]
 pub struct ChatWidget {
     pub current_room: Rc<RefCell<Option<RoomId>>>,
+    pub(crate) me: Option<UserId>,
     pub room: RoomsWidget,
     pub msgs: MessageWidget,
     pub main_screen: bool,

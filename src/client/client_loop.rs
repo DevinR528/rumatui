@@ -4,6 +4,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+use std::time::Duration;
 
 use anyhow::Result;
 use matrix_sdk::Room;
@@ -16,11 +17,13 @@ use uuid::Uuid;
 
 use crate::client::event_stream::EventStream;
 use crate::client::MatrixClient;
-use matrix_sdk::api::r0::membership::{forget_room, join_room_by_id};
+use matrix_sdk::api::r0::membership::{join_room_by_id, leave_room};
 use matrix_sdk::api::r0::message::{create_message_event, get_message_events};
 use matrix_sdk::api::r0::session::login;
+use matrix_sdk::api::r0::typing::create_typing_event;
+use matrix_sdk::api::r0::receipt::create_receipt;
 use matrix_sdk::events::room::message::MessageEventContent;
-use matrix_sdk::identifiers::RoomId;
+use matrix_sdk::identifiers::{EventId, RoomId, UserId};
 
 /// Requests sent from the UI portion of the app.
 ///
@@ -31,6 +34,8 @@ pub enum UserRequest {
     RoomMsgs(RoomId),
     AcceptInvite(RoomId),
     DeclineInvite(RoomId),
+    Typing(RoomId, UserId),
+    ReadReceipt(RoomId, EventId),
     Quit,
 }
 unsafe impl Send for UserRequest {}
@@ -43,6 +48,10 @@ impl fmt::Debug for UserRequest {
             Self::RoomMsgs(id) => write!(f, "failed to get room messages for {}", id),
             Self::AcceptInvite(id) => write!(f, "failed to join {}", id),
             Self::DeclineInvite(id) => write!(f, "failed to decline {}", id),
+            Self::ReadReceipt(room, event) => write!(f, "failed to send read_receipt for {} in {}", event, room),
+            Self::Typing(id, user) => {
+                write!(f, "failed to send typing event for {} in {}", user, id)
+            }
             Self::Quit => write!(f, "quitting filed"),
         }
     }
@@ -54,7 +63,9 @@ pub enum RequestResult {
     SendMessage(Result<create_message_event::Response>),
     RoomMsgs(Result<(get_message_events::Response, Arc<RwLock<Room>>)>),
     AcceptInvite(Result<join_room_by_id::Response>),
-    DeclineInvite(Result<forget_room::Response>),
+    DeclineInvite(Result<leave_room::Response>, RoomId),
+    Typing(Result<create_typing_event::Response>),
+    ReadReceipt(Result<create_receipt::Response>),
     Error(anyhow::Error),
 }
 
@@ -103,7 +114,6 @@ impl MatrixEventHandle {
             if quitting.load(Ordering::SeqCst) {
                 return Ok(());
             }
-
             let set = matrix_sdk::SyncSettings::default();
             cli.sync_forever(set.clone(), |_| async {}).await;
             Ok(())
@@ -143,6 +153,11 @@ impl MatrixEventHandle {
                                 .await
                             {
                                 panic!("client event handler crashed {}", e)
+                            } else {
+                                // store state after receiving past events incase sync only found a few messages
+                                if client.store_room_state(&room_id).await.is_err() {
+                                    // log that an error happened at some point
+                                }
                             }
                         }
                         Err(get_msg_err) => {
@@ -158,8 +173,35 @@ impl MatrixEventHandle {
                         }
                     }
                     UserRequest::DeclineInvite(room_id) => {
-                        let res = client.forget_room_by_id(&room_id).await;
-                        if let Err(e) = to_app.send(RequestResult::DeclineInvite(res)).await {
+                        let res = client.leave_room(&room_id).await;
+                        if let Err(e) = to_app
+                            .send(RequestResult::DeclineInvite(res, room_id))
+                            .await
+                        {
+                            panic!("client event handler crashed {}", e)
+                        }
+                    }
+                    UserRequest::ReadReceipt(room_id, event_id) => {
+                        let res = client
+                            .read_receipt(
+                                &room_id,
+                                &event_id,
+                            )
+                            .await;
+                        if let Err(e) = to_app.send(RequestResult::ReadReceipt(res)).await {
+                            panic!("client event handler crashed {}", e)
+                        }
+                    }
+                    UserRequest::Typing(room_id, user_id) => {
+                        let res = client
+                            .typing_notice(
+                                &room_id,
+                                &user_id,
+                                true,
+                                Some(Duration::from_millis(3000)),
+                            )
+                            .await;
+                        if let Err(e) = to_app.send(RequestResult::Typing(res)).await {
                             panic!("client event handler crashed {}", e)
                         }
                     }
