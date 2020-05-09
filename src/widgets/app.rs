@@ -480,7 +480,8 @@ impl AppWidget {
                 StateResult::Name(name, room_id) => self.chat.room.update_room(name, room_id),
                 StateResult::Message(msg, room) => {
                     self.chat.msgs.add_message(msg, room);
-                    if let Some((event, room)) = self.chat.msgs.read_receipt(self.last_interaction) {
+                    if let Some((event, room)) = self.chat.msgs.read_receipt(self.last_interaction)
+                    {
                         if let Err(e) = self
                             .send_jobs
                             .send(UserRequest::ReadReceipt(room, event))

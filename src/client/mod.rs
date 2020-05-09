@@ -6,18 +6,16 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use matrix_sdk::{
     self,
-    api::r0::membership::{
-        forget_room, join_room_by_id, kick_user, leave_room,
-    },
+    api::r0::membership::{forget_room, join_room_by_id, kick_user, leave_room},
     // api::r0::filter::{LazyLoadOptions, RoomEventFilter},
     api::r0::message::{create_message_event, get_message_events},
+    api::r0::receipt::create_receipt,
     api::r0::session::login,
     api::r0::typing::create_typing_event,
-    api::r0::receipt::create_receipt,
     events::room::message::MessageEventContent,
     identifiers::{EventId, RoomId, UserId},
-    AsyncClient,
-    AsyncClientConfig,
+    Client,
+    ClientConfig,
     JsonStore,
     Room,
     SyncSettings,
@@ -34,7 +32,7 @@ const SYNC_TIMEOUT: Duration = Duration::from_secs(30);
 #[derive(Clone)]
 pub struct MatrixClient {
     /// TODO once matrix-sdk `StateStore` is impled make this work
-    pub inner: AsyncClient,
+    pub inner: Client,
     homeserver: Url,
     user: Option<UserId>,
     settings: SyncSettings,
@@ -60,13 +58,13 @@ impl MatrixClient {
         ))?;
         path.push(".rumatui");
         // reset the client with the state store with username as part of the store path
-        let client_config = AsyncClientConfig::default()
+        let client_config = ClientConfig::default()
             .proxy("http://localhost:8080")? // for mitmproxy
             .disable_ssl_verification()
             .state_store(Box::new(JsonStore::open(path)?));
 
         let client = Self {
-            inner: AsyncClient::new_with_config(homeserver.clone(), None, client_config)?,
+            inner: Client::new_with_config(homeserver.clone(), None, client_config)?,
             homeserver,
             user: None,
             settings: SyncSettings::default(),
@@ -87,10 +85,11 @@ impl MatrixClient {
     ///
     /// * room_id - A valid RoomId otherwise sending will fail.
     pub(crate) async fn store_room_state(&self, room_id: &RoomId) -> Result<()> {
-        self.inner
-            .store_room_state(room_id)
-            .await
-            .context(format!("Storing state of room {} failed", room_id))
+        // self.inner
+        //     .store_room_state(room_id)
+        //     .await
+        //     .context(format!("Storing state of room {} failed", room_id))
+        Ok(())
     }
 
     /// Log in to as the specified user.
@@ -98,8 +97,29 @@ impl MatrixClient {
         &mut self,
         username: String,
         password: String,
-    ) -> Result<(HashMap<RoomId, Arc<RwLock<Room>>>, login::Response)> {
-        let res = self.inner.login(username, password, None, None).await?;
+    ) -> Result<(
+        Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
+        login::Response,
+    )> {
+        let res = self
+            .inner
+            .login(username, password, None, None)
+            .await
+            .map_err(|err| {
+                if let matrix_sdk::Error::RumaResponse(matrix_sdk::FromHttpResponseError::Http(
+                    matrix_sdk::ServerError::Known(matrix_sdk::api::Error {
+                        kind,
+                        message,
+                        status_code,
+                    }),
+                )) = err
+                {
+                    panic!("{}\n{}\n{}", kind, message, status_code);
+                    anyhow::Error::new(err)
+                } else {
+                    anyhow::Error::new(err)
+                }
+            })?;
         self.user = Some(res.user_id.clone());
 
         // if we can't sync with the "Db" then we must sync with the server
@@ -115,7 +135,7 @@ impl MatrixClient {
         }
 
         self.next_batch = self.inner.sync_token().await;
-        Ok((self.inner.get_rooms().await, res))
+        Ok((self.inner.joined_rooms(), res))
     }
 
     /// Manually sync state, provides a default sync token if None is given.
@@ -189,7 +209,8 @@ impl MatrixClient {
             .map_err(|e| anyhow::Error::from(e))
         {
             Ok(res) => {
-                self.last_scroll.insert(id.clone(), res.end.clone());
+                self.last_scroll
+                    .insert(id.clone(), res.end.clone().unwrap());
                 Ok(res)
             }
             err => err,

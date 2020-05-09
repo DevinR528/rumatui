@@ -3,9 +3,10 @@
 use std::fmt;
 
 pub use matrix_sdk::{
-    ruma_api, Endpoint, Error as RumaClientError, FromHttpResponseError as RumaResponseError,
-    IntoHttpError, ServerError,
+    Endpoint, Error as RumaClientError, FromHttpResponseError as RumaResponseError, IntoHttpError,
+    ServerError,
 };
+use ruma_client_api::error::ErrorKind;
 use serde_json::Error as JsonError;
 use url::ParseError;
 
@@ -21,23 +22,12 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Internal representation of errors.
 #[derive(Debug)]
 pub enum Error {
-    RumaResponse {
-        text: String,
-        error: RumaResponseError<RumaClientError>,
-    },
-    RumaRequest {
-        text: String,
-        error: IntoHttpError,
-    },
-    SerDeError {
-        text: String,
-        error: JsonError,
-    },
-    UrlParseError {
-        text: String,
-        error: ParseError,
-    },
+    RumaResponse { text: String, kind: ErrorKind },
+    RumaRequest { text: String, error: IntoHttpError },
+    UrlParseError { text: String, error: ParseError },
+    SerDeError(String),
     NeedAuth(String),
+    UnknownServer(String),
 }
 
 impl fmt::Display for Error {
@@ -48,24 +38,24 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl From<RumaResponseError<RumaClientError>> for Error {
-    fn from(error: RumaResponseError<RumaClientError>) -> Self {
-        match &error {
-            RumaResponseError::Deserialization(de_err) => {
-                let text = format!("deserialization failed: {}", de_err);
-                Self::RumaResponse { text, error }
-            }
-            RumaResponseError::Http(server) => match server {
-                ruma_api::error::ServerError::Known(e) => {
-                    let text = format!("an error occurred with the server: {}", e);
-                    Self::RumaResponse { text, error }
-                }
-                ruma_api::error::ServerError::Unknown(e) => {
-                    let text = format!("an unknown error occurred with the server: {}", e);
-                    Self::RumaResponse { text, error }
-                }
+impl From<RumaClientError> for Error {
+    fn from(error: RumaClientError) -> Self {
+        match error {
+            RumaClientError::AuthenticationRequired => Error::NeedAuth("oops".into()),
+            RumaClientError::RumaResponse(http) => match http {
+                RumaResponseError::Http(server) => match server {
+                    ServerError::Known(matrix_sdk::api::Error { kind, message, .. }) => {
+                        Error::RumaResponse {
+                            text: message,
+                            kind,
+                        }
+                    }
+                    ServerError::Unknown(err) => Error::UnknownServer(err.to_string()),
+                },
+                RumaResponseError::Deserialization(deser) => Error::SerDeError(deser.to_string()),
+                _ => panic!("ruma-client-api errors have changed"),
             },
-            _ => unreachable!("ruma _NonExhaustive_ found"),
+            _ => Error::UnknownServer("".to_string()),
         }
     }
 }

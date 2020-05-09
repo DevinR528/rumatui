@@ -120,10 +120,13 @@ impl RoomsWidget {
     ///
     /// ## Arguments
     ///  * rooms - A `HashMap` of room_id to `Room`.
-    pub(crate) async fn populate_rooms(&mut self, rooms: HashMap<RoomId, Arc<RwLock<Room>>>) {
-        self.rooms = rooms.clone();
+    pub(crate) async fn populate_rooms(
+        &mut self,
+        rooms: Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
+    ) {
+        self.rooms = rooms.read().await.clone();
         let mut items: Vec<(String, RoomId)> = Vec::default();
-        for (id, room) in &rooms {
+        for (id, room) in &self.rooms {
             // filter duplicate rooms
             if items.iter().any(|(_name, rid)| id == rid) {
                 continue;
@@ -133,7 +136,7 @@ impl RoomsWidget {
             if r.tombstone.is_some() {
                 continue;
             }
-            items.push((r.calculate_name(), id.clone()));
+            items.push((r.display_name(), id.clone()));
         }
 
         if let Some((_name, id)) = items.first() {
@@ -145,7 +148,7 @@ impl RoomsWidget {
 
     pub(crate) async fn add_room(&mut self, room: Arc<RwLock<Room>>) {
         let r = room.read().await;
-        let name = r.calculate_name();
+        let name = r.display_name();
         let room_id = r.room_id.clone();
 
         self.rooms.insert(room_id.clone(), Arc::clone(&room));
@@ -168,7 +171,7 @@ impl RoomsWidget {
     pub(crate) async fn invited(&mut self, sender: UserId, room: Arc<RwLock<Room>>) {
         let r = room.read().await;
         let room_id = r.room_id.clone();
-        let room_name = r.calculate_name();
+        let room_name = r.display_name();
         self.invite = Some(Invitation {
             sender,
             room_id,

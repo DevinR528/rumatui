@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -30,8 +31,13 @@ pub struct ChatWidget {
 }
 
 impl ChatWidget {
-    pub(crate) async fn set_room_state(&mut self, rooms: HashMap<RoomId, Arc<RwLock<Room>>>) {
-        self.msgs.populate_initial_msgs(&rooms).await;
+    pub(crate) async fn set_room_state(
+        &mut self,
+        rooms: Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
+    ) {
+        self.msgs
+            .populate_initial_msgs(rooms.read().await.deref())
+            .await;
         self.room.populate_rooms(rooms).await;
         self.msgs.current_room = Rc::clone(&self.room.current_room);
         self.current_room = Rc::clone(&self.room.current_room);

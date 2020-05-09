@@ -19,9 +19,9 @@ use crate::client::event_stream::EventStream;
 use crate::client::MatrixClient;
 use matrix_sdk::api::r0::membership::{join_room_by_id, leave_room};
 use matrix_sdk::api::r0::message::{create_message_event, get_message_events};
+use matrix_sdk::api::r0::receipt::create_receipt;
 use matrix_sdk::api::r0::session::login;
 use matrix_sdk::api::r0::typing::create_typing_event;
-use matrix_sdk::api::r0::receipt::create_receipt;
 use matrix_sdk::events::room::message::MessageEventContent;
 use matrix_sdk::identifiers::{EventId, RoomId, UserId};
 
@@ -48,7 +48,9 @@ impl fmt::Debug for UserRequest {
             Self::RoomMsgs(id) => write!(f, "failed to get room messages for {}", id),
             Self::AcceptInvite(id) => write!(f, "failed to join {}", id),
             Self::DeclineInvite(id) => write!(f, "failed to decline {}", id),
-            Self::ReadReceipt(room, event) => write!(f, "failed to send read_receipt for {} in {}", event, room),
+            Self::ReadReceipt(room, event) => {
+                write!(f, "failed to send read_receipt for {} in {}", event, room)
+            }
             Self::Typing(id, user) => {
                 write!(f, "failed to send typing event for {} in {}", user, id)
             }
@@ -59,7 +61,12 @@ impl fmt::Debug for UserRequest {
 
 /// Either a `UserRequest` succeeds or fails with the given result.
 pub enum RequestResult {
-    Login(Result<(HashMap<RoomId, Arc<RwLock<Room>>>, login::Response)>),
+    Login(
+        Result<(
+            Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
+            login::Response,
+        )>,
+    ),
     SendMessage(Result<create_message_event::Response>),
     RoomMsgs(Result<(get_message_events::Response, Arc<RwLock<Room>>)>),
     AcceptInvite(Result<join_room_by_id::Response>),
@@ -147,7 +154,13 @@ impl MatrixEventHandle {
                                 .send(RequestResult::RoomMsgs(Ok((
                                     res,
                                     Arc::clone(
-                                        client.inner.get_rooms().await.get(&room_id).unwrap(),
+                                        client
+                                            .inner
+                                            .joined_rooms()
+                                            .read()
+                                            .await
+                                            .get(&room_id)
+                                            .unwrap(),
                                     ),
                                 ))))
                                 .await
@@ -182,12 +195,7 @@ impl MatrixEventHandle {
                         }
                     }
                     UserRequest::ReadReceipt(room_id, event_id) => {
-                        let res = client
-                            .read_receipt(
-                                &room_id,
-                                &event_id,
-                            )
-                            .await;
+                        let res = client.read_receipt(&room_id, &event_id).await;
                         if let Err(e) = to_app.send(RequestResult::ReadReceipt(res)).await {
                             panic!("client event handler crashed {}", e)
                         }
