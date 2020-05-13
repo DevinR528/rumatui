@@ -168,6 +168,7 @@ impl MatrixEventHandle {
                                 panic!("client event handler crashed {}", e)
                             } else {
                                 // store state after receiving past events incase sync only found a few messages
+                                // TODO this does nothing until PR to add this method to matrix-sdk
                                 if client.store_room_state(&room_id).await.is_err() {
                                     // log that an error happened at some point
                                 }

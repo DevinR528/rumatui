@@ -7,7 +7,7 @@ pub use matrix_sdk::{
     ServerError,
 };
 use ruma_client_api::error::ErrorKind;
-use serde_json::Error as JsonError;
+// use serde_json::Error as JsonError;
 use url::ParseError;
 
 #[cfg(feature = "encryption")]
