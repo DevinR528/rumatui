@@ -59,6 +59,7 @@ fn main() -> Result<(), failure::Error> {
                         Key::Up => app.on_up(),
                         Key::Down => app.on_down(),
                         Key::Backspace => app.on_backspace(),
+                        Key::Delete => app.on_delete().await,
                         Key::Char(c) => app.on_key(c).await,
                         Key::Esc => app.should_quit = true,
                         _ => {}

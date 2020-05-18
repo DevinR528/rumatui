@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::ops::{Index, IndexMut};
+use std::ops::{DerefMut, Index, IndexMut};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -24,13 +24,13 @@ pub struct ListState<I> {
     pub selected: usize,
 }
 
-impl<I> Default for ListState<I> {
+impl<I: std::fmt::Debug> Default for ListState<I> {
     fn default() -> Self {
         Self::new(Vec::new())
     }
 }
 
-impl<I> ListState<I> {
+impl<I: std::fmt::Debug> ListState<I> {
     pub fn new(items: Vec<I>) -> ListState<I> {
         ListState { items, selected: 0 }
     }
@@ -156,10 +156,21 @@ impl RoomsWidget {
     }
 
     pub(crate) fn remove_room(&mut self, room_id: RoomId) {
-        // self.rooms.remove(&room_id);
+        self.rooms.remove(&room_id);
         if let Some(idx) = self.names.items.iter().position(|(_, id)| &room_id == id) {
             self.names.items.remove(idx);
         }
+        if !self.names.is_empty() {
+            self.names.select_next();
+            if let Some((_name, room_id)) = self.names.get_selected() {
+                if let Some(id) = self.current_room.borrow_mut().deref_mut() {
+                    *id = room_id.clone();
+                    return;
+                }
+            }
+        }
+        // else no room found so remove the current room
+        self.current_room.borrow_mut().take();
     }
 
     pub(crate) fn update_room(&mut self, name: String, room_id: RoomId) {

@@ -11,7 +11,7 @@ use matrix_sdk::events::{
         avatar::AvatarEvent,
         canonical_alias::CanonicalAliasEvent,
         join_rules::JoinRulesEvent,
-        member::{MemberEvent, MembershipChange, MembershipState},
+        member::{MemberEvent, MemberEventContent, MembershipChange, MembershipState},
         message::{
             feedback::FeedbackEvent, MessageEvent, MessageEventContent, TextMessageEventContent,
         },
@@ -59,8 +59,14 @@ pub enum StateResult {
 }
 unsafe impl Send for StateResult {}
 
+#[derive(Clone, Debug)]
 pub struct EventStream {
-    send: Mutex<mpsc::Sender<StateResult>>,
+    /// Send messages to the UI loop.
+    ///
+    /// This is an Arc only to derive Clone which is only to
+    /// trick the borrow checker into thinking adding EventStream in a loop is okay
+    /// as it is done only for Login which will only happen once in the loop.
+    send: Arc<Mutex<mpsc::Sender<StateResult>>>,
 }
 unsafe impl Send for EventStream {}
 
@@ -70,10 +76,34 @@ impl EventStream {
 
         (
             Self {
-                send: Mutex::new(send),
+                send: Arc::new(Mutex::new(send)),
             },
             recv,
         )
+    }
+
+    async fn handle_room_member(&self, room: Arc<RwLock<Room>>, event: &MemberEvent) {
+        let MemberEvent {
+            sender, state_key, ..
+        } = event;
+        let receiver = UserId::try_from(state_key.as_str()).unwrap();
+        let membership = event.membership_change();
+        if let Err(e) = self
+            .send
+            .lock()
+            .await
+            .send(StateResult::Member {
+                sender: sender.clone(),
+                receiver,
+                room,
+                membership,
+                timeline_event: true,
+                member: event.content.membership,
+            })
+            .await
+        {
+            panic!("{}", e)
+        }
     }
 }
 
@@ -82,30 +112,15 @@ impl EventEmitter for EventStream {
     /// Send a membership change event to the ui thread.
     async fn on_room_member(&self, room: SyncRoom, event: &MemberEvent) {
         match room {
-            SyncRoom::Joined(room) => {
-                let MemberEvent {
-                    sender, state_key, ..
-                } = event;
-                let receiver = UserId::try_from(state_key.as_str()).unwrap();
-                let membership = event.membership_change();
-                if let Err(e) = self
-                    .send
-                    .lock()
-                    .await
-                    .send(StateResult::Member {
-                        sender: sender.clone(),
-                        receiver,
-                        room,
-                        membership,
-                        timeline_event: true,
-                        member: event.content.membership,
-                    })
-                    .await
-                {
-                    panic!("{}", e)
-                }
+            SyncRoom::Invited(room) => {
+                self.handle_room_member(room, event).await;
             }
-            _ => {}
+            SyncRoom::Left(room) => {
+                self.handle_room_member(room, event).await;
+            }
+            SyncRoom::Joined(room) => {
+                self.handle_room_member(room, event).await;
+            }
         }
     }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomName` event.
@@ -219,15 +234,21 @@ impl EventEmitter for EventStream {
 
     // `AnyStrippedStateEvent`s
     /// Fires when `AsyncClient` receives a `StateEvent::RoomMember` event.
-    async fn on_stripped_state_member(&self, room: SyncRoom, event: &StrippedRoomMember) {
+    async fn on_stripped_state_member(
+        &self,
+        room: SyncRoom,
+        event: &StrippedRoomMember,
+        prev_content: Option<MemberEventContent>,
+    ) {
+        // TODO only invite is handled as stripped state member
         match room {
-            SyncRoom::Joined(room) => {
+            SyncRoom::Invited(room) | SyncRoom::Left(room) | SyncRoom::Joined(room) => {
                 let StrippedRoomMember {
                     sender, state_key, ..
                 } = event;
 
                 let receiver = UserId::try_from(state_key.as_str()).unwrap();
-                let membership = membership_change(event);
+                let membership = stripped_membership_change(prev_content, event);
                 if let Err(e) = self
                     .send
                     .lock()
@@ -245,8 +266,6 @@ impl EventEmitter for EventStream {
                     panic!("{}", e)
                 }
             }
-            SyncRoom::Left(room) => {}
-            SyncRoom::Invited(room) => {}
         }
     }
     /// Fires when `AsyncClient` receives a `StateEvent::RoomName` event.
@@ -326,9 +345,17 @@ impl EventEmitter for EventStream {
 /// Helper function for membership change of StrippedRoomMember.
 ///
 /// Check [the specification][spec] for details. [spec]: https://matrix.org/docs/spec/client_server/latest#m-room-member
-pub fn membership_change(member: &StrippedRoomMember) -> MembershipChange {
+pub fn stripped_membership_change(
+    prev_content: Option<MemberEventContent>,
+    member: &StrippedRoomMember,
+) -> MembershipChange {
     use MembershipState::*;
-    let prev_membership = MembershipState::Leave;
+
+    let prev_membership = if let Some(prev) = &prev_content {
+        prev.membership
+    } else {
+        Leave
+    };
     match (prev_membership, &member.content.membership) {
         (Invite, Invite) | (Leave, Leave) | (Ban, Ban) => MembershipChange::None,
         (Invite, Join) | (Leave, Join) => MembershipChange::Joined,

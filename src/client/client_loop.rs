@@ -34,6 +34,7 @@ pub enum UserRequest {
     RoomMsgs(RoomId),
     AcceptInvite(RoomId),
     DeclineInvite(RoomId),
+    LeaveRoom(RoomId),
     Typing(RoomId, UserId),
     ReadReceipt(RoomId, EventId),
     Quit,
@@ -48,6 +49,7 @@ impl fmt::Debug for UserRequest {
             Self::RoomMsgs(id) => write!(f, "failed to get room messages for {}", id),
             Self::AcceptInvite(id) => write!(f, "failed to join {}", id),
             Self::DeclineInvite(id) => write!(f, "failed to decline {}", id),
+            Self::LeaveRoom(id) => write!(f, "failed to leave {}", id),
             Self::ReadReceipt(room, event) => {
                 write!(f, "failed to send read_receipt for {} in {}", event, room)
             }
@@ -71,6 +73,7 @@ pub enum RequestResult {
     RoomMsgs(Result<(get_message_events::Response, Arc<RwLock<Room>>)>),
     AcceptInvite(Result<join_room_by_id::Response>),
     DeclineInvite(Result<leave_room::Response>, RoomId),
+    LeaveRoom(Result<leave_room::Response>, RoomId),
     Typing(Result<create_typing_event::Response>),
     ReadReceipt(Result<create_receipt::Response>),
     Error(anyhow::Error),
@@ -193,6 +196,19 @@ impl MatrixEventHandle {
                             .await
                         {
                             panic!("client event handler crashed {}", e)
+                        }
+                    }
+                    UserRequest::LeaveRoom(room_id) => {
+                        let res = client.leave_room(&room_id).await;
+                        if let Err(e) = to_app
+                            .send(RequestResult::LeaveRoom(res, room_id.clone()))
+                            .await
+                        {
+                            panic!("client event handler crashed {}", e)
+                        } else {
+                            if let Err(e) = client.forget_room(&room_id).await {
+                                panic!("client event handler crashed {}", e)
+                            }
                         }
                     }
                     UserRequest::ReadReceipt(room_id, event_id) => {

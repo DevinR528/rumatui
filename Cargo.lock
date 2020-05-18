@@ -1079,7 +1079,6 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 [[package]]
 name = "matrix-sdk"
 version = "0.1.0"
-source = "git+https://github.com/matrix-org/matrix-rust-sdk/#676633eec18d328fe3839cb5a610903d0f6b9a0f"
 dependencies = [
  "futures-timer",
  "http",
@@ -1096,7 +1095,6 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-base"
 version = "0.1.0"
-source = "git+https://github.com/matrix-org/matrix-rust-sdk/#676633eec18d328fe3839cb5a610903d0f6b9a0f"
 dependencies = [
  "async-trait",
  "matrix-sdk-common",
@@ -1110,7 +1108,6 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-common"
 version = "0.1.0"
-source = "git+https://github.com/matrix-org/matrix-rust-sdk/#676633eec18d328fe3839cb5a610903d0f6b9a0f"
 dependencies = [
  "futures-locks",
  "instant",
@@ -1126,7 +1123,6 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-crypto"
 version = "0.1.0"
-source = "git+https://github.com/matrix-org/matrix-rust-sdk/#676633eec18d328fe3839cb5a610903d0f6b9a0f"
 dependencies = [
  "async-trait",
  "atomic",
@@ -1793,15 +1789,15 @@ dependencies = [
 
 [[package]]
 name = "ruma-api"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4d1f23ec408993a39acb852a311a5469422b0c087a6497efeb0ad9c04ad72db"
+checksum = "82ffdb7fb9cf6af2b1d0d8254d922560ecb70081d7e70931c9b996b6b4839db5"
 dependencies = [
  "http",
  "percent-encoding",
  "ruma-api-macros",
  "ruma-identifiers",
- "ruma-serde",
+ "ruma-serde 0.2.1",
  "serde",
  "serde_json",
  "strum",
@@ -1809,9 +1805,9 @@ dependencies = [
 
 [[package]]
 name = "ruma-api-macros"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ae19a3485b607be10c07f0e6a1c672e8cc2693a50a29f25195f7034dbe7859c"
+checksum = "52b82b4567b9af9b40a86f7778821c016ea961f55e4fee255f8f24bb28ee7452"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1830,7 +1826,7 @@ dependencies = [
  "ruma-common",
  "ruma-events",
  "ruma-identifiers",
- "ruma-serde",
+ "ruma-serde 0.1.3",
  "serde",
  "serde_json",
  "strum",
@@ -1842,7 +1838,7 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "235f2fed35114ef3fbff1b7d5350f22ac712cffff55cc7b7732d39ae4adf6966"
 dependencies = [
- "ruma-serde",
+ "ruma-serde 0.1.3",
  "serde",
  "serde_json",
 ]
@@ -1857,7 +1853,7 @@ dependencies = [
  "ruma-common",
  "ruma-events-macros",
  "ruma-identifiers",
- "ruma-serde",
+ "ruma-serde 0.1.3",
  "serde",
  "serde_json",
 ]
@@ -1888,6 +1884,20 @@ name = "ruma-serde"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e14edc0e2f5177c419e3b89060b1e94fb3af81b2f253783ac6967f14a7ec3911"
+dependencies = [
+ "dtoa",
+ "itoa",
+ "js_int",
+ "serde",
+ "serde_json",
+ "url",
+]
+
+[[package]]
+name = "ruma-serde"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0dd3d04c6755bae23101dec7426d044b773ef517932f23d5a6254c4caa1cfce3"
 dependencies = [
  "dtoa",
  "itoa",
@@ -2337,9 +2347,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.20"
+version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05c1d570eb1a36f0345a5ce9c6c6e665b70b73d11236912c0b477616aeec47b1"
+checksum = "d099fa27b9702bed751524694adbe393e18b36b204da91eb1cbbbbb4a5ee2d58"
 dependencies = [
  "bytes",
  "fnv",
@@ -2397,9 +2407,9 @@ checksum = "e987b6bf443f4b5b3b6f38704195592cca41c5bb7aedd3c3693c7081f8289860"
 
 [[package]]
 name = "tracing"
-version = "0.1.13"
+version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1721cc8cf7d770cc4257872507180f35a4797272f5962f24c806af9e7faf52ab"
+checksum = "a7c6b59d116d218cb2d990eb06b77b64043e0268ef7323aae63d8b30ae462923"
 dependencies = [
  "cfg-if",
  "tracing-attributes",
@@ -2408,10 +2418,11 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fbad39da2f9af1cae3016339ad7f2c7a9e870f12e8fd04c4fd7ef35b30c0d2b"
+checksum = "99bbad0de3fd923c9c3232ead88510b783e5a4d16a6154adffa3d53308de984c"
 dependencies = [
+ "proc-macro2",
  "quote",
  "syn",
 ]

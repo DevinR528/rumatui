@@ -6,7 +6,7 @@ use tui::{Frame, Terminal};
 
 pub mod app;
 pub mod chat;
-pub mod error;
+mod error;
 pub mod login;
 pub mod message;
 pub mod rooms;

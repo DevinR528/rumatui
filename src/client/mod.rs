@@ -85,11 +85,10 @@ impl MatrixClient {
     ///
     /// * room_id - A valid RoomId otherwise sending will fail.
     pub(crate) async fn store_room_state(&self, room_id: &RoomId) -> Result<()> {
-        // self.inner
-        //     .store_room_state(room_id)
-        //     .await
-        //     .context(format!("Storing state of room {} failed", room_id))
-        Ok(())
+        self.inner
+            .store_room_state(room_id)
+            .await
+            .context(format!("Storing state of room {} failed", room_id))
     }
 
     /// Log in to as the specified user.
@@ -105,20 +104,20 @@ impl MatrixClient {
             .inner
             .login(username, password, None, None)
             .await
-            .map_err(|err| {
-                if let matrix_sdk::Error::RumaResponse(matrix_sdk::FromHttpResponseError::Http(
+            .map_err(|err| match err {
+                matrix_sdk::Error::RumaResponse(matrix_sdk::FromHttpResponseError::Http(
                     matrix_sdk::ServerError::Known(matrix_sdk::api::Error {
                         kind,
                         message,
                         status_code,
                     }),
-                )) = err
-                {
-                    panic!("{}\n{}\n{}", kind, message, status_code);
-                    anyhow::Error::new(err)
-                } else {
-                    anyhow::Error::new(err)
-                }
+                )) => anyhow::Error::new(matrix_sdk::api::Error {
+                    kind,
+                    message: message.clone(),
+                    status_code,
+                })
+                .context(format!("{} {}", kind, message)),
+                err @ _ => anyhow::Error::new(err),
             })?;
         self.user = Some(res.user_id.clone());
 
@@ -237,10 +236,7 @@ impl MatrixClient {
     /// # Arguments
     ///
     /// * room_id - A valid RoomId otherwise sending will fail.
-    pub(crate) async fn forget_room_by_id(
-        &self,
-        room_id: &RoomId,
-    ) -> Result<forget_room::Response> {
+    pub(crate) async fn forget_room(&self, room_id: &RoomId) -> Result<forget_room::Response> {
         self.inner
             .forget_room_by_id(room_id)
             .await

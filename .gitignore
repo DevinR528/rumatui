@@ -1,3 +1,4 @@
 /target
 info.txt
 Cargo.lock
+sync*.json
