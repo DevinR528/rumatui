@@ -5,6 +5,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use js_int::UInt;
 use matrix_sdk::events::room::message::{
     MessageEvent, MessageEventContent, TextMessageEventContent,
 };
@@ -66,7 +67,7 @@ pub struct MessageWidget {
     pub(crate) current_room: Rc<RefCell<Option<RoomId>>>,
     messages: Vec<(RoomId, Message)>,
     pub(crate) me: Option<UserId>,
-    pub unread_notifications: u32,
+    pub unread_notifications: UInt,
     send_msg: String,
     notifications: VecDeque<(Option<SystemTime>, String)>,
     scroll_pos: usize,
@@ -81,13 +82,12 @@ impl MessageWidget {
             // TODO this should never fail but see about js_int::UInt impling `Into<u32>`
             self.unread_notifications = room
                 .unread_notifications
-                .map(|num| u32::from_str(&num.to_string()).unwrap())
                 .unwrap_or_default();
 
             self.unread_notifications += room
                 .unread_highlight
-                .map(|num| u32::from_str(&num.to_string()).unwrap())
                 .unwrap_or_default();
+
             for msg in room.messages.iter() {
                 self.add_message_event(msg, &room);
             }
@@ -268,12 +268,10 @@ impl MessageWidget {
     pub fn check_unread(&mut self, room: &Room) -> Option<EventId> {
         self.unread_notifications = room
                 .unread_notifications
-                .map(|num| u32::from_str(&num.to_string()).unwrap())
                 .unwrap_or_default();
 
         self.unread_notifications += room
             .unread_highlight
-            .map(|num| u32::from_str(&num.to_string()).unwrap())
             .unwrap_or_default();
 
         self.messages.iter().rfind(|(_id, msg)| msg.read).map(|(_, msg)| msg.event_id.clone())
@@ -477,30 +475,4 @@ impl RenderWidget for MessageWidget {
         );
         f.render_widget(button, btn[1]);
     }
-}
-
-fn unread_notification_count(count: u32) -> String {
-    let digits: Vec<_> = count
-        .to_string()
-        .chars()
-        .map(|d| d.to_digit(10).unwrap())
-        .collect();
-
-    let mut notification = String::new();
-    for int in digits {
-        match int {
-            0 => {},
-            1 => notification.push_str("1️⃣"),
-            2 => notification.push_str("2️⃣"),
-            3 => notification.push_str("3️⃣"),
-            4 => notification.push_str("4️⃣"),
-            5 => notification.push_str("5️⃣"),
-            6 => notification.push_str("6️⃣"),
-            7 => notification.push_str("7️⃣"),
-            8 => notification.push_str("8️⃣"),
-            9 => notification.push_str("9️⃣"),
-            _ => unreachable!("unread_notification_count should create a vector of each digit 0-9"),
-        }
-    }
-    notification
 }
