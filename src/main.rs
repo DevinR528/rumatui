@@ -53,27 +53,37 @@ fn main() -> Result<(), failure::Error> {
 
             match events.next()? {
                 Event::Input(event) => match event {
-                    TermEvent::Key(key) => match key {
-                        Key::Ctrl(c) if c == 'q' => app.should_quit = true,
-                        Key::Ctrl(c) if c == 'j' => app.on_send().await,
-                        Key::Up => app.on_up(),
-                        Key::Down => app.on_down(),
-                        Key::Backspace => app.on_backspace(),
-                        Key::Delete => app.on_delete().await,
-                        Key::Char(c) => app.on_key(c).await,
-                        Key::Esc => app.should_quit = true,
-                        _ => {}
+                    TermEvent::Key(key) => {
+
+                        app.on_notifications().await;
+
+                        match key {
+                            Key::Ctrl(c) if c == 'q' => app.should_quit = true,
+                            Key::Ctrl(c) if c == 'j' => app.on_send().await,
+                            Key::Up => app.on_up().await,
+                            Key::Down => app.on_down().await,
+                            Key::Backspace => app.on_backspace(),
+                            Key::Delete => app.on_delete().await,
+                            Key::Char(c) => app.on_key(c).await,
+                            Key::Esc => app.should_quit = true,
+                            _ => {}
+                        }
                     },
-                    TermEvent::Mouse(m) => match m {
-                        MouseEvent::Press(btn, x, y) if btn == MouseButton::WheelUp => {
-                            app.on_scroll_up(x, y).await
+                    TermEvent::Mouse(m) => {
+
+                        app.on_notifications().await;
+                        
+                        match m {
+                            MouseEvent::Press(btn, x, y) if btn == MouseButton::WheelUp => {
+                                app.on_scroll_up(x, y).await
+                            }
+                            MouseEvent::Press(btn, x, y) if btn == MouseButton::WheelDown => {
+                                app.on_scroll_down(x, y).await
+                            }
+                            MouseEvent::Press(btn, x, y) => app.on_click(btn, x, y).await,
+                            MouseEvent::Release(_, _) => {}
+                            MouseEvent::Hold(_, _) => {}
                         }
-                        MouseEvent::Press(btn, x, y) if btn == MouseButton::WheelDown => {
-                            app.on_scroll_down(x, y)
-                        }
-                        MouseEvent::Press(btn, x, y) => app.on_click(btn, x, y).await,
-                        MouseEvent::Release(_, _) => {}
-                        MouseEvent::Hold(_, _) => {}
                     },
                     TermEvent::Unsupported(_) => {}
                 },

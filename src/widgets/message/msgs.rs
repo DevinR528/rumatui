@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
+use std::str::FromStr;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -65,6 +66,7 @@ pub struct MessageWidget {
     pub(crate) current_room: Rc<RefCell<Option<RoomId>>>,
     messages: Vec<(RoomId, Message)>,
     pub(crate) me: Option<UserId>,
+    pub unread_notifications: u32,
     send_msg: String,
     notifications: VecDeque<(Option<SystemTime>, String)>,
     scroll_pos: usize,
@@ -76,6 +78,16 @@ impl MessageWidget {
     pub async fn populate_initial_msgs(&mut self, rooms: &HashMap<RoomId, Arc<RwLock<Room>>>) {
         for (_id, room) in rooms {
             let room = room.read().await;
+            // TODO this should never fail but see about js_int::UInt impling `Into<u32>`
+            self.unread_notifications = room
+                .unread_notifications
+                .map(|num| u32::from_str(&num.to_string()).unwrap())
+                .unwrap_or_default();
+
+            self.unread_notifications += room
+                .unread_highlight
+                .map(|num| u32::from_str(&num.to_string()).unwrap())
+                .unwrap_or_default();
             for msg in room.messages.iter() {
                 self.add_message_event(msg, &room);
             }
@@ -253,6 +265,20 @@ impl MessageWidget {
         }
     }
 
+    pub fn check_unread(&mut self, room: &Room) -> Option<EventId> {
+        self.unread_notifications = room
+                .unread_notifications
+                .map(|num| u32::from_str(&num.to_string()).unwrap())
+                .unwrap_or_default();
+
+        self.unread_notifications += room
+            .unread_highlight
+            .map(|num| u32::from_str(&num.to_string()).unwrap())
+            .unwrap_or_default();
+
+        self.messages.iter().rfind(|(id, msg)| msg.read).map(|(_, msg)| msg.event_id.clone())
+    }
+
     pub fn on_scroll_up(&mut self, x: u16, y: u16) -> bool {
         let intersects = self.msg_area.intersects(Rect::new(x, y, 1, 1));
         if intersects {
@@ -362,12 +388,17 @@ impl RenderWidget for MessageWidget {
             }
         }
 
+        let title = format!(
+            "Messages {}",
+            self.unread_notifications.to_string(),
+            // unread_notification_count(self.unread_notifications)
+        );
         let messages = Paragraph::new(text.iter())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .border_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
-                    .title("Messages")
+                    .title(&title)
                     .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
             )
             .wrap(true)
@@ -378,11 +409,11 @@ impl RenderWidget for MessageWidget {
 
         f.render_widget(messages, chunks[0]);
 
-        // display each notification for 8 seconds
+        // display each notification for 4 seconds
         if let Some((time, _item)) = self.notifications.get_mut(0) {
             if let Some(time) = time {
                 if let Ok(elapsed) = time.elapsed() {
-                    if elapsed > Duration::from_secs(8) {
+                    if elapsed > Duration::from_secs(4) {
                         let _ = self.notifications.pop_front();
                     }
                 }
@@ -446,4 +477,30 @@ impl RenderWidget for MessageWidget {
         );
         f.render_widget(button, btn[1]);
     }
+}
+
+fn unread_notification_count(count: u32) -> String {
+    let digits: Vec<_> = count
+        .to_string()
+        .chars()
+        .map(|d| d.to_digit(10).unwrap())
+        .collect();
+
+    let mut notification = String::new();
+    for int in digits {
+        match int {
+            0 => {},
+            1 => notification.push_str("1️⃣"),
+            2 => notification.push_str("2️⃣"),
+            3 => notification.push_str("3️⃣"),
+            4 => notification.push_str("4️⃣"),
+            5 => notification.push_str("5️⃣"),
+            6 => notification.push_str("6️⃣"),
+            7 => notification.push_str("7️⃣"),
+            8 => notification.push_str("8️⃣"),
+            9 => notification.push_str("9️⃣"),
+            _ => unreachable!("unread_notification_count should create a vector of each digit 0-9"),
+        }
+    }
+    notification
 }

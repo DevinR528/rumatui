@@ -10,6 +10,7 @@ use matrix_sdk::{
     // api::r0::filter::{LazyLoadOptions, RoomEventFilter},
     api::r0::message::{create_message_event, get_message_events},
     api::r0::receipt::create_receipt,
+    api::r0::read_marker::set_read_marker,
     api::r0::session::login,
     api::r0::typing::create_typing_event,
     events::room::message::MessageEventContent,
@@ -310,11 +311,7 @@ impl MatrixClient {
     ///
     /// * room_id - The `RoomId` the user is typing in.
     ///
-    /// * event_id - The `UserId` of the user that is typing.
-    ///
-    /// * typing - Whether the user is typing, if false `timeout` is not needed.
-    ///
-    /// * timeout - Length of time in milliseconds to mark user is typing.
+    /// * event_id - The `EventId` of the event the user has read to.
     pub async fn read_receipt(
         &self,
         room_id: &RoomId,
@@ -324,5 +321,28 @@ impl MatrixClient {
             .read_receipt(room_id, event_id)
             .await
             .context(format!("failed to send read_receipt to {}", room_id))
+    }
+
+    /// Send a request to notify the room of a user typing.
+    ///
+    /// Returns a `create_typing_event::Response`, an empty response.
+    ///
+    /// # Arguments
+    ///
+    /// * room_id - The `RoomId` the user is typing in.
+    ///
+    /// * fully_read - The `EventId` of the event the user has read to.
+    ///
+    /// * read_receipt - The `EventId` to set the read receipt location at.
+    pub async fn read_marker(
+        &self,
+        room_id: &RoomId,
+        fully_read: &EventId,
+        read_receipt: Option<&EventId>,
+    ) -> Result<set_read_marker::Response> {
+        self.inner
+            .read_marker(room_id, fully_read, read_receipt)
+            .await
+            .context(format!("failed to send read_marker to {}", room_id))
     }
 }

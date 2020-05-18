@@ -155,23 +155,23 @@ impl AppWidget {
                 }
             } else {
                 if self.chat.room.on_scroll_up(x, y) {
-                    self.chat.msgs.reset_scroll();
+                    self.chat.msgs.reset_scroll()
                 }
             }
         }
     }
 
-    pub fn on_scroll_down(&mut self, x: u16, y: u16) {
+    pub async fn on_scroll_down(&mut self, x: u16, y: u16) {
         if self.chat.main_screen {
             self.chat.msgs.on_scroll_down(x, y);
             // TODO make each widget's scroll method more similar
             if self.chat.room.on_scroll_down(x, y) {
-                self.chat.msgs.reset_scroll();
+                self.chat.msgs.reset_scroll()
             }
         }
     }
 
-    pub fn on_up(&mut self) {
+    pub async fn on_up(&mut self) {
         if !self.login_w.logged_in {
             if let LoginSelect::Username = self.login_w.login.selected {
                 self.login_w.login.selected = LoginSelect::Password;
@@ -184,7 +184,7 @@ impl AppWidget {
         }
     }
 
-    pub fn on_down(&mut self) {
+    pub async fn on_down(&mut self) {
         if !self.login_w.logged_in {
             if let LoginSelect::Username = self.login_w.login.selected {
                 self.login_w.login.selected = LoginSelect::Password;
@@ -239,6 +239,7 @@ impl AppWidget {
                         }
                     }
                 }
+
 
                 self.chat.msgs.add_char(c);
             }
@@ -534,6 +535,26 @@ impl AppWidget {
             // TODO what should happen when a send fails
             return;
         };
+    }
+
+    pub async fn on_notifications(&mut self) {
+        let room_id = self.chat.current_room.borrow().deref().clone();
+        if let Some(id) = room_id {
+            let err = if let Some(room) = self.chat.room.rooms.get(&id) {
+                let room = room.read().await;
+                if let Some(event_id) = self.chat.msgs.check_unread(room.deref()) {
+                    self.send_jobs.send(UserRequest::ReadReceipt(id.clone(), event_id)).await
+                } else {
+                    Ok(())
+                }
+            } else {
+                Ok(())
+            };
+
+            if let Err(e) = err {
+                self.set_error(anyhow::Error::from(e));
+            }
+        }
     }
 
     async fn process_room_events(
