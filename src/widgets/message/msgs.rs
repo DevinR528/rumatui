@@ -276,7 +276,7 @@ impl MessageWidget {
             .map(|num| u32::from_str(&num.to_string()).unwrap())
             .unwrap_or_default();
 
-        self.messages.iter().rfind(|(id, msg)| msg.read).map(|(_, msg)| msg.event_id.clone())
+        self.messages.iter().rfind(|(_id, msg)| msg.read).map(|(_, msg)| msg.event_id.clone())
     }
 
     pub fn on_scroll_up(&mut self, x: u16, y: u16) -> bool {
