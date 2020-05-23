@@ -536,7 +536,7 @@ impl AppWidget {
                                     // TODO keep track so we don't emit duplicate notices for
                                     // the same user with different EventIds
                                     for (user, _ts) in map {
-                                        notices.push(format!("{} has seen the last three messages", user.localpart()));
+                                        notices.push(format!("{} has seen the latest messages", user.localpart()));
                                     }
                                 }
                             }

@@ -1,3 +1,14 @@
+# [Unreleased (still)]
+
+* Display membership status when updated
+* Join a room you have been invited to
+* Client sends read receipts to server
+* Display when messages have been read
+* Leave a room by pressing Delete key (this should probably be a Ctrl-some key deal...)
+* Specify homeserver to join on start up (before the login screen)
+  * Simply run `rumatui [HOMESERVER]`, defaults to `http://matrix.org`
+* `ErrorWidget` displays errors, now a wrapper `Error` type is needed to show something useful
+
 # [Unreleased] pre 0.1.0
 
 Improvements:
