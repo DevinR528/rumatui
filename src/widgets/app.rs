@@ -417,7 +417,6 @@ impl AppWidget {
                     room,
                     membership,
                     timeline_event,
-                    member,
                 } => match membership {
                     MembershipChange::Joined => {
                         if Some(&receiver) == self.chat.msgs.me.as_ref() {
@@ -485,11 +484,12 @@ impl AppWidget {
                         }
                     }
                     MembershipChange::ProfileChanged => {
-                        self.chat.msgs.add_notify("PROFILE PROFILE");
+                        self.chat.msgs.add_notify(&format!(
+                            "{} updated their profile",
+                            receiver.localpart()
+                        ))
                     }
-                    MembershipChange::None => {
-                        self.chat.msgs.add_notify(&format!("NONE {:?}", member));
-                    }
+                    MembershipChange::None => {}
                     MembershipChange::Error => panic!("membership error"),
                     MembershipChange::InvitationRejected => {
                         if Some(&receiver) == self.chat.msgs.me.as_ref() {
@@ -521,8 +521,31 @@ impl AppWidget {
                         }
                     }
                 }
-                StateResult::FullyRead(_ev_id, _room_id) => self.chat.msgs.add_notify(""),
+                StateResult::FullyRead(ev_id, room_id) => {
+                    if self.chat.msgs.read_to_end(&ev_id) && self.chat.current_room.borrow().as_ref() == Some(&room_id) {
+                        self.chat.msgs.add_notify("READ TO END TODO ??")
+                    }
+                },
                 StateResult::Typing(msg) => self.chat.msgs.add_notify(&msg),
+                StateResult::ReadReceipt(room_id, events) => {
+                    let mut notices = vec![];
+                    if self.chat.current_room.borrow().as_ref() == Some(&room_id) {
+                        for e_id in self.chat.msgs.last_3_msg_event_ids() {
+                            if let Some(rec) = events.get(e_id) {
+                                if let Some(map) = &rec.read {
+                                    // TODO keep track so we don't emit duplicate notices for
+                                    // the same user with different EventIds
+                                    for (user, _ts) in map {
+                                        notices.push(format!("{} has seen the last three messages", user.localpart()));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    for notice in notices {
+                        self.chat.msgs.add_notify(&notice);
+                    }
+                }
                 _ => {}
             },
             _ => {}

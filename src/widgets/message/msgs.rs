@@ -1,6 +1,5 @@
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
-use std::str::FromStr;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -232,6 +231,14 @@ impl MessageWidget {
         }
     }
 
+    pub(crate) fn read_to_end(&self, event_id: &EventId) -> bool {
+        self.messages.last().map(|(_, msg)| &msg.event_id) == Some(event_id)
+    }
+
+    pub(crate) fn last_3_msg_event_ids(&self) -> impl Iterator<Item = &EventId> {
+        self.messages[self.messages.len() - 4..].iter().map(|(_, msg)| &msg.event_id)
+    }
+
     pub(crate) fn read_receipt(
         &mut self,
         last_interaction: SystemTime,
@@ -389,7 +396,6 @@ impl RenderWidget for MessageWidget {
         let title = format!(
             "Messages {}",
             self.unread_notifications.to_string(),
-            // unread_notification_count(self.unread_notifications)
         );
         let messages = Paragraph::new(text.iter())
             .block(

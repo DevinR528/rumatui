@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
@@ -6,6 +7,7 @@ use matrix_sdk::events::{
     ignored_user_list::IgnoredUserListEvent,
     presence::PresenceEvent,
     push_rules::PushRulesEvent,
+    receipt::{ReceiptEvent, Receipts},
     room::{
         aliases::AliasesEvent,
         avatar::AvatarEvent,
@@ -49,11 +51,11 @@ pub enum StateResult {
         room: Arc<RwLock<Room>>,
         membership: MembershipChange,
         timeline_event: bool,
-        member: MembershipState,
     },
     Message(Message, RoomId),
     Name(String, RoomId),
     FullyRead(EventId, RoomId),
+    ReadReceipt(RoomId, BTreeMap<EventId, Receipts>),
     Typing(String),
     Err,
 }
@@ -98,7 +100,6 @@ impl EventStream {
                 room,
                 membership,
                 timeline_event: true,
-                member: event.content.membership,
             })
             .await
         {
@@ -259,7 +260,6 @@ impl EventEmitter for EventStream {
                         room,
                         membership,
                         timeline_event: false,
-                        member: event.content.membership,
                     })
                     .await
                 {
@@ -306,6 +306,8 @@ impl EventEmitter for EventStream {
             }
         }
     }
+    // TODO move the StateResult::Typing variants a list of typing users and make messages in app
+    // like every other StateResult. Use Room::compute_display_name or whatever when PR is done
     /// Fires when `AsyncClient` receives a `NonRoomEvent::Typing` event.
     async fn on_account_data_typing(&self, room: SyncRoom, event: &TypingEvent) {
         if let SyncRoom::Joined(room) = room {
@@ -330,6 +332,22 @@ impl EventEmitter for EventStream {
                         if typing.len() > 1 { "are" } else { "is" }
                     )
                 }))
+                .await
+            {
+                panic!("{}", e)
+            }
+        }
+    }
+
+    async fn on_account_data_receipt(&self, room: SyncRoom, event: &ReceiptEvent) {
+        if let SyncRoom::Joined(room) = room {
+            let room_id = room.read().await.room_id.clone();
+            let events = event.content.clone();
+            if let Err(e) = self
+                .send
+                .lock()
+                .await
+                .send(StateResult::ReadReceipt(room_id, events))
                 .await
             {
                 panic!("{}", e)

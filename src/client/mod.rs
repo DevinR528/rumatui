@@ -65,7 +65,7 @@ impl MatrixClient {
             .state_store(Box::new(JsonStore::open(path)?));
 
         let client = Self {
-            inner: Client::new_with_config(homeserver.clone(), None, client_config)?,
+            inner: Client::new_with_config(homeserver.clone(), client_config)?,
             homeserver,
             user: None,
             settings: SyncSettings::default(),
@@ -303,7 +303,7 @@ impl MatrixClient {
             .context(format!("failed to send typing notification to {}", room_id))
     }
 
-    /// Send a request to notify the room of a user typing.
+    /// Send a request to notify the room the specific event has been seen.
     ///
     /// Returns a `create_typing_event::Response`, an empty response.
     ///
@@ -323,9 +323,9 @@ impl MatrixClient {
             .context(format!("failed to send read_receipt to {}", room_id))
     }
 
-    /// Send a request to notify the room of a user typing.
+    /// Send a request to notify the room the user has seen up to `fully_read`.
     ///
-    /// Returns a `create_typing_event::Response`, an empty response.
+    /// Returns a `set_read_marker::Response`, an empty response.
     ///
     /// # Arguments
     ///
