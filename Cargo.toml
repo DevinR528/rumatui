@@ -26,7 +26,7 @@ itertools = "0.9.0"
 js_int = "0.1.5"
 lazy_static = "1.4.0"
 # matrix-sdk = { git = "https://github.com/matrix-org/matrix-rust-sdk/", features = ["messages"]}
-matrix-sdk = { git = "https://github.com/DevinR528/matrix-rust-sdk", branch = "rumatui", features = ["messages"] }
+matrix-sdk = { git = "https://github.com/DevinR528/matrix-rust-sdk", branch = "rumatui", version = "0.1.0", features = ["messages"]}
 # matrix-sdk = { path = "../__forks__/matrix-rust-sdk/matrix_sdk", features = ["messages"] }
 mdcat = "0.15"
 muncher = "0.6.0"
@@ -41,7 +41,7 @@ serde_json = "1.0.52"
 termion = "1.5.5"
 tokio = { version = "0.2.20", features = ["macros", "rt-threaded", "sync"] }
 # tui = { git = "https://github.com/fdehau/tui-rs/" }
-tui = { git = "https://github.com/DevinR528/tui-rs/", branch = "tail-scroll" }
+tui = { git = "https://github.com/DevinR528/tui-rs/", version = "0.8.0", branch = "tail-scroll" }
 unicode-width = "0.1.7"
 unicode-segmentation = "1.6.0"
 url = "2.1.1"
