@@ -31,6 +31,9 @@ use matrix_sdk::events::{
 use matrix_sdk::{
     self,
     identifiers::{EventId, RoomId, UserId},
+    ruma_ext::{
+        reaction::ReactionEventContent, ExtraMessageEventContent, ExtraReactionEventContent,
+    },
     EventEmitter, Room, SyncRoom,
 };
 use tokio::sync::mpsc;
@@ -53,9 +56,11 @@ pub enum StateResult {
         timeline_event: bool,
     },
     Message(Message, RoomId),
+    MessageEdit(String, RoomId, EventId),
     Name(String, RoomId),
     FullyRead(EventId, RoomId),
     ReadReceipt(RoomId, BTreeMap<EventId, Receipts>),
+    Reaction(RoomId, EventId, String),
     Typing(String),
     Err,
 }
@@ -284,13 +289,13 @@ impl EventEmitter for EventStream {
 
     // `NonRoomEvent` (this is a type alias from ruma_events) from `IncomingAccountData`
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomMember` event.
-    async fn on_account_presence(&self, _: SyncRoom, _: &PresenceEvent) {}
+    async fn on_non_room_presence(&self, _: SyncRoom, _: &PresenceEvent) {}
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomName` event.
-    async fn on_account_ignored_users(&self, _: SyncRoom, _: &IgnoredUserListEvent) {}
+    async fn on_non_room_ignored_users(&self, _: SyncRoom, _: &IgnoredUserListEvent) {}
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomCanonicalAlias` event.
-    async fn on_account_push_rules(&self, _: SyncRoom, _: &PushRulesEvent) {}
+    async fn on_non_room_push_rules(&self, _: SyncRoom, _: &PushRulesEvent) {}
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomAliases` event.
-    async fn on_account_data_fully_read(&self, room: SyncRoom, event: &FullyReadEvent) {
+    async fn on_non_room_fully_read(&self, room: SyncRoom, event: &FullyReadEvent) {
         if let SyncRoom::Joined(room) = room {
             if let Err(e) = self
                 .send
@@ -306,10 +311,10 @@ impl EventEmitter for EventStream {
             }
         }
     }
-    // TODO move the StateResult::Typing variants a list of typing users and make messages in app
+    // TODO make the StateResult::Typing variants a list of typing users and make messages in app
     // like every other StateResult. Use Room::compute_display_name or whatever when PR is done
     /// Fires when `AsyncClient` receives a `NonRoomEvent::Typing` event.
-    async fn on_account_data_typing(&self, room: SyncRoom, event: &TypingEvent) {
+    async fn on_non_room_typing(&self, room: SyncRoom, event: &TypingEvent) {
         if let SyncRoom::Joined(room) = room {
             let typing = room
                 .read()
@@ -339,7 +344,7 @@ impl EventEmitter for EventStream {
         }
     }
 
-    async fn on_account_data_receipt(&self, room: SyncRoom, event: &ReceiptEvent) {
+    async fn on_non_room_receipt(&self, room: SyncRoom, event: &ReceiptEvent) {
         if let SyncRoom::Joined(room) = room {
             let room_id = room.read().await.room_id.clone();
             let events = event.content.clone();
@@ -358,6 +363,49 @@ impl EventEmitter for EventStream {
     // `PresenceEvent` is a struct so there is only the one method
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomAliases` event.
     async fn on_presence_event(&self, _: SyncRoom, _event: &PresenceEvent) {}
+
+    // `RumaUnsupportedEvent
+    /// Fires when `Client` receives a `RumaUnsupportedRoomEvent<ExtraRoomEventContent::Reaction>`.
+    async fn on_reaction_event(&self, room: SyncRoom, event: &ExtraReactionEventContent) {
+        if let SyncRoom::Joined(room) = room {
+            let ReactionEventContent::Annotation { event_id, key } = &event.relates_to;
+            let event_id = event_id.clone();
+            let room_id = room.read().await.room_id.clone();
+            if let Err(e) = self
+                .send
+                .lock()
+                .await
+                .send(StateResult::Reaction(room_id, event_id, key.to_string()))
+                .await
+            {
+                panic!("{}", e)
+            }
+        }
+    }
+    /// Fires when `Client` receives a `RumaUnsupportedRoomEvent<ExtraRoomEventContent::MessageEdit>`.
+    async fn on_message_edit_event(&self, room: SyncRoom, event: &ExtraMessageEventContent) {
+        if let SyncRoom::Joined(room) = room {
+            let ExtraMessageEventContent::EditEvent(edit) = event;
+            if edit.new_content.msgtype == "m.text" && edit.relates_to.rel_type == "m.replace" {
+                let new_body = if let Some(fmt) = edit.new_content.formatted_body.as_ref() {
+                    fmt.to_string()
+                } else {
+                    edit.body.to_string()
+                };
+                let event_id = edit.relates_to.event_id.clone();
+                let room_id = room.read().await.room_id.clone();
+                if let Err(e) = self
+                    .send
+                    .lock()
+                    .await
+                    .send(StateResult::MessageEdit(new_body, room_id, event_id))
+                    .await
+                {
+                    panic!("{}", e)
+                }
+            }
+        }
+    }
 }
 
 /// Helper function for membership change of StrippedRoomMember.

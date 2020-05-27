@@ -79,13 +79,9 @@ impl MessageWidget {
         for (_id, room) in rooms {
             let room = room.read().await;
             // TODO this should never fail but see about js_int::UInt impling `Into<u32>`
-            self.unread_notifications = room
-                .unread_notifications
-                .unwrap_or_default();
+            self.unread_notifications = room.unread_notifications.unwrap_or_default();
 
-            self.unread_notifications += room
-                .unread_highlight
-                .unwrap_or_default();
+            self.unread_notifications += room.unread_highlight.unwrap_or_default();
 
             for msg in room.messages.iter() {
                 self.add_message_event(msg, &room);
@@ -236,7 +232,9 @@ impl MessageWidget {
     }
 
     pub(crate) fn last_3_msg_event_ids(&self) -> impl Iterator<Item = &EventId> {
-        self.messages[self.messages.len() - 4..].iter().map(|(_, msg)| &msg.event_id)
+        self.messages[self.messages.len() - 4..]
+            .iter()
+            .map(|(_, msg)| &msg.event_id)
     }
 
     pub(crate) fn read_receipt(
@@ -273,15 +271,14 @@ impl MessageWidget {
     }
 
     pub fn check_unread(&mut self, room: &Room) -> Option<EventId> {
-        self.unread_notifications = room
-                .unread_notifications
-                .unwrap_or_default();
+        self.unread_notifications = room.unread_notifications.unwrap_or_default();
 
-        self.unread_notifications += room
-            .unread_highlight
-            .unwrap_or_default();
+        self.unread_notifications += room.unread_highlight.unwrap_or_default();
 
-        self.messages.iter().rfind(|(_id, msg)| msg.read).map(|(_, msg)| msg.event_id.clone())
+        self.messages
+            .iter()
+            .rfind(|(_id, msg)| msg.read)
+            .map(|(_, msg)| msg.event_id.clone())
     }
 
     pub fn on_scroll_up(&mut self, x: u16, y: u16) -> bool {
@@ -393,10 +390,7 @@ impl RenderWidget for MessageWidget {
             }
         }
 
-        let title = format!(
-            "Messages {}",
-            self.unread_notifications.to_string(),
-        );
+        let title = format!("Messages {}", self.unread_notifications.to_string(),);
         let messages = Paragraph::new(text.iter())
             .block(
                 Block::default()
@@ -413,11 +407,11 @@ impl RenderWidget for MessageWidget {
 
         f.render_widget(messages, chunks[0]);
 
-        // display each notification for 4 seconds
+        // display each notification for 6 seconds
         if let Some((time, _item)) = self.notifications.get_mut(0) {
             if let Some(time) = time {
                 if let Ok(elapsed) = time.elapsed() {
-                    if elapsed > Duration::from_secs(4) {
+                    if elapsed > Duration::from_secs(6) {
                         let _ = self.notifications.pop_front();
                     }
                 }

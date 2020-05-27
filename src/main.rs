@@ -54,7 +54,6 @@ fn main() -> Result<(), failure::Error> {
             match events.next()? {
                 Event::Input(event) => match event {
                     TermEvent::Key(key) => {
-
                         app.on_notifications().await;
 
                         match key {
@@ -68,11 +67,10 @@ fn main() -> Result<(), failure::Error> {
                             Key::Esc => app.should_quit = true,
                             _ => {}
                         }
-                    },
+                    }
                     TermEvent::Mouse(m) => {
-
                         app.on_notifications().await;
-                        
+
                         match m {
                             MouseEvent::Press(btn, x, y) if btn == MouseButton::WheelUp => {
                                 app.on_scroll_up(x, y).await
@@ -84,7 +82,7 @@ fn main() -> Result<(), failure::Error> {
                             MouseEvent::Release(_, _) => {}
                             MouseEvent::Hold(_, _) => {}
                         }
-                    },
+                    }
                     TermEvent::Unsupported(_) => {}
                 },
                 Event::Tick => {

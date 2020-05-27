@@ -240,7 +240,6 @@ impl AppWidget {
                     }
                 }
 
-
                 self.chat.msgs.add_char(c);
             }
         }
@@ -483,12 +482,10 @@ impl AppWidget {
                             ))
                         }
                     }
-                    MembershipChange::ProfileChanged => {
-                        self.chat.msgs.add_notify(&format!(
-                            "{} updated their profile",
-                            receiver.localpart()
-                        ))
-                    }
+                    MembershipChange::ProfileChanged => self
+                        .chat
+                        .msgs
+                        .add_notify(&format!("{} updated their profile", receiver.localpart())),
                     MembershipChange::None => {}
                     MembershipChange::Error => panic!("membership error"),
                     MembershipChange::InvitationRejected => {
@@ -521,11 +518,14 @@ impl AppWidget {
                         }
                     }
                 }
-                StateResult::FullyRead(ev_id, room_id) => {
-                    if self.chat.msgs.read_to_end(&ev_id) && self.chat.current_room.borrow().as_ref() == Some(&room_id) {
+                StateResult::MessageEdit(msg, room_id, event_id) => {},
+                StateResult::FullyRead(event_id, room_id) => {
+                    if self.chat.msgs.read_to_end(&event_id)
+                        && self.chat.current_room.borrow().as_ref() == Some(&room_id)
+                    {
                         self.chat.msgs.add_notify("READ TO END TODO ??")
                     }
-                },
+                }
                 StateResult::Typing(msg) => self.chat.msgs.add_notify(&msg),
                 StateResult::ReadReceipt(room_id, events) => {
                     let mut notices = vec![];
@@ -536,7 +536,10 @@ impl AppWidget {
                                     // TODO keep track so we don't emit duplicate notices for
                                     // the same user with different EventIds
                                     for (user, _ts) in map {
-                                        notices.push(format!("{} has seen the latest messages", user.localpart()));
+                                        notices.push(format!(
+                                            "{} has seen the latest messages",
+                                            user.localpart()
+                                        ));
                                     }
                                 }
                             }
@@ -546,6 +549,7 @@ impl AppWidget {
                         self.chat.msgs.add_notify(&notice);
                     }
                 }
+                StateResult::Reaction(room_id, event_id, msg) => {},
                 _ => {}
             },
             _ => {}
@@ -566,7 +570,9 @@ impl AppWidget {
             let err = if let Some(room) = self.chat.room.rooms.get(&id) {
                 let room = room.read().await;
                 if let Some(event_id) = self.chat.msgs.check_unread(room.deref()) {
-                    self.send_jobs.send(UserRequest::ReadReceipt(id.clone(), event_id)).await
+                    self.send_jobs
+                        .send(UserRequest::ReadReceipt(id.clone(), event_id))
+                        .await
                 } else {
                     Ok(())
                 }
