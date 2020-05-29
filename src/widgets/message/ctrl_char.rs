@@ -1,3 +1,5 @@
+use std::fmt;
+
 use muncher::Muncher;
 use rumatui_tui::style::{Color, Modifier, Style};
 use rumatui_tui::widgets::Text;
@@ -254,10 +256,38 @@ impl CtrlChunk {
     }
 }
 
+impl fmt::Display for CtrlChunk {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let ctrl_code = self
+            .ctrl
+            .iter()
+            .map(|c| {
+                if c == "8;;" {
+                    format!("\u{1b}]{}", c)
+                } else {
+                    format!("\u{1b}[{}", c)
+                }
+            })
+            .collect::<String>();
+        write!(f, "{}{}", ctrl_code, self.text)
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct CtrlChars {
     input: String,
     parsed: Vec<CtrlChunk>,
+}
+
+impl fmt::Display for CtrlChars {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let text = self
+            .parsed
+            .iter()
+            .map(CtrlChunk::to_string)
+            .collect::<String>();
+        write!(f, "{}", text)
+    }
 }
 
 impl CtrlChars {
@@ -368,8 +398,9 @@ fn main() {
         let mut w = Writer::default();
         mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
-        println!("{:?}\n\n", w.to_string());
-        CtrlChars::parse(w.to_string()).into_text();
+        let expected = "\u{1b}]8;;http://www.google.com/ \u{1b}[33ruma-identifiers \u{1b}[1hello\n\n\u{1b}[1\u{1b}[34┄\u{1b}[1\u{1b}[34table\n\n• one\n• two\n\n\u{1b}[32────────────────────\n\u{1b}[34fn \u{1b}[33main() {\n    \u{1b}[32println!(\"\u{1b}[36hello\");\n}\n\u{1b}[32────────────────────\n";
+
+        assert_eq!(expected, CtrlChars::parse(w.to_string()).to_string())
     }
 
     #[test]
@@ -391,8 +422,10 @@ fn main() {
         let mut w = Writer::default();
         mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
-        println!("{:?}\n\n", w.to_string());
-        println!("{:#?}", CtrlChars::parse(w.to_string()).into_text());
+        assert_eq!(
+            "\u{1b}]8;;http://www.googlelskdnfodaf.com/\n",
+            CtrlChars::parse(w.to_string()).to_string()
+        );
     }
 
     use rumatui_tui::backend::TestBackend;
@@ -446,8 +479,26 @@ fn main() {
                 .unwrap();
             terminal.backend().buffer().clone()
         };
-
-        println!("{:#?}", render(Alignment::Left))
+        let expected = rumatui_tui::buffer::Buffer::with_lines(vec![
+            "┌──────────────────┐",
+            "│http://www.google.│",
+            "│com/              │",
+            "│ruma-identifiers  │",
+            "│hello             │",
+            "│                  │",
+            "│┄table            │",
+            "│                  │",
+            "│• one             │",
+            "└──────────────────┘",
+        ]);
+        
+        // TODO actually check that the colors and formatting are being set this
+        // only checks that the symbols (chars) are the same.
+        assert!(expected
+            .content()
+            .iter()
+            .zip(render(Alignment::Left).content())
+            .all(|(expected, found)| expected.symbol == found.symbol))
     }
 
     #[test]
@@ -471,10 +522,9 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
         let mut w = Writer::default();
         mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
-        let parsed = CtrlChars::parse(w.to_string());
-        let expected = "\u{1b}]8;;http://www.google.com/\u{7}google\u{1b}]8;;\u{7} \u{1b}[33mruma-identifiers\u{1b}[0m \u{1b}[1mhello\u{1b}[0m\n\n\u{1b}[1;34m┄\u{1b}[0m\u{1b}[1;34mtable\u{1b}[0m\n\n• one\n• two\n\n\u{1b}[32m────────────────────\u{1b}[0m\n\u{1b}[34mfn\u{1b}[0m \u{1b}[33mmain\u{1b}[0m() {\n    \u{1b}[32mprintln!\u{1b}[0m(\"\u{1b}[36mhello\u{1b}[0m\");\n}\n\u{1b}[32m────────────────────\u{1b}[0m\n";
-        println!("{:#?}", parsed);
-        let _text = parsed.into_text();
+        let expected = "\u{1b}[3\u{1b}[32In reply to blah blah\n\nhttps://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-roomid-leave doesn\'t seem to have a body\n";
+
+        assert_eq!(expected, CtrlChars::parse(w.to_string()).to_string())
     }
 
     #[test]
@@ -496,7 +546,6 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
         let mut w = Writer::default();
         mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
-        let parsed = CtrlChars::parse(w.to_string());
-        print!("{:?}", parsed);
+        println!("{:?}", CtrlChars::parse(w.to_string()).to_string())
     }
 }

@@ -34,7 +34,9 @@ use matrix_sdk::{
     // ruma_ext::{
     //     reaction::ReactionEventContent, ExtraMessageEventContent, ExtraReactionEventContent,
     // },
-    EventEmitter, Room, SyncRoom,
+    EventEmitter,
+    Room,
+    SyncRoom,
 };
 use tokio::sync::mpsc;
 use tokio::sync::{Mutex, RwLock};

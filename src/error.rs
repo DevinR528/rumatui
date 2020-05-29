@@ -3,8 +3,8 @@
 use std::fmt;
 
 pub use matrix_sdk::{
-    Endpoint, Error as RumaClientError, FromHttpResponseError as RumaResponseError, IntoHttpError,
-    ServerError, api::Error as RumaApiError, 
+    api::Error as RumaApiError, Endpoint, Error as RumaClientError,
+    FromHttpResponseError as RumaResponseError, IntoHttpError, ServerError,
 };
 // use ruma_client_api::error::ErrorKind;
 // use serde_json::Error as JsonError;

@@ -6,11 +6,11 @@ use std::sync::Arc;
 
 use matrix_sdk::identifiers::{RoomId, UserId};
 use matrix_sdk::Room;
-use termion::event::MouseButton;
-use tokio::sync::RwLock;
 use rumatui_tui::backend::Backend;
 use rumatui_tui::layout::{Constraint, Direction, Layout, Rect};
 use rumatui_tui::Frame;
+use termion::event::MouseButton;
+use tokio::sync::RwLock;
 
 use crate::widgets::{message::MessageWidget, rooms::RoomsWidget, RenderWidget};
 

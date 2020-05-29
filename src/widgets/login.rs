@@ -1,9 +1,9 @@
-use termion::event::MouseButton;
 use rumatui_tui::backend::Backend;
 use rumatui_tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use rumatui_tui::style::{Color, Modifier, Style};
 use rumatui_tui::widgets::{Block, Borders, Paragraph, Text};
 use rumatui_tui::Frame;
+use termion::event::MouseButton;
 
 use crate::widgets::RenderWidget;
 

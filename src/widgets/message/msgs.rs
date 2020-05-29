@@ -10,13 +10,13 @@ use matrix_sdk::events::room::message::{
 };
 use matrix_sdk::identifiers::{EventId, RoomId, UserId};
 use matrix_sdk::Room;
-use termion::event::MouseButton;
-use tokio::sync::RwLock;
 use rumatui_tui::backend::Backend;
 use rumatui_tui::layout::{Constraint, Direction, Layout, Rect, ScrollMode};
 use rumatui_tui::style::{Color, Modifier, Style};
 use rumatui_tui::widgets::{Block, Borders, Paragraph, Text};
 use rumatui_tui::Frame;
+use termion::event::MouseButton;
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::widgets::{message::ctrl_char, utils::markdown_to_html, RenderWidget};

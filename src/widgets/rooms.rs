@@ -7,14 +7,14 @@ use std::sync::Arc;
 use itertools::Itertools;
 use matrix_sdk::identifiers::{RoomId, UserId};
 use matrix_sdk::Room;
-use serde::{Deserialize, Serialize};
-use termion::event::MouseButton;
-use tokio::sync::RwLock;
 use rumatui_tui::backend::Backend;
 use rumatui_tui::layout::{Constraint, Direction, Layout, Rect};
 use rumatui_tui::style::{Color, Modifier, Style};
 use rumatui_tui::widgets::{Block, Borders, List, Paragraph, Text};
 use rumatui_tui::Frame;
+use serde::{Deserialize, Serialize};
+use termion::event::MouseButton;
+use tokio::sync::RwLock;
 
 use crate::widgets::RenderWidget;
 

@@ -13,14 +13,14 @@ use matrix_sdk::events::{
     },
 };
 use matrix_sdk::Room;
-use termion::event::MouseButton;
-use tokio::runtime::Handle;
-use tokio::sync::{mpsc, RwLock};
 use rumatui_tui::backend::Backend;
 use rumatui_tui::layout::{Alignment, Constraint, Layout};
 use rumatui_tui::style::{Color, Modifier, Style};
 use rumatui_tui::widgets::{Block, Borders, Paragraph, Text};
 use rumatui_tui::Terminal;
+use termion::event::MouseButton;
+use tokio::runtime::Handle;
+use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;
 
 use crate::client::client_loop::{MatrixEventHandle, RequestResult, UserRequest};
