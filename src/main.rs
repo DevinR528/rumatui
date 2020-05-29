@@ -8,8 +8,8 @@ use termion::event::{Event as TermEvent, Key, MouseButton, MouseEvent};
 use termion::input::MouseTerminal;
 use termion::raw::IntoRawMode;
 
-use tui::backend::TermionBackend;
-use tui::Terminal;
+use rumatui_tui::backend::TermionBackend;
+use rumatui_tui::Terminal;
 
 mod client;
 mod error;

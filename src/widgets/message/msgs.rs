@@ -12,11 +12,11 @@ use matrix_sdk::identifiers::{EventId, RoomId, UserId};
 use matrix_sdk::Room;
 use termion::event::MouseButton;
 use tokio::sync::RwLock;
-use tui::backend::Backend;
-use tui::layout::{Constraint, Direction, Layout, Rect, ScrollMode};
-use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Paragraph, Text};
-use tui::Frame;
+use rumatui_tui::backend::Backend;
+use rumatui_tui::layout::{Constraint, Direction, Layout, Rect, ScrollMode};
+use rumatui_tui::style::{Color, Modifier, Style};
+use rumatui_tui::widgets::{Block, Borders, Paragraph, Text};
+use rumatui_tui::Frame;
 use uuid::Uuid;
 
 use crate::widgets::{message::ctrl_char, utils::markdown_to_html, RenderWidget};
@@ -149,6 +149,18 @@ impl MessageWidget {
         }
         self.messages.push((room, msg));
         // self.calculate_scroll_down();
+    }
+
+    pub fn edit_message(&mut self, room: &RoomId, event_id: &EventId, msg: String) {
+        // remove the message echo when user sends a message and we display the text before
+        // the server responds
+        if let Some(idx) = self
+            .messages
+            .iter()
+            .position(|(id, m)| &m.event_id == event_id && room == id)
+        {
+            self.messages[idx].1.text = msg;
+        }
     }
 
     pub fn add_notify(&mut self, notify: &str) {

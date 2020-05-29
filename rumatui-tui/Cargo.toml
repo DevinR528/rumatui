@@ -1,0 +1,27 @@
+[package]
+name = "rumatui-tui"
+version = "0.8.0"
+authors = ["Florian Dehau <work@fdehau.com>"]
+description = """
+A library to build rich terminal user interfaces or dashboards
+"""
+keywords = ["tui", "terminal", "dashboard"]
+repository = "https://github.com/fdehau/tui-rs"
+license = "MIT"
+edition = "2018"
+
+[features]
+default = ["termion"]
+
+[dependencies]
+bitflags = "1.0"
+cassowary = "0.3"
+itertools = "0.9"
+either = "1.5"
+unicode-segmentation = "1.2"
+unicode-width = "0.1"
+termion = { version = "1.5", optional = true }
+
+[dev-dependencies]
+rand = "0.7"
+argh = "0.1"

@@ -16,11 +16,11 @@ use matrix_sdk::Room;
 use termion::event::MouseButton;
 use tokio::runtime::Handle;
 use tokio::sync::{mpsc, RwLock};
-use tui::backend::Backend;
-use tui::layout::{Alignment, Constraint, Layout};
-use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Paragraph, Text};
-use tui::Terminal;
+use rumatui_tui::backend::Backend;
+use rumatui_tui::layout::{Alignment, Constraint, Layout};
+use rumatui_tui::style::{Color, Modifier, Style};
+use rumatui_tui::widgets::{Block, Borders, Paragraph, Text};
+use rumatui_tui::Terminal;
 use uuid::Uuid;
 
 use crate::client::client_loop::{MatrixEventHandle, RequestResult, UserRequest};
@@ -416,94 +416,153 @@ impl AppWidget {
                     room,
                     membership,
                     timeline_event,
-                } => match membership {
-                    MembershipChange::Joined => {
-                        if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                            *self.chat.current_room.borrow_mut() =
-                                Some(room.read().await.room_id.clone());
-                            self.chat.room.add_room(room).await;
-                        } else {
-                            self.chat
-                                .msgs
-                                .add_notify(&format!("{} joined the room", sender.localpart()));
-                        }
-                    }
-                    MembershipChange::Invited => {
-                        if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                            // if this is a RoomEvent from the joined rooms timeline don't respond
-                            if !timeline_event {
-                                self.chat.room.invited(sender, room).await;
+                } => {
+                    let invitation = if let MembershipChange::Invited = membership {
+                        true
+                    } else {
+                        false
+                    };
+                    // only display notifications for the current room
+                    if self.chat.current_room.borrow().as_ref() == Some(&room.read().await.room_id)
+                        // unless this is an invitation
+                        && invitation
+                        // or it is an event directed towards the user
+                        // TODO in this case we should probably specify the room the event is for
+                        && Some(&receiver) == self.chat.msgs.me.as_ref()
+                    {
+                        match membership {
+                            MembershipChange::ProfileChanged => self.chat.msgs.add_notify(
+                                &format!("{} updated their profile", receiver.localpart()),
+                            ),
+                            MembershipChange::Joined => {
+                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
+                                    *self.chat.current_room.borrow_mut() =
+                                        Some(room.read().await.room_id.clone());
+                                    self.chat.room.add_room(room).await;
+                                } else {
+                                    self.chat.msgs.add_notify(&format!(
+                                        "{} joined the room",
+                                        sender.localpart()
+                                    ));
+                                }
                             }
-                        } else {
-                            self.chat.msgs.add_notify(&format!(
-                                "{} was invited to the room",
-                                receiver.localpart()
-                            ));
+                            MembershipChange::Invited => {
+                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
+                                    // if this is a RoomEvent from the joined rooms timeline it is not
+                                    // an actual invitation
+                                    if !timeline_event {
+                                        self.chat.room.invited(sender, room).await;
+                                    }
+                                } else {
+                                    self.chat.msgs.add_notify(&format!(
+                                        "{} was invited to the room",
+                                        receiver.localpart()
+                                    ));
+                                }
+                            }
+                            MembershipChange::InvitationRejected => {
+                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
+                                    self.chat.msgs.add_notify("you rejected an invitation");
+                                    self.chat
+                                        .room
+                                        .remove_room(room.read().await.room_id.clone())
+                                } else {
+                                    self.chat.msgs.add_notify(&format!(
+                                        "{} rejected an invitation to the room",
+                                        receiver.localpart()
+                                    ))
+                                }
+                            }
+                            MembershipChange::InvitationRevoked => {
+                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
+                                    self.chat.msgs.add_notify(&format!(
+                                        "your invitation was rejected by {}",
+                                        sender.localpart()
+                                    ));
+                                    self.chat
+                                        .room
+                                        .remove_room(room.read().await.room_id.clone())
+                                } else {
+                                    self.chat.msgs.add_notify(&format!(
+                                        "{}'s invitations was rejected by {}",
+                                        receiver.localpart(),
+                                        sender.localpart(),
+                                    ))
+                                }
+                            }
+                            MembershipChange::Left => {
+                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
+                                    self.chat.msgs.add_notify("you left the room");
+                                    self.chat
+                                        .room
+                                        .remove_room(room.read().await.room_id.clone());
+                                } else {
+                                    self.chat.msgs.add_notify(&format!(
+                                        "{} left the room",
+                                        receiver.localpart()
+                                    ))
+                                }
+                            }
+                            MembershipChange::Banned => {
+                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
+                                    self.chat.msgs.add_notify("you were banned from the room");
+                                    self.chat
+                                        .room
+                                        .remove_room(room.read().await.room_id.clone())
+                                } else {
+                                    self.chat.msgs.add_notify(&format!(
+                                        "{} was banned from the room",
+                                        receiver.localpart()
+                                    ))
+                                }
+                            }
+                            MembershipChange::Unbanned => {
+                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
+                                    self.chat.msgs.add_notify("you were unbanned from the room");
+                                    self.chat
+                                        .room
+                                        .remove_room(room.read().await.room_id.clone())
+                                } else {
+                                    self.chat.msgs.add_notify(&format!(
+                                        "{} was unbanned from the room",
+                                        receiver.localpart()
+                                    ))
+                                }
+                            }
+                            MembershipChange::Kicked => {
+                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
+                                    self.chat.msgs.add_notify("you were kicked from the room");
+                                    self.chat
+                                        .room
+                                        .remove_room(room.read().await.room_id.clone())
+                                } else {
+                                    self.chat.msgs.add_notify(&format!(
+                                        "{} was kicked from the room",
+                                        receiver.localpart()
+                                    ))
+                                }
+                            }
+                            MembershipChange::KickedAndBanned => {
+                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
+                                    self.chat
+                                        .msgs
+                                        .add_notify("you were kicked and banned from the room");
+                                    self.chat
+                                        .room
+                                        .remove_room(room.read().await.room_id.clone())
+                                } else {
+                                    self.chat.msgs.add_notify(&format!(
+                                        "{} was kicked and banned from the room",
+                                        receiver.localpart()
+                                    ))
+                                }
+                            }
+                            MembershipChange::None => {}
+                            MembershipChange::Error => panic!("membership error"),
+                            _ => panic!("MembershipChange::NotImplemented is never valid bug"),
                         }
                     }
-                    MembershipChange::Left => {
-                        if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                            // TODO delete the room file generated by our database
-                            self.chat.msgs.add_notify("you left the room");
-                            self.chat
-                                .room
-                                .remove_room(room.read().await.room_id.clone());
-                        } else {
-                            self.chat
-                                .msgs
-                                .add_notify(&format!("{} left the room", receiver.localpart()))
-                        }
-                    }
-                    MembershipChange::Banned => {
-                        if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                            // TODO delete the room file generated by our database
-                            self.chat.msgs.add_notify("you were banned from the room");
-                            self.chat
-                                .room
-                                .remove_room(room.read().await.room_id.clone())
-                        } else {
-                            self.chat.msgs.add_notify(&format!(
-                                "{} was banned from the room",
-                                receiver.localpart()
-                            ))
-                        }
-                    }
-                    MembershipChange::Kicked => {
-                        if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                            // TODO delete the room file generated by our database
-                            self.chat.msgs.add_notify("you were kicked from the room");
-                            self.chat
-                                .room
-                                .remove_room(room.read().await.room_id.clone())
-                        } else {
-                            self.chat.msgs.add_notify(&format!(
-                                "{} was kicked from the room",
-                                receiver.localpart()
-                            ))
-                        }
-                    }
-                    MembershipChange::ProfileChanged => self
-                        .chat
-                        .msgs
-                        .add_notify(&format!("{} updated their profile", receiver.localpart())),
-                    MembershipChange::None => {}
-                    MembershipChange::Error => panic!("membership error"),
-                    MembershipChange::InvitationRejected => {
-                        if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                            // TODO delete the room file generated by our database
-                            self.chat.msgs.add_notify("you rejected an invitation");
-                            self.chat
-                                .room
-                                .remove_room(room.read().await.room_id.clone())
-                        } else {
-                            self.chat.msgs.add_notify(&format!(
-                                "{} rejected an invitation from the room",
-                                receiver.localpart()
-                            ))
-                        }
-                    }
-                    mem => todo!("implement more membership changes {:?}", mem),
-                },
+                }
                 StateResult::Name(name, room_id) => self.chat.room.update_room(name, room_id),
                 StateResult::Message(msg, room) => {
                     self.chat.msgs.add_message(msg, room);
@@ -518,15 +577,24 @@ impl AppWidget {
                         }
                     }
                 }
-                StateResult::MessageEdit(msg, room_id, event_id) => {},
+                StateResult::MessageEdit(msg, room_id, event_id) => {
+                    self.chat.msgs.edit_message(&room_id, &event_id, msg);
+                }
                 StateResult::FullyRead(event_id, room_id) => {
                     if self.chat.msgs.read_to_end(&event_id)
                         && self.chat.current_room.borrow().as_ref() == Some(&room_id)
                     {
-                        self.chat.msgs.add_notify("READ TO END TODO ??")
+                        // TODO
+                        self.chat
+                            .msgs
+                            .add_notify("what is a read to end event? TODO")
                     }
                 }
-                StateResult::Typing(msg) => self.chat.msgs.add_notify(&msg),
+                StateResult::Typing(room_id, msg) => {
+                    if self.chat.current_room.borrow().as_ref() == Some(&room_id) {
+                        self.chat.msgs.add_notify(&msg)
+                    }
+                }
                 StateResult::ReadReceipt(room_id, events) => {
                     let mut notices = vec![];
                     if self.chat.current_room.borrow().as_ref() == Some(&room_id) {
@@ -535,11 +603,19 @@ impl AppWidget {
                                 if let Some(map) = &rec.read {
                                     // TODO keep track so we don't emit duplicate notices for
                                     // the same user with different EventIds
-                                    for (user, _ts) in map {
-                                        notices.push(format!(
-                                            "{} has seen the latest messages",
-                                            user.localpart()
-                                        ));
+                                    for (user, receipt) in map {
+                                        if receipt
+                                            .ts
+                                            .and_then(|ts| ts.elapsed().ok())
+                                            // only show read receipts for the last 10 minutes
+                                            .map(|dur| dur.as_secs() < 600)
+                                            == Some(true)
+                                        {
+                                            notices.push(format!(
+                                                "{} has seen the latest messages",
+                                                user.localpart()
+                                            ));
+                                        }
                                     }
                                 }
                             }
@@ -549,7 +625,7 @@ impl AppWidget {
                         self.chat.msgs.add_notify(&notice);
                     }
                 }
-                StateResult::Reaction(room_id, event_id, msg) => {},
+                StateResult::Reaction(_room_id, _event_id, _msg) => {}
                 _ => {}
             },
             _ => {}

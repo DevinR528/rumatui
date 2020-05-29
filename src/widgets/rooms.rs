@@ -10,11 +10,11 @@ use matrix_sdk::Room;
 use serde::{Deserialize, Serialize};
 use termion::event::MouseButton;
 use tokio::sync::RwLock;
-use tui::backend::Backend;
-use tui::layout::{Constraint, Direction, Layout, Rect};
-use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, List, Paragraph, Text};
-use tui::Frame;
+use rumatui_tui::backend::Backend;
+use rumatui_tui::layout::{Constraint, Direction, Layout, Rect};
+use rumatui_tui::style::{Color, Modifier, Style};
+use rumatui_tui::widgets::{Block, Borders, List, Paragraph, Text};
+use rumatui_tui::Frame;
 
 use crate::widgets::RenderWidget;
 

@@ -60,8 +60,8 @@ impl MatrixClient {
         path.push(".rumatui");
         // reset the client with the state store with username as part of the store path
         let client_config = ClientConfig::default()
-            .proxy("http://localhost:8080")? // for mitmproxy
-            .disable_ssl_verification()
+            // .proxy("http://localhost:8080")? // for mitmproxy
+            // .disable_ssl_verification()
             .state_store(Box::new(JsonStore::open(path)?));
 
         let client = Self {
@@ -122,17 +122,14 @@ impl MatrixClient {
             })?;
         self.user = Some(res.user_id.clone());
 
-        // if we can't sync with the "Db" then we must sync with the server
-        if !self.inner.sync_with_state_store().await? {
-            let _response = self
-                .inner
-                .sync(
-                    SyncSettings::default()
-                        .timeout(SYNC_TIMEOUT)
-                        .full_state(false),
-                )
-                .await?;
-        }
+        let _response = self
+            .inner
+            .sync(
+                SyncSettings::default()
+                    .timeout(SYNC_TIMEOUT)
+                    .full_state(false),
+            )
+            .await?;
 
         self.next_batch = self.inner.sync_token().await;
         Ok((self.inner.joined_rooms(), res))

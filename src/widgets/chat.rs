@@ -8,9 +8,9 @@ use matrix_sdk::identifiers::{RoomId, UserId};
 use matrix_sdk::Room;
 use termion::event::MouseButton;
 use tokio::sync::RwLock;
-use tui::backend::Backend;
-use tui::layout::{Constraint, Direction, Layout, Rect};
-use tui::Frame;
+use rumatui_tui::backend::Backend;
+use rumatui_tui::layout::{Constraint, Direction, Layout, Rect};
+use rumatui_tui::Frame;
 
 use crate::widgets::{message::MessageWidget, rooms::RoomsWidget, RenderWidget};
 

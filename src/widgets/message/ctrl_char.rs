@@ -1,6 +1,6 @@
 use muncher::Muncher;
-use tui::style::{Color, Modifier, Style};
-use tui::widgets::Text;
+use rumatui_tui::style::{Color, Modifier, Style};
+use rumatui_tui::widgets::Text;
 
 use super::Message;
 
@@ -310,16 +310,16 @@ pub fn process_text<'a>(msg: &'a Message) -> Vec<Text<'a>> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use mdcat::{self, ResourceAccess, TerminalCapabilities, TerminalSize};
+    use mdcat::{self, ResourceAccess, Settings, TerminalCapabilities, TerminalSize};
     use pulldown_cmark::{Options, Parser};
     use std::fmt::{self, Display};
     use std::io::{self, Write};
     use syntect::parsing::SyntaxSet;
 
     #[derive(Default)]
-    pub struct Writter(Vec<u8>);
+    pub struct Writer(Vec<u8>);
 
-    impl Write for Writter {
+    impl Write for Writer {
         #[inline]
         fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
             self.0.extend_from_slice(buf);
@@ -330,7 +330,7 @@ mod test {
             Ok(())
         }
     }
-    impl Display for Writter {
+    impl Display for Writer {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             if let Ok(s) = String::from_utf8(self.0.clone()) {
                 write!(f, "{}", s)
@@ -359,17 +359,14 @@ fn main() {
         let parser = Parser::new_ext(&input, options);
         let syntax_set = SyntaxSet::load_defaults_nonewlines();
 
-        let mut w = Writter::default();
-        mdcat::push_tty(
-            &mut w,
-            &TerminalCapabilities::detect(),
-            TerminalSize::detect().unwrap(),
-            parser,
-            &std::path::Path::new("/"),
-            ResourceAccess::RemoteAllowed,
+        let settings = Settings {
+            terminal_capabilities: TerminalCapabilities::detect(),
+            terminal_size: TerminalSize::detect().unwrap(),
+            resource_access: ResourceAccess::LocalOnly,
             syntax_set,
-        )
-        .expect("failed");
+        };
+        let mut w = Writer::default();
+        mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
         println!("{:?}\n\n", w.to_string());
         CtrlChars::parse(w.to_string()).into_text();
@@ -385,26 +382,23 @@ fn main() {
         let parser = Parser::new_ext(&input, options);
         let syntax_set = SyntaxSet::load_defaults_nonewlines();
 
-        let mut w = Writter::default();
-        mdcat::push_tty(
-            &mut w,
-            &TerminalCapabilities::detect(),
-            TerminalSize::detect().unwrap(),
-            parser,
-            &std::path::Path::new("/"),
-            ResourceAccess::RemoteAllowed,
+        let settings = Settings {
+            terminal_capabilities: TerminalCapabilities::detect(),
+            terminal_size: TerminalSize::detect().unwrap(),
+            resource_access: ResourceAccess::LocalOnly,
             syntax_set,
-        )
-        .expect("failed");
+        };
+        let mut w = Writer::default();
+        mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
         println!("{:?}\n\n", w.to_string());
         println!("{:#?}", CtrlChars::parse(w.to_string()).into_text());
     }
 
-    use tui::backend::TestBackend;
-    use tui::layout::Alignment;
-    use tui::widgets::{Block, Borders, Paragraph};
-    use tui::Terminal;
+    use rumatui_tui::backend::TestBackend;
+    use rumatui_tui::layout::Alignment;
+    use rumatui_tui::widgets::{Block, Borders, Paragraph};
+    use rumatui_tui::Terminal;
 
     #[test]
     fn paragraph_colors() {
@@ -425,17 +419,14 @@ fn main() {
         let parser = Parser::new_ext(&input, options);
         let syntax_set = SyntaxSet::load_defaults_nonewlines();
 
-        let mut w = Writter::default();
-        mdcat::push_tty(
-            &mut w,
-            &TerminalCapabilities::detect(),
-            TerminalSize::detect().unwrap(),
-            parser,
-            &std::path::Path::new("/"),
-            ResourceAccess::RemoteAllowed,
+        let settings = Settings {
+            terminal_capabilities: TerminalCapabilities::detect(),
+            terminal_size: TerminalSize::detect().unwrap(),
+            resource_access: ResourceAccess::LocalOnly,
             syntax_set,
-        )
-        .expect("failed");
+        };
+        let mut w = Writer::default();
+        mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
         let text = CtrlChars::parse(w.to_string()).into_text();
 
@@ -471,20 +462,17 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
         let parser = Parser::new_ext(&input, options);
         let syntax_set = SyntaxSet::load_defaults_nonewlines();
 
-        let mut w = Writter::default();
-        mdcat::push_tty(
-            &mut w,
-            &TerminalCapabilities::detect(),
-            TerminalSize::detect().unwrap(),
-            parser,
-            &std::path::Path::new("/"),
-            ResourceAccess::RemoteAllowed,
+        let settings = Settings {
+            terminal_capabilities: TerminalCapabilities::detect(),
+            terminal_size: TerminalSize::detect().unwrap(),
+            resource_access: ResourceAccess::LocalOnly,
             syntax_set,
-        )
-        .expect("failed");
+        };
+        let mut w = Writer::default();
+        mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
         let parsed = CtrlChars::parse(w.to_string());
-
+        let expected = "\u{1b}]8;;http://www.google.com/\u{7}google\u{1b}]8;;\u{7} \u{1b}[33mruma-identifiers\u{1b}[0m \u{1b}[1mhello\u{1b}[0m\n\n\u{1b}[1;34m┄\u{1b}[0m\u{1b}[1;34mtable\u{1b}[0m\n\n• one\n• two\n\n\u{1b}[32m────────────────────\u{1b}[0m\n\u{1b}[34mfn\u{1b}[0m \u{1b}[33mmain\u{1b}[0m() {\n    \u{1b}[32mprintln!\u{1b}[0m(\"\u{1b}[36mhello\u{1b}[0m\");\n}\n\u{1b}[32m────────────────────\u{1b}[0m\n";
         println!("{:#?}", parsed);
         let _text = parsed.into_text();
     }
@@ -499,17 +487,14 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
         let parser = Parser::new_ext(&input, options);
         let syntax_set = SyntaxSet::load_defaults_nonewlines();
 
-        let mut w = Writter::default();
-        mdcat::push_tty(
-            &mut w,
-            &TerminalCapabilities::detect(),
-            TerminalSize::detect().unwrap(),
-            parser,
-            &std::path::Path::new("/"),
-            ResourceAccess::RemoteAllowed,
+        let settings = Settings {
+            terminal_capabilities: TerminalCapabilities::detect(),
+            terminal_size: TerminalSize::detect().unwrap(),
+            resource_access: ResourceAccess::LocalOnly,
             syntax_set,
-        )
-        .expect("failed");
+        };
+        let mut w = Writer::default();
+        mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
         let parsed = CtrlChars::parse(w.to_string());
         print!("{:?}", parsed);
