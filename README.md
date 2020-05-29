@@ -13,7 +13,7 @@ This project is still very much a work in progress. Please file issues, but I wi
 
 # Install
 ```bash
-cargo install rumatui --version 0.1.10-alpha
+cargo install rumatui --version 0.1.11-alpha
 ```
 
 # Run

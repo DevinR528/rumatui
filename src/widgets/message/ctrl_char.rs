@@ -424,6 +424,7 @@ fn main() {
 
         assert_eq!(
             "\u{1b}]8;;http://www.googlelskdnfodaf.com/\n",
+            // "{:?}",
             CtrlChars::parse(w.to_string()).to_string()
         );
     }
@@ -546,6 +547,8 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
         let mut w = Writer::default();
         mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
-        println!("{:?}", CtrlChars::parse(w.to_string()).to_string())
+        let expected = "TWIM: \\n# Docker-matrix\\n\\nThe docker image for synapse v1.12.4rc1 is now on \u{1b}]8;;https://hub.docker.com/r/mvgorcum/docker-matrix/tags\n";
+
+        assert_eq!(expected, CtrlChars::parse(w.to_string()).to_string())
     }
 }
