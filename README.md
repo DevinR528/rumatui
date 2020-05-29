@@ -5,7 +5,7 @@
 
 Work In Progress. A Matrix client written using [tui.rs](https://github.com/fdehau/tui-rs) and [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk) to provide a clickable cli to chat.
 
-![rumatui-demo](https://github.com/DevinR528/rumatui/blob/master/resources/rumatui.gif)
+![rumatui-demo](https://github.com/DevinR528/rumatui/blob/master/resources/rumatui-notice.gif)
 
 # Install (not yet)
 ```bash
