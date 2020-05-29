@@ -1186,7 +1186,7 @@ dependencies = [
  "instant",
  "js_int",
  "ruma-api",
- "ruma-client-api 0.9.0",
+ "ruma-client-api",
  "ruma-events",
  "ruma-identifiers",
  "tokio",
@@ -1843,7 +1843,7 @@ dependencies = [
  "percent-encoding",
  "ruma-api-macros",
  "ruma-identifiers",
- "ruma-serde 0.2.2",
+ "ruma-serde",
  "serde",
  "serde_json",
  "strum",
@@ -1862,24 +1862,6 @@ dependencies = [
 
 [[package]]
 name = "ruma-client-api"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84a57433fc6dded259aef2b12ceb91d78d3607b182278f648edd5c19c23d81cd"
-dependencies = [
- "http",
- "js_int",
- "ruma-api",
- "ruma-common",
- "ruma-events",
- "ruma-identifiers",
- "ruma-serde 0.1.3",
- "serde",
- "serde_json",
- "strum",
-]
-
-[[package]]
-name = "ruma-client-api"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "082913ad135ca55ee06a55d295bea954982f2ac5e0150adc09024f5cbb8cb6cf"
@@ -1890,7 +1872,7 @@ dependencies = [
  "ruma-common",
  "ruma-events",
  "ruma-identifiers",
- "ruma-serde 0.2.2",
+ "ruma-serde",
  "serde",
  "serde_json",
  "strum",
@@ -1903,7 +1885,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "253416d67b4bde281f2781424232a58a946a4f1c451d5f857a8d0705d58eaf2a"
 dependencies = [
  "matches",
- "ruma-serde 0.2.2",
+ "ruma-serde",
  "serde",
  "serde_json",
 ]
@@ -1918,7 +1900,7 @@ dependencies = [
  "ruma-common",
  "ruma-events-macros",
  "ruma-identifiers",
- "ruma-serde 0.2.2",
+ "ruma-serde",
  "serde",
  "serde_json",
 ]
@@ -1946,20 +1928,6 @@ dependencies = [
 
 [[package]]
 name = "ruma-serde"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e14edc0e2f5177c419e3b89060b1e94fb3af81b2f253783ac6967f14a7ec3911"
-dependencies = [
- "dtoa",
- "itoa",
- "js_int",
- "serde",
- "serde_json",
- "url",
-]
-
-[[package]]
-name = "ruma-serde"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c71dabb8e2709ca4f59201cb72d7fe8d590e7e3f55feb348e851c18354938af"
@@ -1974,7 +1942,7 @@ dependencies = [
 
 [[package]]
 name = "rumatui"
-version = "0.1.0"
+version = "0.1.10-alpha"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1995,7 +1963,7 @@ dependencies = [
  "muncher",
  "pulldown-cmark",
  "regex",
- "ruma-client-api 0.8.0",
+ "ruma-client-api",
  "ruma-identifiers",
  "rumatui-tui 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",

@@ -1,15 +1,16 @@
 [package]
 name = "rumatui"
-version = "0.1.0"
+version = "0.1.10-alpha"
 authors = ["Devin R <devin.ragotzy@gmail.com>"]
 license = "MIT/Apache-2.0"
-description = "Command line todo in Rust."
-repository = "https://github.com/DevinR528/forget"
-keywords = ["todo", "cli", "productivity", "console", "terminal"]
-categories = ["development-tools"]
+description = "A click-able command-line Matrix client."
+repository = "https://github.com/DevinR528/rumatui"
+keywords = ["chat", "matrix", "ruma", "matrix-rust-sdk", "tui"]
+categories = ["command-line-utilities"]
 edition = "2018"
 readme = "README.md"
-exclude = [ "resources" ]
+# at some point exclude this ??
+# exclude = ["resources"] 
 
 [dependencies]
 async-trait = "0.1.30"
@@ -34,8 +35,8 @@ muncher = "0.6.0"
 regex = "1.3.7"
 
 # turn on rand feature to generate EventId's
-ruma-identifiers = { version = "*", features = ["rand"] }
-ruma-client-api = "0.8.0"
+ruma-identifiers = { version = "0.16.1", features = ["rand"] }
+ruma-client-api = "0.9.0"
 
 serde = { version = "1.0.106", features = ["derive"] }
 serde_json = "1.0.52"
