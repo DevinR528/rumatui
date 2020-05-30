@@ -375,7 +375,7 @@ mod test {
     }
 
     #[test]
-    // #[ignore] // the ignored tests work perfectly fine locally but fail in CI great x(
+    #[ignore] // the ignored tests work perfectly fine locally but fail in CI great x(
     fn test_formatter() {
         let input = "[google](http://www.google.com) `ruma-identifiers` __hello__
 # table
@@ -409,7 +409,7 @@ fn main() {
     }
 
     #[test]
-    // #[ignore]
+    #[ignore]
     fn test_formatter2() {
         let input = "[`hi`](http://www.googlelskdnfodaf.com)";
 
@@ -442,7 +442,7 @@ fn main() {
     use rumatui_tui::Terminal;
 
     #[test]
-    // #[ignore]
+    #[ignore]
     fn paragraph_colors() {
         let input = "[google](http://www.google.com) `ruma-identifiers` __hello__
 # table
