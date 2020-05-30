@@ -286,7 +286,7 @@ impl RenderWidget for RoomsWidget {
                     Text::styled(format!("{} {}", highlight_symbol, name), style)
                 } else {
                     let style = Style::default().fg(Color::Blue);
-                    Text::styled(format!("   {}", name), style)
+                    Text::styled(format!(" {}", name), style)
                 }
             })
             .skip(offset as usize);
@@ -296,7 +296,6 @@ impl RenderWidget for RoomsWidget {
                     .borders(Borders::ALL)
                     .title("Rooms")
                     .border_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
-                    .title("Messages")
                     .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
             )
             .style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD));

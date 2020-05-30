@@ -341,6 +341,7 @@ pub fn process_text<'a>(msg: &'a Message) -> Vec<Text<'a>> {
     formatted
 }
 
+// TODO why do all but `failed_message` work locally and fail in travis CI?
 #[cfg(test)]
 mod test {
     use super::*;
