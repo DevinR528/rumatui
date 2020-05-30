@@ -375,18 +375,18 @@ mod test {
     }
 
     #[test]
-    #[ignore] // the ignored tests work perfectly fine locally but fail in CI great x(
+    // #[ignore] // the ignored tests work perfectly fine locally but fail in CI great x(
     fn test_formatter() {
-        let input = r#"[google](http://www.google.com) `ruma-identifiers` __hello__
+        let input = "[google](http://www.google.com) `ruma-identifiers` __hello__
 # table
 - one
 - two
 
 ```rust
 fn main() {
-    println!("hello");
+    println!(\"hello\");
 }
-```"#;
+```";
 
         let mut options = Options::empty();
         options.insert(Options::ENABLE_TASKLISTS);
@@ -409,9 +409,9 @@ fn main() {
     }
 
     #[test]
-    #[ignore]
+    // #[ignore]
     fn test_formatter2() {
-        let input = r#"[`hi`](http://www.googlelskdnfodaf.com)"#;
+        let input = "[`hi`](http://www.googlelskdnfodaf.com)";
 
         let mut options = Options::empty();
         options.insert(Options::ENABLE_TASKLISTS);
@@ -442,7 +442,7 @@ fn main() {
     use rumatui_tui::Terminal;
 
     #[test]
-    #[ignore]
+    // #[ignore]
     fn paragraph_colors() {
         let input = "[google](http://www.google.com) `ruma-identifiers` __hello__
 # table
