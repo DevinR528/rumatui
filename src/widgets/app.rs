@@ -425,10 +425,10 @@ impl AppWidget {
                     // only display notifications for the current room
                     if self.chat.current_room.borrow().as_ref() == Some(&room.read().await.room_id)
                         // unless this is an invitation
-                        && invitation
+                        || invitation
                         // or it is an event directed towards the user
                         // TODO in this case we should probably specify the room the event is for
-                        && Some(&receiver) == self.chat.msgs.me.as_ref()
+                        || Some(&receiver) == self.chat.msgs.me.as_ref()
                     {
                         match membership {
                             MembershipChange::ProfileChanged => self.chat.msgs.add_notify(
