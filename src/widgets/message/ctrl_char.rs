@@ -501,7 +501,7 @@ fn main() {
             "│• one             │",
             "└──────────────────┘",
         ]);
-        
+
         // TODO actually check that the colors and formatting are being set this
         // only checks that the symbols (chars) are the same.
         assert!(expected

@@ -58,7 +58,7 @@ fn main() -> Result<(), failure::Error> {
 
                         match key {
                             Key::Ctrl(c) if c == 'q' => app.should_quit = true,
-                            Key::Ctrl(c) if c == 'j' => app.on_send().await,
+                            Key::Ctrl(c) if c == 's' => app.on_send().await,
                             Key::Up => app.on_up().await,
                             Key::Down => app.on_down().await,
                             Key::Backspace => app.on_backspace(),
