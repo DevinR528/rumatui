@@ -403,7 +403,7 @@ fn main() {
         let mut w = Writer::default();
         mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
-        let expected = r#""\u{1b}]8;;http://www.google.com/ \u{1b}[33ruma-identifiers \u{1b}[1hello\n\n\u{1b}[1\u{1b}[34┄\u{1b}[1\u{1b}[34table\n\n• one\n• two\n\n\u{1b}[32────────────────────\n\u{1b}[34fn \u{1b}[33main() {\n    \u{1b}[32println!(\"\u{1b}[36hello\");\n}\n\u{1b}[32────────────────────\n""#;
+        let expected = "\u{1b}]8;;http://www.google.com/ \u{1b}[33ruma-identifiers \u{1b}[1hello\n\n\u{1b}[1\u{1b}[34┄\u{1b}[1\u{1b}[34table\n\n• one\n• two\n\n\u{1b}[32────────────────────\n\u{1b}[34fn \u{1b}[33main() {\n    \u{1b}[32println!(\"\u{1b}[36hello\");\n}\n\u{1b}[32────────────────────\n";
 
         assert_eq!(expected, CtrlChars::parse(w.to_string()).to_string())
     }
@@ -431,7 +431,7 @@ fn main() {
         let ctrl = CtrlChars::parse(w.to_string());
         // println!("{:#?}", ctrl);
         assert_eq!(
-            r#""\u{1b}]8;;http://www.googlelskdnfodaf.com/\n""#,
+            "\u{1b}]8;;http://www.googlelskdnfodaf.com/\n",
             ctrl.to_string(),
         );
     }
@@ -444,16 +444,16 @@ fn main() {
     #[test]
     #[ignore]
     fn paragraph_colors() {
-        let input = r#"[google](http://www.google.com) `ruma-identifiers` __hello__
+        let input = "[google](http://www.google.com) `ruma-identifiers` __hello__
 # table
 - one
 - two
 
 ```rust
 fn main() {
-    println!("hello");
+    println!(\"hello\");
 }
-```"#;
+```";
 
         let mut options = Options::empty();
         options.insert(Options::ENABLE_TASKLISTS);
@@ -512,9 +512,9 @@ fn main() {
 
     #[test]
     fn reply_formatter() {
-        let input = r#"> In reply to blah blah
+        let input = "> In reply to blah blah
 
-https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-roomid-leave doesn\'t seem to have a body"#;
+https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-roomid-leave doesn\'t seem to have a body";
 
         let mut options = Options::empty();
         options.insert(Options::ENABLE_TASKLISTS);
@@ -531,7 +531,7 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
         let mut w = Writer::default();
         mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
-        let expected = r#""\u{1b}[3\u{1b}[32In reply to blah blah\n\nhttps://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-roomid-leave doesn\'t seem to have a body\n""#;
+        let expected = "\u{1b}[3\u{1b}[32In reply to blah blah\n\nhttps://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-roomid-leave doesn\'t seem to have a body\n";
 
         assert_eq!(expected, CtrlChars::parse(w.to_string()).to_string());
         // println!("{:?}", CtrlChars::parse(w.to_string()).to_string())
@@ -540,7 +540,7 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
     #[test]
     #[ignore]
     fn failed_messages() {
-        let input = r#"TWIM: \n# Docker-matrix\n\nThe docker image for synapse v1.12.4rc1 is now on [mvgorcum/docker-matrix:v1.12.4rc1](https://hub.docker.com/r/mvgorcum/docker-matrix/tags)"#;
+        let input = "TWIM: \n# Docker-matrix\n\nThe docker image for synapse v1.12.4rc1 is now on [mvgorcum/docker-matrix:v1.12.4rc1](https://hub.docker.com/r/mvgorcum/docker-matrix/tags)";
 
         let mut options = Options::empty();
         options.insert(Options::ENABLE_TASKLISTS);
@@ -557,7 +557,7 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
         let mut w = Writer::default();
         mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
-        let expected = r#""TWIM: \\n# Docker-matrix\\n\\nThe docker image for synapse v1.12.4rc1 is now on \u{1b}]8;;https://hub.docker.com/r/mvgorcum/docker-matrix/tags\n""#;
+        let expected = "TWIM: \\n# Docker-matrix\\n\\nThe docker image for synapse v1.12.4rc1 is now on \u{1b}]8;;https://hub.docker.com/r/mvgorcum/docker-matrix/tags\n";
         assert_eq!(expected, CtrlChars::parse(w.to_string()).to_string());
         // println!("{:#?}", CtrlChars::parse(w.to_string()).to_string())
     }
