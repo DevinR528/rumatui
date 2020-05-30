@@ -53,10 +53,6 @@ pub enum MsgType {
     Video,
 }
 
-// TODO split MessageWidget into render and state halves. MsgRender has the methods to filter
-// and populate messages using the messages Vec. MessageState or Data?? will populate and keep track of
-// state, add_message_event, get_sending_message, process and such are part of state/data
-
 #[derive(Clone, Debug, Default)]
 pub struct MessageWidget {
     msg_area: Rect,
@@ -78,7 +74,6 @@ impl MessageWidget {
     pub async fn populate_initial_msgs(&mut self, rooms: &HashMap<RoomId, Arc<RwLock<Room>>>) {
         for (_id, room) in rooms {
             let room = room.read().await;
-            // TODO this should never fail but see about js_int::UInt impling `Into<u32>`
             self.unread_notifications = room.unread_notifications.unwrap_or_default();
 
             self.unread_notifications += room.unread_highlight.unwrap_or_default();
@@ -133,21 +128,21 @@ impl MessageWidget {
                         read: false,
                         sent_receipt: false,
                     },
-                    room.room_id.clone(),
+                    &room.room_id,
                 );
             }
             _ => {}
         }
     }
 
-    pub fn add_message(&mut self, msg: Message, room: RoomId) {
+    pub fn add_message(&mut self, msg: Message, room: &RoomId) {
         // remove the message echo when user sends a message and we display the text before
         // the server responds
         if let Some(idx) = self.messages.iter().position(|(_, m)| m.uuid == msg.uuid) {
-            self.messages[idx] = (room, msg);
+            self.messages[idx] = (room.clone(), msg);
             return;
         }
-        self.messages.push((room, msg));
+        self.messages.push((room.clone(), msg));
         // self.calculate_scroll_down();
     }
 
@@ -233,7 +228,7 @@ impl MessageWidget {
                     read: true,
                     sent_receipt: true,
                 };
-                self.add_message(msg, id.clone())
+                self.add_message(msg, id)
             }
             _ => {}
         }
@@ -338,7 +333,7 @@ impl MessageWidget {
         self.send_msg.push(ch);
     }
 
-    pub fn pop(&mut self) {
+    pub fn remove_char(&mut self) {
         self.send_msg.pop();
     }
 }

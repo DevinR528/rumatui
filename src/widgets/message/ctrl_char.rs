@@ -26,7 +26,7 @@ impl CtrlChunk {
         if munch.seek(5) == Some("\u{1b}]8;;".to_string()) {
             let raw_link = munch.eat_until(|c| *c == '\u{7}').collect::<String>();
             // eat all of display text for now
-            // TODO display the wanted text for the link
+            // TODO display the wanted text for the link [show_me](http://link.com)
             munch.eat();
             let _ = munch.eat_until(|c| *c == '\u{7}');
             munch.eat();
@@ -501,7 +501,7 @@ fn main() {
             "│• one             │",
             "└──────────────────┘",
         ]);
-        
+
         // TODO actually check that the colors and formatting are being set this
         // only checks that the symbols (chars) are the same.
         assert!(expected

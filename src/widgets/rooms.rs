@@ -95,9 +95,6 @@ pub enum Invite {
     Decline,
     NoClick,
 }
-// TODO split RoomsWidget into render and state halves. RoomRender has the methods to filter
-// and populate ListState using the rooms HashMap. RoomState or RoomData?? will populate and keep track of
-// state
 
 #[derive(Clone, Debug, Default)]
 pub struct RoomsWidget {
@@ -155,9 +152,9 @@ impl RoomsWidget {
         self.names.items.push((name, room_id));
     }
 
-    pub(crate) fn remove_room(&mut self, room_id: RoomId) {
-        self.rooms.remove(&room_id);
-        if let Some(idx) = self.names.items.iter().position(|(_, id)| &room_id == id) {
+    pub(crate) fn remove_room(&mut self, room_id: &RoomId) {
+        self.rooms.remove(room_id);
+        if let Some(idx) = self.names.items.iter().position(|(_, id)| room_id == id) {
             self.names.items.remove(idx);
         }
         if !self.names.is_empty() {
@@ -173,9 +170,9 @@ impl RoomsWidget {
         self.current_room.borrow_mut().take();
     }
 
-    pub(crate) fn update_room(&mut self, name: String, room_id: RoomId) {
-        if let Some(idx) = self.names.items.iter().position(|(_, id)| &room_id == id) {
-            self.names.items[idx] = (name, room_id);
+    pub(crate) fn update_room(&mut self, name: &str, room_id: &RoomId) {
+        if let Some(idx) = self.names.items.iter().position(|(_, id)| room_id == id) {
+            self.names.items[idx] = (name.to_string(), room_id.clone());
         }
     }
 

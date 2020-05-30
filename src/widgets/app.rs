@@ -4,38 +4,46 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use anyhow::Error;
-use matrix_sdk::api::r0::message::get_message_events;
-use matrix_sdk::events::{
-    collections::all::RoomEvent,
-    room::{
-        member::MembershipChange,
-        message::{MessageEvent, MessageEventContent, TextMessageEventContent},
+use matrix_sdk::{
+    api::r0::message::get_message_events,
+    events::{
+        collections::all::RoomEvent,
+        room::{
+            member::MembershipChange,
+            message::{MessageEvent, MessageEventContent, TextMessageEventContent},
+        },
     },
+    identifiers::UserId,
+    Room,
 };
-use matrix_sdk::Room;
-use rumatui_tui::backend::Backend;
-use rumatui_tui::layout::{Alignment, Constraint, Layout};
-use rumatui_tui::style::{Color, Modifier, Style};
-use rumatui_tui::widgets::{Block, Borders, Paragraph, Text};
-use rumatui_tui::Terminal;
+use rumatui_tui::{
+    backend::Backend,
+    layout::{Alignment, Constraint, Layout},
+    style::{Color, Modifier, Style},
+    widgets::{Block, Borders, Paragraph, Text},
+    Terminal,
+};
 use termion::event::MouseButton;
-use tokio::runtime::Handle;
-use tokio::sync::{mpsc, RwLock};
+use tokio::{
+    runtime::Handle,
+    sync::{mpsc, RwLock},
+};
 use uuid::Uuid;
 
-use crate::client::client_loop::{MatrixEventHandle, RequestResult, UserRequest};
-use crate::client::event_stream::{EventStream, StateResult};
-use crate::widgets::{
-    chat::ChatWidget,
-    error::ErrorWidget,
-    login::{Login, LoginSelect, LoginWidget},
-    message::Message,
-    rooms::Invite,
-    DrawWidget, RenderWidget,
+use crate::{
+    client::{
+        client_loop::{MatrixEventHandle, RequestResult, UserRequest},
+        event_stream::{EventStream, StateResult},
+    },
+    widgets::{
+        chat::ChatWidget,
+        error::ErrorWidget,
+        login::{Login, LoginSelect, LoginWidget},
+        message::Message,
+        rooms::Invite,
+        DrawWidget, RenderWidget,
+    },
 };
-
-// TODO split AppWidget into render and state halves. AppRender has the methods to deal with rendering.
-// AppState or AppData?? will delegate to the state half of each widget.
 
 pub struct AppWidget {
     /// Title of the app "rumatui".
@@ -102,11 +110,11 @@ impl AppWidget {
         if !self.login_w.logged_in {
             self.login_w.on_click(btn, x, y);
         }
-        if self.chat.msgs.on_click(btn, x, y) {
+        if self.chat.msgs_on_click(btn, x, y) {
             self.on_send().await;
         }
-        if let Some(room_id) = self.chat.room.invite.as_ref().map(|i| i.room_id.clone()) {
-            match self.chat.room.on_click(btn, x, y) {
+        if let Some(room_id) = self.chat.as_invite().map(|i| i.room_id.clone()) {
+            match self.chat.room_on_click(btn, x, y) {
                 Invite::Accept => {
                     if let Err(e) = self
                         .send_jobs
@@ -115,8 +123,8 @@ impl AppWidget {
                     {
                         self.set_error(anyhow::Error::from(e))
                     } else {
-                        self.chat.joining_room = true;
-                        self.chat.room.remove_invite();
+                        self.chat.set_joining_room(true);
+                        self.chat.remove_invite();
                     }
                 }
                 Invite::Decline => {
@@ -127,7 +135,7 @@ impl AppWidget {
                     {
                         self.set_error(anyhow::Error::from(e))
                     } else {
-                        self.chat.room.remove_invite();
+                        self.chat.remove_invite();
                     }
                 }
                 Invite::NoClick => {}
@@ -136,37 +144,30 @@ impl AppWidget {
     }
 
     pub async fn on_scroll_up(&mut self, x: u16, y: u16) {
-        if self.chat.main_screen {
-            if self.chat.msgs.on_scroll_up(x, y) {
+        if self.chat.is_main_screen() {
+            if self.chat.msgs_on_scroll_up(x, y) {
                 if !self.scrolling {
                     self.scrolling = true;
-                    let room_id = self
-                        .chat
-                        .room
-                        .current_room
-                        .borrow()
-                        .as_ref()
-                        .unwrap()
-                        .clone();
+                    let room_id = self.chat.into_current_room_id().unwrap();
 
                     if let Err(e) = self.send_jobs.send(UserRequest::RoomMsgs(room_id)).await {
                         self.set_error(anyhow::Error::from(e))
                     }
                 }
             } else {
-                if self.chat.room.on_scroll_up(x, y) {
-                    self.chat.msgs.reset_scroll()
+                if self.chat.room_on_scroll_up(x, y) {
+                    self.chat.reset_scroll()
                 }
             }
         }
     }
 
     pub async fn on_scroll_down(&mut self, x: u16, y: u16) {
-        if self.chat.main_screen {
-            self.chat.msgs.on_scroll_down(x, y);
+        if self.chat.is_main_screen() {
+            self.chat.msgs_on_scroll_down(x, y);
             // TODO make each widget's scroll method more similar
-            if self.chat.room.on_scroll_down(x, y) {
-                self.chat.msgs.reset_scroll()
+            if self.chat.room_on_scroll_down(x, y) {
+                self.chat.reset_scroll()
             }
         }
     }
@@ -178,9 +179,9 @@ impl AppWidget {
             } else {
                 self.login_w.login.selected = LoginSelect::Username;
             }
-        } else if self.chat.main_screen {
-            self.chat.room.select_previous();
-            self.chat.msgs.reset_scroll()
+        } else if self.chat.is_main_screen() {
+            self.chat.room_select_previous();
+            self.chat.reset_scroll()
         }
     }
 
@@ -191,9 +192,9 @@ impl AppWidget {
             } else {
                 self.login_w.login.selected = LoginSelect::Username;
             }
-        } else if self.chat.main_screen {
-            self.chat.room.select_next();
-            self.chat.msgs.reset_scroll()
+        } else if self.chat.is_main_screen() {
+            self.chat.room_select_next();
+            self.chat.reset_scroll()
         }
     }
 
@@ -224,15 +225,12 @@ impl AppWidget {
                 } else {
                     self.login_w.login.password.push(c);
                 }
-            } else if self.chat.main_screen {
+            } else if self.chat.is_main_screen() {
                 // send typing notice to the server
-                let room_id = {
-                    let id = self.chat.current_room.borrow();
-                    id.deref().clone()
-                };
+                let room_id = self.chat.into_current_room_id();
                 if !self.typing_notice {
                     self.typing_notice = true;
-                    if let (Some(me), Some(room_id)) = (self.chat.me.clone(), room_id) {
+                    if let (Some(me), Some(room_id)) = (self.chat.into_current_user(), room_id) {
                         if let Err(e) = self.send_jobs.send(UserRequest::Typing(room_id, me)).await
                         {
                             self.set_error(Error::from(e));
@@ -240,7 +238,7 @@ impl AppWidget {
                     }
                 }
 
-                self.chat.msgs.add_char(c);
+                self.chat.add_char(c);
             }
         }
     }
@@ -256,19 +254,19 @@ impl AppWidget {
             } else {
                 self.login_w.login.password.pop();
             }
-        } else if self.chat.main_screen {
-            self.chat.msgs.pop();
+        } else if self.chat.is_main_screen() {
+            self.chat.remove_char();
         }
     }
 
     pub async fn on_delete(&mut self) {
-        if self.chat.main_screen {
-            let id = self.chat.current_room.borrow().deref().clone();
+        if self.chat.is_main_screen() {
+            let id = self.chat.into_current_room_id();
             if let Some(room_id) = id {
                 if let Err(e) = self.send_jobs.send(UserRequest::LeaveRoom(room_id)).await {
                     self.set_error(anyhow::Error::from(e))
                 } else {
-                    self.chat.leaving_room = true;
+                    self.chat.set_leaving_room(true);
                 }
             }
         }
@@ -276,10 +274,10 @@ impl AppWidget {
 
     pub async fn on_send(&mut self) {
         // unfortunately we have to do it this way or we have a mutable borrow in the scope of immutable
-        let res = if let Some(room_id) = self.chat.current_room.borrow().as_ref() {
-            match self.chat.msgs.get_sending_message() {
+        let res = if let Some(room_id) = self.chat.into_current_room_id() {
+            match self.chat.get_sending_message() {
                 Ok(msg) => {
-                    self.chat.sending_message = true;
+                    self.chat.set_sending_message(true);
                     let uuid = Uuid::new_v4();
                     let message = msg.clone();
                     if let Err(e) = self
@@ -289,25 +287,32 @@ impl AppWidget {
                     {
                         Err(anyhow::Error::from(e))
                     } else {
-                        if let Some(room) = self.chat.room.rooms.get(room_id) {
+                        // find the room the message was just sent to
+                        let local_message = if let Some(room) = self.chat.rooms().get(&room_id) {
                             let r = room.read().await;
                             let matrix_sdk::Room { members, .. } = r.deref();
                             let name = if let Some(mem) =
-                                members.get(self.chat.msgs.me.as_ref().unwrap())
+                                members.get(self.chat.as_current_user().unwrap())
                             {
                                 mem.name.clone()
                             } else {
-                                self.chat.msgs.me.as_ref().unwrap().localpart().into()
+                                self.chat.as_current_user().unwrap().localpart().into()
                             };
-                            self.chat.msgs.echo_sent_msg(
-                                room_id,
+                            Some(name)
+                        } else {
+                            None
+                        };
+
+                        if let Some(name) = local_message {
+                            self.chat.echo_sent_msg(
+                                &room_id,
                                 name,
                                 &self.homeserver,
                                 uuid,
                                 message,
                             );
                         }
-                        self.chat.msgs.clear_send_msg();
+                        self.chat.clear_send_msg();
                         Ok(())
                     }
                 }
@@ -323,6 +328,138 @@ impl AppWidget {
 
     fn set_error(&mut self, e: anyhow::Error) {
         self.error = Some(e);
+    }
+
+    pub(crate) async fn handle_membership(
+        &mut self,
+        membership: MembershipChange,
+        receiver: UserId,
+        sender: UserId,
+        room: Arc<RwLock<Room>>,
+        timeline_event: bool,
+        show_room_name: bool,
+    ) {
+        let for_me = Some(&receiver) == self.chat.as_current_user();
+        let room_name = if show_room_name { format!("\"{}\"", room.read().await.display_name()) } else { "the room".to_string() };
+        match membership {
+            MembershipChange::ProfileChanged => self
+                .chat
+                .add_notify(&format!("{} updated their profile", receiver.localpart())),
+            MembershipChange::Joined => {
+                if for_me {
+                    self.chat.set_current_room_id(&room.read().await.room_id);
+                    self.chat.add_room(room).await;
+                } else {
+                    self.chat.add_notify(&format!(
+                        "{} joined {}",
+                        // TODO when matrix-sdk gets display_name methods use them where ever possible
+                        // instead of `.localpart()`.
+                        sender.localpart(),
+                        room_name,
+                    ));
+                }
+            }
+            MembershipChange::Invited => {
+                if for_me {
+                    // if this is a RoomEvent from the joined rooms timeline it is not
+                    // an actual invitation
+                    if !timeline_event {
+                        self.chat.invited(sender, room).await;
+                    }
+                } else {
+                    self.chat
+                        .add_notify(&format!("{} was invited to {}", receiver.localpart(), room_name));
+                }
+            }
+            MembershipChange::InvitationRejected => {
+                if for_me {
+                    self.chat.add_notify("you rejected an invitation");
+                    self.chat.remove_room(&room.read().await.room_id)
+                } else {
+                    self.chat.add_notify(&format!(
+                        "{} rejected an invitation to {}",
+                        receiver.localpart(),
+                        room_name,
+                    ))
+                }
+            }
+            MembershipChange::InvitationRevoked => {
+                if for_me {
+                    self.chat.add_notify(&format!(
+                        "your invitation was rejected by {}",
+                        sender.localpart()
+                    ));
+                    self.chat.remove_room(&room.read().await.room_id)
+                } else {
+                    self.chat.add_notify(&format!(
+                        "{}'s invitations was rejected by {}",
+                        receiver.localpart(),
+                        sender.localpart(),
+                    ))
+                }
+            }
+            MembershipChange::Left => {
+                if for_me {
+                    self.chat.add_notify(&format!("you left {}", room_name));
+                    self.chat.remove_room(&room.read().await.room_id);
+                } else {
+                    self.chat
+                        .add_notify(&format!("{} left {}", receiver.localpart(), room_name))
+                }
+            }
+            MembershipChange::Banned => {
+                if for_me {
+                    self.chat.add_notify("you were banned from the room");
+                    self.chat.remove_room(&room.read().await.room_id)
+                } else {
+                    self.chat.add_notify(&format!(
+                        "{} was banned from {}",
+                        receiver.localpart(),
+                        room_name,
+                    ))
+                }
+            }
+            MembershipChange::Unbanned => {
+                if for_me {
+                    self.chat.add_notify(&format!("you were unbanned from {}", room_name));
+                    self.chat.remove_room(&room.read().await.room_id)
+                } else {
+                    self.chat.add_notify(&format!(
+                        "{} was unbanned from {}",
+                        receiver.localpart(),
+                        room_name,
+                    ))
+                }
+            }
+            MembershipChange::Kicked => {
+                if for_me {
+                    self.chat.add_notify(&format!("you were kicked from {}", room_name));
+                    self.chat.remove_room(&room.read().await.room_id)
+                } else {
+                    self.chat.add_notify(&format!(
+                        "{} was kicked from {}",
+                        receiver.localpart(),
+                        room_name,
+                    ))
+                }
+            }
+            MembershipChange::KickedAndBanned => {
+                if for_me {
+                    self.chat
+                        .add_notify(&format!("you were kicked and banned from {}", room_name));
+                    self.chat.remove_room(&room.read().await.room_id)
+                } else {
+                    self.chat.add_notify(&format!(
+                        "{} was kicked and banned from {}",
+                        receiver.localpart(),
+                        room_name,
+                    ))
+                }
+            }
+            MembershipChange::None => {}
+            MembershipChange::Error => panic!("membership error"),
+            _ => panic!("MembershipChange::NotImplemented is never valid bug"),
+        }
     }
 
     /// This checks once then continues returns to continue the ui loop.
@@ -341,22 +478,19 @@ impl AppWidget {
                     }
                     Ok((rooms, resp)) => {
                         self.login_w.logged_in = true;
-                        self.chat.main_screen = true;
+                        self.chat.set_main_screen(true);
                         self.login_w.logging_in = false;
-                        self.chat.msgs.me = Some(resp.user_id.clone());
-                        self.chat.me = Some(resp.user_id.clone());
+                        self.chat.set_current_user(&resp.user_id);
                         self.chat.set_room_state(rooms).await;
                     }
                 },
                 // TODO this has the EventId which we need to keep
                 RequestResult::SendMessage(res) => match res {
                     Err(e) => self.set_error(e),
-                    Ok(_res) => self.chat.sending_message = false,
+                    Ok(_res) => self.chat.set_sending_message(false),
                 },
                 RequestResult::RoomMsgs(res) => match res {
                     Err(e) => {
-                        // TODO recover from requesting room not currently joined
-                        // this should be fixed once MembershipState::Leave is working
                         self.set_error(e)
                     }
                     Ok((res, room)) => {
@@ -367,7 +501,7 @@ impl AppWidget {
                 RequestResult::AcceptInvite(res) => match res {
                     Err(e) => self.set_error(e),
                     Ok(res) => {
-                        self.chat.joining_room = false;
+                        self.chat.set_joining_room(false);
                         if let Err(e) = self
                             .send_jobs
                             .send(UserRequest::RoomMsgs(res.room_id))
@@ -381,14 +515,14 @@ impl AppWidget {
                     if let Err(e) = res {
                         self.set_error(e);
                     }
-                    self.chat.room.remove_room(room_id)
+                    self.chat.remove_room(&room_id)
                 }
                 RequestResult::LeaveRoom(res, room_id) => {
                     if let Err(e) = res {
                         self.set_error(e);
                     }
-                    self.chat.leaving_room = false;
-                    self.chat.room.remove_room(room_id)
+                    self.chat.set_leaving_room(false);
+                    self.chat.remove_room(&room_id)
                 }
                 RequestResult::Typing(res) => {
                     if let Err(e) = res {
@@ -409,7 +543,6 @@ impl AppWidget {
 
         match self.emitter_msgs.try_recv() {
             Ok(res) => match res {
-                // TODO make the MembershipState::Leave events work
                 StateResult::Member {
                     sender,
                     receiver,
@@ -422,152 +555,34 @@ impl AppWidget {
                     } else {
                         false
                     };
+
                     // only display notifications for the current room
-                    if self.chat.current_room.borrow().as_ref() == Some(&room.read().await.room_id)
+                    if self.chat.is_current_room(&room.read().await.room_id)
                         // unless this is an invitation
                         || invitation
                         // or it is an event directed towards the user
-                        // TODO in this case we should probably specify the room the event is for
-                        || Some(&receiver) == self.chat.msgs.me.as_ref()
+                        || Some(&receiver) == self.chat.as_current_user()
+                        // or it is an event we directed at another user
+                        || Some(&sender) == self.chat.as_current_user()
                     {
-                        match membership {
-                            MembershipChange::ProfileChanged => self.chat.msgs.add_notify(
-                                &format!("{} updated their profile", receiver.localpart()),
-                            ),
-                            MembershipChange::Joined => {
-                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                                    *self.chat.current_room.borrow_mut() =
-                                        Some(room.read().await.room_id.clone());
-                                    self.chat.room.add_room(room).await;
-                                } else {
-                                    self.chat.msgs.add_notify(&format!(
-                                        "{} joined the room",
-                                        sender.localpart()
-                                    ));
-                                }
-                            }
-                            MembershipChange::Invited => {
-                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                                    // if this is a RoomEvent from the joined rooms timeline it is not
-                                    // an actual invitation
-                                    if !timeline_event {
-                                        self.chat.room.invited(sender, room).await;
-                                    }
-                                } else {
-                                    self.chat.msgs.add_notify(&format!(
-                                        "{} was invited to the room",
-                                        receiver.localpart()
-                                    ));
-                                }
-                            }
-                            MembershipChange::InvitationRejected => {
-                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                                    self.chat.msgs.add_notify("you rejected an invitation");
-                                    self.chat
-                                        .room
-                                        .remove_room(room.read().await.room_id.clone())
-                                } else {
-                                    self.chat.msgs.add_notify(&format!(
-                                        "{} rejected an invitation to the room",
-                                        receiver.localpart()
-                                    ))
-                                }
-                            }
-                            MembershipChange::InvitationRevoked => {
-                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                                    self.chat.msgs.add_notify(&format!(
-                                        "your invitation was rejected by {}",
-                                        sender.localpart()
-                                    ));
-                                    self.chat
-                                        .room
-                                        .remove_room(room.read().await.room_id.clone())
-                                } else {
-                                    self.chat.msgs.add_notify(&format!(
-                                        "{}'s invitations was rejected by {}",
-                                        receiver.localpart(),
-                                        sender.localpart(),
-                                    ))
-                                }
-                            }
-                            MembershipChange::Left => {
-                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                                    self.chat.msgs.add_notify("you left the room");
-                                    self.chat
-                                        .room
-                                        .remove_room(room.read().await.room_id.clone());
-                                } else {
-                                    self.chat.msgs.add_notify(&format!(
-                                        "{} left the room",
-                                        receiver.localpart()
-                                    ))
-                                }
-                            }
-                            MembershipChange::Banned => {
-                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                                    self.chat.msgs.add_notify("you were banned from the room");
-                                    self.chat
-                                        .room
-                                        .remove_room(room.read().await.room_id.clone())
-                                } else {
-                                    self.chat.msgs.add_notify(&format!(
-                                        "{} was banned from the room",
-                                        receiver.localpart()
-                                    ))
-                                }
-                            }
-                            MembershipChange::Unbanned => {
-                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                                    self.chat.msgs.add_notify("you were unbanned from the room");
-                                    self.chat
-                                        .room
-                                        .remove_room(room.read().await.room_id.clone())
-                                } else {
-                                    self.chat.msgs.add_notify(&format!(
-                                        "{} was unbanned from the room",
-                                        receiver.localpart()
-                                    ))
-                                }
-                            }
-                            MembershipChange::Kicked => {
-                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                                    self.chat.msgs.add_notify("you were kicked from the room");
-                                    self.chat
-                                        .room
-                                        .remove_room(room.read().await.room_id.clone())
-                                } else {
-                                    self.chat.msgs.add_notify(&format!(
-                                        "{} was kicked from the room",
-                                        receiver.localpart()
-                                    ))
-                                }
-                            }
-                            MembershipChange::KickedAndBanned => {
-                                if Some(&receiver) == self.chat.msgs.me.as_ref() {
-                                    self.chat
-                                        .msgs
-                                        .add_notify("you were kicked and banned from the room");
-                                    self.chat
-                                        .room
-                                        .remove_room(room.read().await.room_id.clone())
-                                } else {
-                                    self.chat.msgs.add_notify(&format!(
-                                        "{} was kicked and banned from the room",
-                                        receiver.localpart()
-                                    ))
-                                }
-                            }
-                            MembershipChange::None => {}
-                            MembershipChange::Error => panic!("membership error"),
-                            _ => panic!("MembershipChange::NotImplemented is never valid bug"),
-                        }
+                        // when the event is directed at ourselves but from another room show the room name
+                        let show_room_name = !self.chat.is_current_room(&room.read().await.room_id);
+
+                        self.handle_membership(
+                            membership,
+                            receiver,
+                            sender,
+                            room,
+                            timeline_event,
+                            show_room_name,
+                        )
+                        .await;
                     }
                 }
-                StateResult::Name(name, room_id) => self.chat.room.update_room(name, room_id),
+                StateResult::Name(name, room_id) => self.chat.update_room(&name, &room_id),
                 StateResult::Message(msg, room) => {
-                    self.chat.msgs.add_message(msg, room);
-                    if let Some((event, room)) = self.chat.msgs.read_receipt(self.last_interaction)
-                    {
+                    self.chat.add_message(msg, &room);
+                    if let Some((event, room)) = self.chat.read_receipt(self.last_interaction) {
                         if let Err(e) = self
                             .send_jobs
                             .send(UserRequest::ReadReceipt(room, event))
@@ -578,27 +593,24 @@ impl AppWidget {
                     }
                 }
                 StateResult::MessageEdit(msg, room_id, event_id) => {
-                    self.chat.msgs.edit_message(&room_id, &event_id, msg);
+                    self.chat.edit_message(&room_id, &event_id, msg);
                 }
                 StateResult::FullyRead(event_id, room_id) => {
-                    if self.chat.msgs.read_to_end(&event_id)
-                        && self.chat.current_room.borrow().as_ref() == Some(&room_id)
+                    if self.chat.read_to_end(&event_id)
+                        && self.chat.is_current_room(&room_id)
                     {
-                        // TODO
-                        self.chat
-                            .msgs
-                            .add_notify("what is a read to end event? TODO")
+                        // TODO what should be done for fully read events
                     }
                 }
                 StateResult::Typing(room_id, msg) => {
-                    if self.chat.current_room.borrow().as_ref() == Some(&room_id) {
-                        self.chat.msgs.add_notify(&msg)
+                    if self.chat.is_current_room(&room_id) {
+                        self.chat.add_notify(&msg)
                     }
                 }
                 StateResult::ReadReceipt(room_id, events) => {
                     let mut notices = vec![];
-                    if self.chat.current_room.borrow().as_ref() == Some(&room_id) {
-                        for e_id in self.chat.msgs.last_3_msg_event_ids() {
+                    if self.chat.is_current_room(&room_id) {
+                        for e_id in self.chat.last_3_msg_event_ids() {
                             if let Some(rec) = events.get(e_id) {
                                 if let Some(map) = &rec.read {
                                     // TODO keep track so we don't emit duplicate notices for
@@ -622,7 +634,7 @@ impl AppWidget {
                         }
                     }
                     for notice in notices {
-                        self.chat.msgs.add_notify(&notice);
+                        self.chat.add_notify(&notice);
                     }
                 }
                 StateResult::Reaction(_room_id, _event_id, _msg) => {}
@@ -641,11 +653,15 @@ impl AppWidget {
     }
 
     pub async fn on_notifications(&mut self) {
-        let room_id = self.chat.current_room.borrow().deref().clone();
+        let room_id = self.chat.into_current_room_id();
         if let Some(id) = room_id {
-            let err = if let Some(room) = self.chat.room.rooms.get(&id) {
-                let room = room.read().await;
-                if let Some(event_id) = self.chat.msgs.check_unread(room.deref()) {
+            let room = if let Some(room) = self.chat.rooms().get(&id) {
+                Some(Arc::clone(room))
+            } else {
+                None
+            };
+            let err = if let Some(room) = room {
+                if let Some(event_id) = self.chat.check_unread(room).await {
                     self.send_jobs
                         .send(UserRequest::ReadReceipt(id.clone(), event_id))
                         .await
@@ -721,9 +737,7 @@ impl AppWidget {
                                     read: false,
                                     sent_receipt: false,
                                 };
-                                self.chat
-                                    .msgs
-                                    .add_message(msg, room.read().await.room_id.clone())
+                                self.chat.add_message(msg, &room.read().await.room_id)
                             }
                             _ => {}
                         }
@@ -752,16 +766,16 @@ impl DrawWidget for AppWidget {
                     "Login to a Matrix Server",
                     Style::new().fg(Color::Green),
                 )]
-            } else if self.chat.joining_room {
+            } else if self.chat.is_joining_room() {
                 vec![Text::styled("Joining room", Style::new().fg(Color::Green))]
-            } else if self.chat.leaving_room {
+            } else if self.chat.is_leaving_room() {
                 vec![Text::styled("Leaving room", Style::new().fg(Color::Green))]
-            } else if self.chat.sending_message {
+            } else if self.chat.is_sending_message() {
                 vec![Text::styled(
                     "Sending message",
                     Style::new().fg(Color::Green),
                 )]
-            } else if self.chat.main_screen {
+            } else if self.chat.is_main_screen() {
                 vec![Text::styled("Chatting", Style::new().fg(Color::Green))]
             } else {
                 vec![Text::styled("", Style::new().fg(Color::Green))]
