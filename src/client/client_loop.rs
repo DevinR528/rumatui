@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fmt;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -28,6 +27,7 @@ use matrix_sdk::identifiers::{EventId, RoomId, UserId};
 /// Requests sent from the UI portion of the app.
 ///
 /// Each request is sent in response to some user input.
+#[derive(Debug)]
 pub enum UserRequest {
     Login(String, String),
     SendMessage(RoomId, MessageEventContent, Uuid),
@@ -40,26 +40,6 @@ pub enum UserRequest {
     Quit,
 }
 unsafe impl Send for UserRequest {}
-
-impl fmt::Debug for UserRequest {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Login(name, _) => write!(f, "failed login for {}", name),
-            Self::SendMessage(id, _, _) => write!(f, "failed sending message for {}", id),
-            Self::RoomMsgs(id) => write!(f, "failed to get room messages for {}", id),
-            Self::AcceptInvite(id) => write!(f, "failed to join {}", id),
-            Self::DeclineInvite(id) => write!(f, "failed to decline {}", id),
-            Self::LeaveRoom(id) => write!(f, "failed to leave {}", id),
-            Self::ReadReceipt(room, event) => {
-                write!(f, "failed to send read_receipt for {} in {}", event, room)
-            }
-            Self::Typing(id, user) => {
-                write!(f, "failed to send typing event for {} in {}", user, id)
-            }
-            Self::Quit => write!(f, "quitting filed"),
-        }
-    }
-}
 
 /// Either a `UserRequest` succeeds or fails with the given result.
 pub enum RequestResult {

@@ -13,7 +13,7 @@ use matrix_sdk::{
             message::{MessageEvent, MessageEventContent, TextMessageEventContent},
         },
     },
-    identifiers::UserId,
+    identifiers::{RoomId, UserId},
     Room,
 };
 use rumatui_tui::{
@@ -148,7 +148,7 @@ impl AppWidget {
             if self.chat.msgs_on_scroll_up(x, y) {
                 if !self.scrolling {
                     self.scrolling = true;
-                    let room_id = self.chat.into_current_room_id().unwrap();
+                    let room_id = self.chat.to_current_room_id().unwrap();
 
                     if let Err(e) = self.send_jobs.send(UserRequest::RoomMsgs(room_id)).await {
                         self.set_error(anyhow::Error::from(e))
@@ -227,7 +227,7 @@ impl AppWidget {
                 }
             } else if self.chat.is_main_screen() {
                 // send typing notice to the server
-                let room_id = self.chat.into_current_room_id();
+                let room_id = self.chat.to_current_room_id();
                 if !self.typing_notice {
                     self.typing_notice = true;
                     if let (Some(me), Some(room_id)) = (self.chat.into_current_user(), room_id) {
@@ -261,7 +261,7 @@ impl AppWidget {
 
     pub async fn on_delete(&mut self) {
         if self.chat.is_main_screen() {
-            let id = self.chat.into_current_room_id();
+            let id = self.chat.to_current_room_id();
             if let Some(room_id) = id {
                 if let Err(e) = self.send_jobs.send(UserRequest::LeaveRoom(room_id)).await {
                     self.set_error(anyhow::Error::from(e))
@@ -274,7 +274,7 @@ impl AppWidget {
 
     pub async fn on_send(&mut self) {
         // unfortunately we have to do it this way or we have a mutable borrow in the scope of immutable
-        let res = if let Some(room_id) = self.chat.into_current_room_id() {
+        let res = if let Some(room_id) = self.chat.to_current_room_id() {
             match self.chat.get_sending_message() {
                 Ok(msg) => {
                     self.chat.set_sending_message(true);
@@ -326,142 +326,6 @@ impl AppWidget {
         }
     }
 
-    fn set_error(&mut self, e: anyhow::Error) {
-        self.error = Some(e);
-    }
-
-    pub(crate) async fn handle_membership(
-        &mut self,
-        membership: MembershipChange,
-        receiver: UserId,
-        sender: UserId,
-        room: Arc<RwLock<Room>>,
-        timeline_event: bool,
-        show_room_name: bool,
-    ) {
-        let for_me = Some(&receiver) == self.chat.as_current_user();
-        let room_name = if show_room_name { format!("\"{}\"", room.read().await.display_name()) } else { "the room".to_string() };
-        match membership {
-            MembershipChange::ProfileChanged => self
-                .chat
-                .add_notify(&format!("{} updated their profile", receiver.localpart())),
-            MembershipChange::Joined => {
-                if for_me {
-                    self.chat.set_current_room_id(&room.read().await.room_id);
-                    self.chat.add_room(room).await;
-                } else {
-                    self.chat.add_notify(&format!(
-                        "{} joined {}",
-                        // TODO when matrix-sdk gets display_name methods use them where ever possible
-                        // instead of `.localpart()`.
-                        sender.localpart(),
-                        room_name,
-                    ));
-                }
-            }
-            MembershipChange::Invited => {
-                if for_me {
-                    // if this is a RoomEvent from the joined rooms timeline it is not
-                    // an actual invitation
-                    if !timeline_event {
-                        self.chat.invited(sender, room).await;
-                    }
-                } else {
-                    self.chat
-                        .add_notify(&format!("{} was invited to {}", receiver.localpart(), room_name));
-                }
-            }
-            MembershipChange::InvitationRejected => {
-                if for_me {
-                    self.chat.add_notify("you rejected an invitation");
-                    self.chat.remove_room(&room.read().await.room_id)
-                } else {
-                    self.chat.add_notify(&format!(
-                        "{} rejected an invitation to {}",
-                        receiver.localpart(),
-                        room_name,
-                    ))
-                }
-            }
-            MembershipChange::InvitationRevoked => {
-                if for_me {
-                    self.chat.add_notify(&format!(
-                        "your invitation was rejected by {}",
-                        sender.localpart()
-                    ));
-                    self.chat.remove_room(&room.read().await.room_id)
-                } else {
-                    self.chat.add_notify(&format!(
-                        "{}'s invitations was rejected by {}",
-                        receiver.localpart(),
-                        sender.localpart(),
-                    ))
-                }
-            }
-            MembershipChange::Left => {
-                if for_me {
-                    self.chat.add_notify(&format!("you left {}", room_name));
-                    self.chat.remove_room(&room.read().await.room_id);
-                } else {
-                    self.chat
-                        .add_notify(&format!("{} left {}", receiver.localpart(), room_name))
-                }
-            }
-            MembershipChange::Banned => {
-                if for_me {
-                    self.chat.add_notify("you were banned from the room");
-                    self.chat.remove_room(&room.read().await.room_id)
-                } else {
-                    self.chat.add_notify(&format!(
-                        "{} was banned from {}",
-                        receiver.localpart(),
-                        room_name,
-                    ))
-                }
-            }
-            MembershipChange::Unbanned => {
-                if for_me {
-                    self.chat.add_notify(&format!("you were unbanned from {}", room_name));
-                    self.chat.remove_room(&room.read().await.room_id)
-                } else {
-                    self.chat.add_notify(&format!(
-                        "{} was unbanned from {}",
-                        receiver.localpart(),
-                        room_name,
-                    ))
-                }
-            }
-            MembershipChange::Kicked => {
-                if for_me {
-                    self.chat.add_notify(&format!("you were kicked from {}", room_name));
-                    self.chat.remove_room(&room.read().await.room_id)
-                } else {
-                    self.chat.add_notify(&format!(
-                        "{} was kicked from {}",
-                        receiver.localpart(),
-                        room_name,
-                    ))
-                }
-            }
-            MembershipChange::KickedAndBanned => {
-                if for_me {
-                    self.chat
-                        .add_notify(&format!("you were kicked and banned from {}", room_name));
-                    self.chat.remove_room(&room.read().await.room_id)
-                } else {
-                    self.chat.add_notify(&format!(
-                        "{} was kicked and banned from {}",
-                        receiver.localpart(),
-                        room_name,
-                    ))
-                }
-            }
-            MembershipChange::None => {}
-            MembershipChange::Error => panic!("membership error"),
-            _ => panic!("MembershipChange::NotImplemented is never valid bug"),
-        }
-    }
-
     /// This checks once then continues returns to continue the ui loop.
     pub async fn on_tick(&mut self) {
         if self.login_w.logged_in && !self.sync_started {
@@ -490,9 +354,7 @@ impl AppWidget {
                     Ok(_res) => self.chat.set_sending_message(false),
                 },
                 RequestResult::RoomMsgs(res) => match res {
-                    Err(e) => {
-                        self.set_error(e)
-                    }
+                    Err(e) => self.set_error(e),
                     Ok((res, room)) => {
                         self.process_room_events(res, room).await;
                         self.scrolling = false
@@ -596,9 +458,7 @@ impl AppWidget {
                     self.chat.edit_message(&room_id, &event_id, msg);
                 }
                 StateResult::FullyRead(event_id, room_id) => {
-                    if self.chat.read_to_end(&event_id)
-                        && self.chat.is_current_room(&room_id)
-                    {
+                    if self.chat.read_to_end(&event_id) && self.chat.is_current_room(&room_id) {
                         // TODO what should be done for fully read events
                     }
                 }
@@ -653,7 +513,7 @@ impl AppWidget {
     }
 
     pub async fn on_notifications(&mut self) {
-        let room_id = self.chat.into_current_room_id();
+        let room_id = self.chat.to_current_room_id();
         if let Some(id) = room_id {
             let room = if let Some(room) = self.chat.rooms().get(&id) {
                 Some(Arc::clone(room))
@@ -678,6 +538,10 @@ impl AppWidget {
         }
     }
 
+    /// When a request is made to get previous room events (by scrolling up)
+    /// the underlying client does not process them so we must deal with them.
+    ///
+    /// TODO: this only handles messages currently.
     async fn process_room_events(
         &mut self,
         events: get_message_events::Response,
@@ -746,6 +610,141 @@ impl AppWidget {
                 }
             }
         }
+    }
+
+    async fn handle_membership(
+        &mut self,
+        membership: MembershipChange,
+        receiver: UserId,
+        sender: UserId,
+        room: Arc<RwLock<Room>>,
+        timeline_event: bool,
+        show_room_name: bool,
+    ) {
+        let for_me = Some(&receiver) == self.chat.as_current_user();
+        let room_name = if show_room_name {
+            format!("\"{}\"", room.read().await.display_name())
+        } else {
+            "the room".to_string()
+        };
+        match membership {
+            MembershipChange::ProfileChanged => self
+                .chat
+                .add_notify(&format!("{} updated their profile", receiver.localpart())),
+            MembershipChange::Joined => {
+                if for_me {
+                    self.chat.set_current_room_id(&room.read().await.room_id);
+                    self.chat.add_room(room).await;
+                } else {
+                    self.chat.add_notify(&format!(
+                        "{} joined {}",
+                        // TODO when matrix-sdk gets display_name methods use them where ever possible
+                        // instead of `.localpart()`.
+                        sender.localpart(),
+                        room_name,
+                    ));
+                }
+            }
+            MembershipChange::Invited => {
+                if for_me {
+                    // if this is a RoomEvent from the joined rooms timeline it is not
+                    // an actual invitation
+                    if !timeline_event {
+                        self.chat.invited(sender, room).await;
+                    }
+                } else {
+                    self.chat.add_notify(&format!(
+                        "{} was invited to {}",
+                        receiver.localpart(),
+                        room_name
+                    ));
+                }
+            }
+            MembershipChange::InvitationRejected => {
+                self.notify_and_leave(
+                    &room.read().await.room_id,
+                    for_me,
+                    format!("you rejected an invitation"),
+                    format!(
+                        "{} rejected an invitation to {}",
+                        receiver.localpart(),
+                        room_name,
+                    ),
+                );
+            }
+            MembershipChange::InvitationRevoked => {
+                self.notify_and_leave(
+                    &room.read().await.room_id,
+                    for_me,
+                    format!("your invitation was rejected by {}", sender.localpart()),
+                    format!(
+                        "{}'s invitations was rejected by {}",
+                        receiver.localpart(),
+                        sender.localpart(),
+                    ),
+                );
+            }
+            MembershipChange::Left => {
+                self.notify_and_leave(
+                    &room.read().await.room_id,
+                    for_me,
+                    format!("you left {}", room_name),
+                    format!("{} left {}", receiver.localpart(), room_name,),
+                );
+            }
+            MembershipChange::Banned => {
+                self.notify_and_leave(
+                    &room.read().await.room_id,
+                    for_me,
+                    format!("you were banned from {}", room_name),
+                    format!("{} was banned from {}", receiver.localpart(), room_name,),
+                );
+            }
+            MembershipChange::Unbanned => {
+                self.notify_and_leave(
+                    &room.read().await.room_id,
+                    for_me,
+                    format!("you were unbanned from {}", room_name),
+                    format!("{} was unbanned from {}", receiver.localpart(), room_name,),
+                );
+            }
+            MembershipChange::Kicked => {
+                self.notify_and_leave(
+                    &room.read().await.room_id,
+                    for_me,
+                    format!("you were kicked from {}", room_name),
+                    format!("{} was kicked from {}", receiver.localpart(), room_name,),
+                );
+            }
+            MembershipChange::KickedAndBanned => {
+                self.notify_and_leave(
+                    &room.read().await.room_id,
+                    for_me,
+                    format!("you were kicked and banned from {}", room_name),
+                    format!(
+                        "{} was kicked and banned from {}",
+                        receiver.localpart(),
+                        room_name,
+                    ),
+                );
+            }
+            MembershipChange::None => {}
+            MembershipChange::Error => panic!("membership error"),
+            _ => panic!("MembershipChange::NotImplemented is never valid BUG"),
+        }
+    }
+
+    fn notify_and_leave(&mut self, room_id: &RoomId, for_me: bool, you: String, other: String) {
+        if for_me {
+            self.chat.add_notify(&you);
+            self.chat.remove_room(room_id)
+        } else {
+            self.chat.add_notify(&other)
+        }
+    }
+
+    fn set_error(&mut self, e: anyhow::Error) {
+        self.error = Some(e);
     }
 }
 

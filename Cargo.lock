@@ -1954,6 +1954,7 @@ dependencies = [
  "failure",
  "futures-core",
  "futures-util",
+ "http",
  "itertools",
  "js_int",
  "lazy_static",

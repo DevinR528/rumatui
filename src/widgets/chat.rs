@@ -74,7 +74,7 @@ impl ChatWidget {
         self.current_room.borrow()
     }
 
-    pub(crate) fn into_current_room_id(&self) -> Option<RoomId> {
+    pub(crate) fn to_current_room_id(&self) -> Option<RoomId> {
         self.current_room.borrow().clone()
     }
 
