@@ -8,18 +8,25 @@ use js_int::UInt;
 use matrix_sdk::events::room::message::{
     MessageEvent, MessageEventContent, TextMessageEventContent,
 };
-use matrix_sdk::identifiers::{EventId, RoomId, UserId};
-use matrix_sdk::Room;
-use rumatui_tui::backend::Backend;
-use rumatui_tui::layout::{Constraint, Direction, Layout, Rect, ScrollMode};
-use rumatui_tui::style::{Color, Modifier, Style};
-use rumatui_tui::widgets::{Block, Borders, Paragraph, Text};
-use rumatui_tui::Frame;
+use matrix_sdk::{
+    identifiers::{EventId, RoomId, UserId},
+    Room,
+};
+use rumatui_tui::{
+    backend::Backend,
+    layout::{Constraint, Direction, Layout, Rect, ScrollMode},
+    style::{Color, Modifier, Style},
+    widgets::{Block, Borders, Paragraph, Text},
+    Frame,
+};
 use termion::event::MouseButton;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::widgets::{message::ctrl_char, utils::markdown_to_html, RenderWidget};
+use crate::{
+    error::Result,
+    widgets::{message::ctrl_char, utils::markdown_to_html, RenderWidget},
+};
 
 /// A wrapper to abstract a `RoomEvent::RoomMessage` and the MessageEvent queue
 /// from `matrix_sdk::Room`.
@@ -72,7 +79,7 @@ pub struct MessageWidget {
 
 impl MessageWidget {
     pub async fn populate_initial_msgs(&mut self, rooms: &HashMap<RoomId, Arc<RwLock<Room>>>) {
-        for (_id, room) in rooms {
+        for room in rooms.values() {
             let room = room.read().await;
             self.unread_notifications = room.unread_notifications.unwrap_or_default();
 
@@ -113,8 +120,7 @@ impl MessageWidget {
                 };
                 let txn_id = unsigned
                     .transaction_id
-                    .as_ref()
-                    .map(|id| id.clone())
+                    .as_ref().cloned()
                     .unwrap_or_default();
 
                 self.add_message(
@@ -175,7 +181,7 @@ impl MessageWidget {
         }
     }
 
-    pub fn get_sending_message(&self) -> Result<MessageEventContent, anyhow::Error> {
+    pub fn get_sending_message(&self) -> Result<MessageEventContent> {
         match self.process_message() {
             MsgType::PlainText => Ok(MessageEventContent::Text(TextMessageEventContent {
                 body: self.send_msg.clone(),
@@ -210,7 +216,7 @@ impl MessageWidget {
                 let msg = if let Some(_fmted) = formatted_body {
                     crate::widgets::utils::markdown_to_terminal(&body).unwrap_or(body.clone())
                 } else {
-                    body.clone()
+                    body
                 };
                 let timestamp = SystemTime::now();
                 let domain = url::Url::parse(homeserver)
@@ -345,7 +351,7 @@ impl RenderWidget for MessageWidget {
         if let None = self.did_overflow {
             self.did_overflow = Some(Rc::new(Cell::new(false)));
         }
-        if let None = self.at_top {
+        if self.at_top.is_none() {
             self.at_top = Some(Rc::new(Cell::new(false)));
         }
         let mut lines = self.send_msg.chars().filter(|c| *c == '\n').count();

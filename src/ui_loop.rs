@@ -45,7 +45,7 @@ impl UiEventHandle {
                         return;
                     }
 
-                    if let Err(_) = send.send(Event::Input(ev)) {
+                    if send.send(Event::Input(ev)).is_err() {
                         return;
                     }
                 }

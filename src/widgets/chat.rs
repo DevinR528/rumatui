@@ -5,20 +5,27 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use matrix_sdk::events::room::message::MessageEventContent;
-use matrix_sdk::identifiers::{EventId, RoomId, UserId};
-use matrix_sdk::Room;
-use rumatui_tui::backend::Backend;
-use rumatui_tui::layout::{Constraint, Direction, Layout, Rect};
-use rumatui_tui::Frame;
+use matrix_sdk::{
+    events::room::message::MessageEventContent,
+    identifiers::{EventId, RoomId, UserId},
+    Room,
+};
+use rumatui_tui::{
+    backend::Backend,
+    layout::{Constraint, Direction, Layout, Rect},
+    Frame,
+};
 use termion::event::MouseButton;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::widgets::{
-    message::{Message, MessageWidget},
-    rooms::{Invitation, Invite, RoomsWidget},
-    RenderWidget,
+use crate::{
+    error::Result,
+    widgets::{
+        message::{Message, MessageWidget},
+        rooms::{Invitation, Invite, RoomsWidget},
+        RenderWidget,
+    },
 };
 
 #[derive(Clone, Debug, Default)]
@@ -87,7 +94,7 @@ impl ChatWidget {
         self.me.as_ref()
     }
 
-    pub(crate) fn into_current_user(&self) -> Option<UserId> {
+    pub(crate) fn to_current_user(&self) -> Option<UserId> {
         self.me.clone()
     }
 
@@ -207,7 +214,7 @@ impl ChatWidget {
         self.msgs.clear_send_msg()
     }
 
-    pub(crate) fn get_sending_message(&self) -> anyhow::Result<MessageEventContent> {
+    pub(crate) fn get_sending_message(&self) -> Result<MessageEventContent> {
         self.msgs.get_sending_message()
     }
 

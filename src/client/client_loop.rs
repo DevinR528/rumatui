@@ -5,28 +5,37 @@ use std::sync::{
 };
 use std::time::Duration;
 
-use anyhow::Result;
-use matrix_sdk::Room;
-use tokio::runtime::Handle;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::RwLock;
-use tokio::task::JoinHandle;
+use matrix_sdk::{
+    api::r0::{
+        membership::{join_room_by_id, leave_room},
+        message::{create_message_event, get_message_events},
+        receipt::create_receipt,
+        session::login,
+        typing::create_typing_event,
+    },
+    events::room::message::MessageEventContent,
+    identifiers::{EventId, RoomId, UserId},
+    Room,
+};
+use tokio::{
+    runtime::Handle,
+    sync::{
+        mpsc::{self, Sender},
+        RwLock,
+    },
+    task::JoinHandle,
+};
 use uuid::Uuid;
 
-use crate::client::event_stream::EventStream;
-use crate::client::MatrixClient;
-use matrix_sdk::api::r0::membership::{join_room_by_id, leave_room};
-use matrix_sdk::api::r0::message::{create_message_event, get_message_events};
-use matrix_sdk::api::r0::receipt::create_receipt;
-use matrix_sdk::api::r0::session::login;
-use matrix_sdk::api::r0::typing::create_typing_event;
-use matrix_sdk::events::room::message::MessageEventContent;
-use matrix_sdk::identifiers::{EventId, RoomId, UserId};
+use crate::{
+    client::{event_stream::EventStream, MatrixClient},
+    error::{Error, Result},
+};
 
 /// Requests sent from the UI portion of the app.
 ///
 /// Each request is sent in response to some user input.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum UserRequest {
     Login(String, String),
@@ -56,7 +65,7 @@ pub enum RequestResult {
     LeaveRoom(Result<leave_room::Response>, RoomId),
     Typing(Result<create_typing_event::Response>),
     ReadReceipt(Result<create_receipt::Response>),
-    Error(anyhow::Error),
+    Error(Error),
 }
 
 unsafe impl Send for RequestResult {}
@@ -184,10 +193,8 @@ impl MatrixEventHandle {
                             .await
                         {
                             panic!("client event handler crashed {}", e)
-                        } else {
-                            if let Err(e) = client.forget_room(&room_id).await {
-                                panic!("client event handler crashed {}", e)
-                            }
+                        } else if let Err(e) = client.forget_room(&room_id).await {
+                            panic!("client event handler crashed {}", e)
                         }
                     }
                     UserRequest::ReadReceipt(room_id, event_id) => {

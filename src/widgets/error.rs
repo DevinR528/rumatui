@@ -1,11 +1,10 @@
-use anyhow::Error;
 use rumatui_tui::backend::Backend;
 use rumatui_tui::layout::{Constraint, Direction, Layout, Rect};
 use rumatui_tui::style::{Color, Style};
 use rumatui_tui::widgets::{Block, Borders, Paragraph, Text};
 use rumatui_tui::Frame;
 
-use crate::widgets::RenderWidget;
+use crate::{error::Error, widgets::RenderWidget};
 
 #[derive(Debug)]
 pub struct ErrorWidget<'e>(pub &'e Error);

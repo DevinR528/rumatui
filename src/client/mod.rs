@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{Context, Result};
 use matrix_sdk::{
     self,
     api::r0::membership::{forget_room, join_room_by_id, kick_user, leave_room},
@@ -24,6 +24,8 @@ use matrix_sdk::{
 use tokio::sync::RwLock;
 use url::Url;
 use uuid::Uuid;
+
+use crate::error::Result;
 
 pub mod client_loop;
 pub mod event_stream;
@@ -51,21 +53,29 @@ impl fmt::Debug for MatrixClient {
 }
 
 impl MatrixClient {
-    pub fn new(homeserver: &str) -> Result<Self, failure::Error> {
+    pub fn new(homeserver: &str) -> Result<Self> {
         let homeserver = Url::parse(&homeserver)?;
-        let mut path = dirs::home_dir().ok_or(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "no home directory found",
-        ))?;
+        let path: Result<PathBuf> = dirs::home_dir()
+            .ok_or(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "no home directory found",
+            ))
+            .map_err(Into::into);
+        let mut path = path?;
         path.push(".rumatui");
+
+        let store: Result<JsonStore> = JsonStore::open(path).map_err(Into::into);
         // reset the client with the state store with username as part of the store path
         let client_config = ClientConfig::default()
             // .proxy("http://localhost:8080")? // for mitmproxy
             // .disable_ssl_verification()
-            .state_store(Box::new(JsonStore::open(path)?));
+            .state_store(Box::new(store?));
+
+        let inner: Result<Client> =
+            Client::new_with_config(homeserver.clone(), client_config).map_err(Into::into);
 
         let client = Self {
-            inner: Client::new_with_config(homeserver.clone(), client_config)?,
+            inner: inner?,
             homeserver,
             user: None,
             settings: SyncSettings::default(),
@@ -89,7 +99,7 @@ impl MatrixClient {
         self.inner
             .store_room_state(room_id)
             .await
-            .context(format!("Storing state of room {} failed", room_id))
+            .map_err(Into::into)
     }
 
     /// Log in to as the specified user.
@@ -101,25 +111,8 @@ impl MatrixClient {
         Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
         login::Response,
     )> {
-        let res = self
-            .inner
-            .login(username, password, None, None)
-            .await
-            .map_err(|err| match err {
-                matrix_sdk::Error::RumaResponse(matrix_sdk::FromHttpResponseError::Http(
-                    matrix_sdk::ServerError::Known(matrix_sdk::api::Error {
-                        kind,
-                        message,
-                        status_code,
-                    }),
-                )) => anyhow::Error::new(matrix_sdk::api::Error {
-                    kind,
-                    message: message.clone(),
-                    status_code,
-                })
-                .context(format!("{} {}", kind, message)),
-                err @ _ => anyhow::Error::new(err),
-            })?;
+        let res = self.inner.login(username, password, None, None).await?;
+
         self.user = Some(res.user_id.clone());
 
         let _response = self
@@ -166,7 +159,7 @@ impl MatrixClient {
         self.inner
             .room_send(&id, msg, Some(uuid))
             .await
-            .context("Message failed to send")
+            .map_err(Into::into)
     }
 
     /// Gets the `RoomEvent`s backwards in time, when user scrolls up.
@@ -199,18 +192,13 @@ impl MatrixClient {
             // }),
         };
 
-        match self
-            .inner
-            .room_messages(request)
-            .await
-            .map_err(|e| anyhow::Error::from(e))
-        {
+        match self.inner.room_messages(request).await {
             Ok(res) => {
                 self.last_scroll
                     .insert(id.clone(), res.end.clone().unwrap());
                 Ok(res)
             }
-            err => err,
+            err => err.map_err(Into::into),
         }
     }
 
@@ -226,7 +214,7 @@ impl MatrixClient {
         self.inner
             .join_room_by_id(room_id)
             .await
-            .context(format!("Joining room {} failed", room_id))
+            .map_err(Into::into)
     }
 
     /// Forgets the specified room.
@@ -238,7 +226,7 @@ impl MatrixClient {
         self.inner
             .forget_room_by_id(room_id)
             .await
-            .context(format!("Forgetting room {} failed", room_id))
+            .map_err(Into::into)
     }
 
     /// Leaves the specified room.
@@ -247,10 +235,7 @@ impl MatrixClient {
     ///
     /// * room_id - A valid RoomId otherwise sending will fail.
     pub(crate) async fn leave_room(&self, room_id: &RoomId) -> Result<leave_room::Response> {
-        self.inner
-            .leave_room(room_id)
-            .await
-            .context(format!("Leaving room {} failed", room_id))
+        self.inner.leave_room(room_id).await.map_err(Into::into)
     }
 
     /// Kicks the specified user from the room.
@@ -271,7 +256,7 @@ impl MatrixClient {
         self.inner
             .kick_user(room_id, user_id, reason)
             .await
-            .context(format!("Leaving room {} failed", room_id))
+            .map_err(Into::into)
     }
 
     /// Send a request to notify the room of a user typing.
@@ -297,7 +282,7 @@ impl MatrixClient {
         self.inner
             .typing_notice(room_id, user_id, typing, timeout)
             .await
-            .context(format!("failed to send typing notification to {}", room_id))
+            .map_err(Into::into)
     }
 
     /// Send a request to notify the room the specific event has been seen.
@@ -317,7 +302,7 @@ impl MatrixClient {
         self.inner
             .read_receipt(room_id, event_id)
             .await
-            .context(format!("failed to send read_receipt to {}", room_id))
+            .map_err(Into::into)
     }
 
     /// Send a request to notify the room the user has seen up to `fully_read`.
@@ -340,6 +325,6 @@ impl MatrixClient {
         self.inner
             .read_marker(room_id, fully_read, read_receipt)
             .await
-            .context(format!("failed to send read_marker to {}", room_id))
+            .map_err(Into::into)
     }
 }

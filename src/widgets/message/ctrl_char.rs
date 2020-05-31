@@ -87,14 +87,14 @@ impl CtrlChunk {
             }
         } else {
             // un control coded text
-            return Self {
+            Self {
                 ctrl: Vec::new(),
                 text: text_or_ctrl,
-            };
+            }
         }
     }
 
-    pub fn to_text<'a>(self) -> Text<'a> {
+    pub fn into_text<'a>(self) -> Text<'a> {
         let mut style = Style::default();
         for ctrl in self.ctrl {
             match ctrl {
@@ -316,7 +316,7 @@ impl CtrlChars {
     }
 
     pub fn into_text<'a>(self) -> Vec<Text<'a>> {
-        self.parsed.into_iter().map(CtrlChunk::to_text).collect()
+        self.parsed.into_iter().map(CtrlChunk::into_text).collect()
     }
 }
 
@@ -328,7 +328,7 @@ pub fn process_text<'a>(msg: &'a Message) -> Vec<Text<'a>> {
         msg = msg.replace("    ", "\u{2800}   ");
     }
     let msg = if msg.ends_with('\n') {
-        msg.to_string()
+        msg
     } else {
         format!("{}\n", msg)
     };

@@ -3,7 +3,6 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use anyhow::Error;
 use matrix_sdk::{
     api::r0::message::get_message_events,
     events::{
@@ -35,6 +34,7 @@ use crate::{
         client_loop::{MatrixEventHandle, RequestResult, UserRequest},
         event_stream::{EventStream, StateResult},
     },
+    error::Error,
     widgets::{
         chat::ChatWidget,
         error::ErrorWidget,
@@ -72,7 +72,7 @@ pub struct AppWidget {
     pub ev_msgs: mpsc::Receiver<RequestResult>,
     /// The result of any MatrixClient job.
     pub emitter_msgs: mpsc::Receiver<StateResult>,
-    pub error: Option<anyhow::Error>,
+    pub error: Option<Error>,
 }
 
 impl AppWidget {
@@ -121,7 +121,7 @@ impl AppWidget {
                         .send(UserRequest::AcceptInvite(room_id))
                         .await
                     {
-                        self.set_error(anyhow::Error::from(e))
+                        self.set_error(e.into())
                     } else {
                         self.chat.set_joining_room(true);
                         self.chat.remove_invite();
@@ -133,7 +133,7 @@ impl AppWidget {
                         .send(UserRequest::DeclineInvite(room_id))
                         .await
                     {
-                        self.set_error(anyhow::Error::from(e))
+                        self.set_error(e.into())
                     } else {
                         self.chat.remove_invite();
                     }
@@ -151,13 +151,11 @@ impl AppWidget {
                     let room_id = self.chat.to_current_room_id().unwrap();
 
                     if let Err(e) = self.send_jobs.send(UserRequest::RoomMsgs(room_id)).await {
-                        self.set_error(anyhow::Error::from(e))
+                        self.set_error(e.into())
                     }
                 }
-            } else {
-                if self.chat.room_on_scroll_up(x, y) {
-                    self.chat.reset_scroll()
-                }
+            } else if self.chat.room_on_scroll_up(x, y) {
+                self.chat.reset_scroll()
             }
         }
     }
@@ -230,7 +228,7 @@ impl AppWidget {
                 let room_id = self.chat.to_current_room_id();
                 if !self.typing_notice {
                     self.typing_notice = true;
-                    if let (Some(me), Some(room_id)) = (self.chat.into_current_user(), room_id) {
+                    if let (Some(me), Some(room_id)) = (self.chat.to_current_user(), room_id) {
                         if let Err(e) = self.send_jobs.send(UserRequest::Typing(room_id, me)).await
                         {
                             self.set_error(Error::from(e));
@@ -264,7 +262,7 @@ impl AppWidget {
             let id = self.chat.to_current_room_id();
             if let Some(room_id) = id {
                 if let Err(e) = self.send_jobs.send(UserRequest::LeaveRoom(room_id)).await {
-                    self.set_error(anyhow::Error::from(e))
+                    self.set_error(e.into())
                 } else {
                     self.chat.set_leaving_room(true);
                 }
@@ -285,7 +283,7 @@ impl AppWidget {
                         .send(UserRequest::SendMessage(room_id.clone(), msg, uuid))
                         .await
                     {
-                        Err(anyhow::Error::from(e))
+                        Err(e.into())
                     } else {
                         // find the room the message was just sent to
                         let local_message = if let Some(room) = self.chat.rooms().get(&room_id) {
@@ -322,7 +320,7 @@ impl AppWidget {
             Ok(())
         };
         if let Err(e) = res {
-            self.set_error(Error::from(e));
+            self.set_error(e);
         }
     }
 
@@ -369,7 +367,7 @@ impl AppWidget {
                             .send(UserRequest::RoomMsgs(res.room_id))
                             .await
                         {
-                            self.set_error(anyhow::Error::from(e))
+                            self.set_error(e.into())
                         }
                     }
                 },
@@ -525,6 +523,7 @@ impl AppWidget {
                     self.send_jobs
                         .send(UserRequest::ReadReceipt(id.clone(), event_id))
                         .await
+                        .map_err(Into::into)
                 } else {
                     Ok(())
                 }
@@ -533,7 +532,7 @@ impl AppWidget {
             };
 
             if let Err(e) = err {
-                self.set_error(anyhow::Error::from(e));
+                self.set_error(e);
             }
         }
     }
@@ -588,7 +587,7 @@ impl AppWidget {
                                 let txn_id = unsigned
                                     .transaction_id
                                     .as_ref()
-                                    .map(|id| id.clone())
+                                    .cloned()
                                     .unwrap_or_default();
 
                                 let msg = Message {
@@ -743,7 +742,7 @@ impl AppWidget {
         }
     }
 
-    fn set_error(&mut self, e: anyhow::Error) {
+    fn set_error(&mut self, e: Error) {
         self.error = Some(e);
     }
 }

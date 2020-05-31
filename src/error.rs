@@ -1,18 +1,19 @@
 //! Error conditions.
 
 use std::fmt;
+use std::io;
 
 use matrix_sdk::{
     api::{error::ErrorKind, Error as RumaApiError},
-    Error as RumaClientError, FromHttpResponseError as RumaResponseError, IntoHttpError,
-    ServerError,
+    Error as MatrixError, FromHttpResponseError as RumaResponseError, IntoHttpError, ServerError,
 };
+use matrix_sdk_base::Error as MatrixBaseError;
+use tokio::sync::mpsc::error::SendError;
 // use ruma_client_api::error::ErrorKind;
-// use serde_json::Error as JsonError;
-// use url::ParseError;
+use serde_json::Error as JsonError;
+use url::ParseError;
 
-#[cfg(feature = "encryption")]
-use matrix_sdk_crypto::OlmError;
+use crate::client::client_loop::UserRequest;
 
 /// Result type for rumatui.
 ///
@@ -31,82 +32,134 @@ Make sure you are logging in on the correct server (rumatui defaults to 'http://
 /// Internal representation of errors.
 #[derive(Debug)]
 pub enum Error {
+    Encryption(String),
     RumaResponse(String),
     RumaRequest(String),
+    Json(String),
+    SerdeJson(JsonError),
+    Io(String),
     UrlParseError(String),
     SerDeError(String),
+    Matrix(String),
     NeedAuth(String),
-    UnknownServer(String),
+    Unknown(String),
+    Channel(String),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "")
+        match self {
+            Self::Encryption(msg) => write!(f, "{}", msg),
+            Self::RumaResponse(msg) => write!(
+                f,
+                "An error occurred with a response from the server.\n{}",
+                msg
+            ),
+            Self::RumaRequest(msg) => write!(
+                f,
+                "An error occurred with a request to the server.\n{}",
+                msg
+            ),
+            Self::Io(msg) => write!(f, "An IO error occurred.\n{}", msg),
+            Self::Json(msg) => write!(f, "An error occurred parsing a JSON object.\n{}", msg),
+            // TODO use the methods on serde_json error
+            Self::SerdeJson(msg) => write!(f, "An error occurred parsing a JSON object.\n{}", msg),
+            Self::UrlParseError(msg) => {
+                write!(f, "An error occurred while parsing a url.\n{}", msg)
+            }
+            Self::SerDeError(msg) => write!(
+                f,
+                "An error occurred while serializing or deserializing.\n{}",
+                msg
+            ),
+            Self::Matrix(msg) => write!(
+                f,
+                "An error occurred in the matrix client library.\n{}",
+                msg
+            ),
+            Self::NeedAuth(msg) => write!(f, "Authentication is required.\n{}", msg),
+            Self::Unknown(msg) => write!(f, "An error occurred.\n{}", msg),
+            Self::Channel(msg) => write!(
+                f,
+                "The receiving end of a channel shutdown while still receiving messages.\n{}",
+                msg
+            ),
+        }
     }
 }
 
 impl std::error::Error for Error {}
 
-impl From<RumaClientError> for Error {
-    fn from(error: RumaClientError) -> Self {
+/// This is the most important error conversion as most of the user facing errors are here.
+impl From<MatrixError> for Error {
+    fn from(error: MatrixError) -> Self {
         match error {
-            RumaClientError::AuthenticationRequired => Error::NeedAuth(AUTH_MSG.to_string()),
-            RumaClientError::RumaResponse(http) => match http {
+            MatrixError::AuthenticationRequired => Error::NeedAuth(AUTH_MSG.to_string()),
+            MatrixError::RumaResponse(http) => match http {
                 RumaResponseError::Http(server) => match server {
+                    // This should be the most common error kind and some should be recoverable.
                     ServerError::Known(RumaApiError { kind, message, .. }) => match kind {
                         ErrorKind::Forbidden => Error::RumaResponse(LOGIN_MSG.to_string()),
-                        ErrorKind::UnknownToken => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::MissingToken => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::BadJson => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::NotJson => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::NotFound => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::LimitExceeded => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::Unknown => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::Unrecognized => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::Unauthorized => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::UserInUse => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::InvalidUsername => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::RoomInUse => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::InvalidRoomState => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::ThreepidInUse => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::ThreepidNotFound => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::ThreepidAuthFailed => {
-                            Error::RumaResponse(format!("{}", message))
-                        }
-                        ErrorKind::ThreepidDenied => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::ServerNotTrusted => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::UnsupportedRoomVersion => {
-                            Error::RumaResponse(format!("{}", message))
-                        }
-                        ErrorKind::IncompatibleRoomVersion => {
-                            Error::RumaResponse(format!("{}", message))
-                        }
-                        ErrorKind::BadState => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::GuestAccessForbidden => {
-                            Error::RumaResponse(format!("{}", message))
-                        }
-                        ErrorKind::CaptchaNeeded => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::CaptchaInvalid => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::MissingParam => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::InvalidParam => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::TooLarge => Error::RumaResponse(format!("{}", message)),
-                        ErrorKind::Exclusive => Error::RumaResponse(format!("{}", message)),
-                        _ => Error::RumaResponse(format!(
-                            "This error is not accounted for, ruma has added error type BUG"
-                        )),
+                        _ => Error::RumaResponse(format!("{}", message)),
                     },
-                    ServerError::Unknown(err) => Error::UnknownServer(format!("{}", err)),
+                    ServerError::Unknown(err) => Error::Unknown(format!("{}", err)),
                 },
                 RumaResponseError::Deserialization(err) => Error::SerDeError(format!("{}", err)),
                 _ => panic!("ruma-client-api errors have changed rumatui BUG"),
             },
-            _ => Error::UnknownServer("".to_string()),
+            MatrixError::MatrixError(err) => match err {
+                MatrixBaseError::StateStore(err) => Error::Matrix(err),
+                MatrixBaseError::SerdeJson(err) => Error::SerdeJson(err),
+                MatrixBaseError::AuthenticationRequired => Error::NeedAuth(
+                    "An unauthenticated request was made that requires authentication".into(),
+                ),
+                MatrixBaseError::IoError(err) => Error::Io(format!("{}", err)),
+                MatrixBaseError::MegolmError(err) => Error::Encryption(format!("{}", err)),
+                MatrixBaseError::OlmError(err) => Error::Encryption(format!("{}", err)),
+            },
+            _ => Error::Unknown("an Error type was added in matrix-sdk (rumatui BUG)".into()),
+        }
+    }
+}
+
+impl From<MatrixBaseError> for Error {
+    fn from(err: MatrixBaseError) -> Self {
+        match err {
+            MatrixBaseError::StateStore(err) => Error::Matrix(err),
+            MatrixBaseError::SerdeJson(err) => Error::SerdeJson(err),
+            MatrixBaseError::AuthenticationRequired => Error::NeedAuth(
+                "An unauthenticated request was made that requires authentication".into(),
+            ),
+            MatrixBaseError::IoError(err) => Error::Io(format!("{}", err)),
+            MatrixBaseError::MegolmError(err) => Error::Encryption(format!("{}", err)),
+            MatrixBaseError::OlmError(err) => Error::Encryption(format!("{}", err)),
         }
     }
 }
 
 impl From<IntoHttpError> for Error {
     fn from(error: IntoHttpError) -> Self {
+        let text = format!("{}", error);
+        Self::RumaRequest(text)
+    }
+}
+
+impl From<SendError<UserRequest>> for Error {
+    fn from(error: SendError<UserRequest>) -> Self {
+        let text = format!("{}", error);
+        Self::RumaRequest(text)
+    }
+}
+
+impl From<ParseError> for Error {
+    fn from(error: ParseError) -> Self {
+        let text = format!("{}", error);
+        Self::RumaRequest(text)
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(error: io::Error) -> Self {
         let text = format!("{}", error);
         Self::RumaRequest(text)
     }

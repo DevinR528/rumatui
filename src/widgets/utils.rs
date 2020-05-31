@@ -1,10 +1,12 @@
 use std::fmt::{self, Display};
-use std::io::{self, Error, ErrorKind, Write};
+use std::io::{self, ErrorKind, Write};
 
 use comrak;
 use mdcat::{self, ResourceAccess, Settings, TerminalCapabilities, TerminalSize};
 use pulldown_cmark::{Options, Parser};
 use syntect::parsing::SyntaxSet;
+
+use crate::error::{Error, Result};
 
 #[derive(Default)]
 pub struct Writer(Vec<u8>);
@@ -30,7 +32,7 @@ impl Display for Writer {
     }
 }
 
-pub(crate) fn markdown_to_terminal(input: &str) -> Result<String, anyhow::Error> {
+pub(crate) fn markdown_to_terminal(input: &str) -> Result<String> {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TASKLISTS);
     options.insert(Options::ENABLE_STRIKETHROUGH);
@@ -39,7 +41,7 @@ pub(crate) fn markdown_to_terminal(input: &str) -> Result<String, anyhow::Error>
 
     let settings = Settings {
         terminal_capabilities: TerminalCapabilities::detect(),
-        terminal_size: TerminalSize::detect().ok_or(anyhow::Error::new(Error::new(
+        terminal_size: TerminalSize::detect().ok_or(Error::from(io::Error::new(
             ErrorKind::Other,
             "could not detect terminal",
         )))?,
@@ -48,7 +50,7 @@ pub(crate) fn markdown_to_terminal(input: &str) -> Result<String, anyhow::Error>
     };
     let mut w = Writer::default();
     mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser)
-        .map_err(|e| anyhow::Error::new(Error::new(ErrorKind::Other, e.to_string())))?;
+        .map_err(|e| Error::from(io::Error::new(ErrorKind::Other, e.to_string())))?;
 
     Ok(w.to_string())
 }

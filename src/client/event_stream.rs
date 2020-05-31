@@ -186,7 +186,7 @@ impl EventEmitter for EventStream {
                     let txn_id = unsigned
                         .transaction_id
                         .as_ref()
-                        .map(|id| id.clone())
+                        .cloned()
                         .unwrap_or_default();
 
                     if let Err(e) = self
