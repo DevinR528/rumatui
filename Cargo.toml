@@ -1,6 +1,6 @@
 [package]
 name = "rumatui"
-version = "0.1.12-alpha"
+version = "0.1.13-alpha"
 authors = ["Devin R <devin.ragotzy@gmail.com>"]
 license = "MIT/Apache-2.0"
 description = "A click-able command-line Matrix client."
@@ -14,15 +14,11 @@ readme = "README.md"
 
 [dependencies]
 async-trait = "0.1.30"
-anyhow = "1.0.28"
 chrono = "0.4"
 comrak = "0.7.0"
 crossbeam-channel = "0.4.2"
 dirs = "2.0.2"
-either = "1.5.3"
 failure = "0.1.7"
-futures-core = "0.3.4"
-futures-util = "0.3.4"
 http = "0.2.1"
 itertools = "0.9.0"
 js_int = "0.1.5"
@@ -31,18 +27,18 @@ lazy_static = "1.4.0"
 matrix-sdk = "0.1.0"
 matrix-sdk-base = { version = "0.1.0", features = ["messages"] }
 
-mdcat = "0.17.1"
+mdcat = "0.18.2"
 muncher = "0.6.0"
-regex = "1.3.7"
+regex = "1.3.9"
 
 # turn on rand feature to generate EventId's
 ruma-identifiers = { version = "0.16.1", features = ["rand"] }
 ruma-client-api = "0.9.0"
 
-serde = { version = "1.0.106", features = ["derive"] }
+serde = { version = "1.0.111", features = ["derive"] }
 serde_json = "1.0.52"
 termion = "1.5.5"
-tokio = { version = "0.2.20", features = ["macros", "rt-threaded", "sync"] }
+tokio = { version = "0.2.21", features = ["macros", "rt-threaded", "sync"] }
 
 # crates.io published fork of tui
 rumatui-tui = "0.8.0"

@@ -1,5 +1,17 @@
 # [Unreleased] pre 0.1.0
 
+## 0.1.13-alpha
+
+* Errors are now displayed with more helpful messages
+  * Using internal Error type instead of `anyhow::Error`
+* Send a message with Ctrl-s
+* Update dependencies
+  * `mdcat` 0.15 -> 0.18.2
+  * `serde` 1.0.111 -> 1.0.111
+  * `regex` 1.3.7 -> 1.3.9
+  * `tokio` 0.2.20 -> 0.2.21
+
+## 0.1.12-alpha
 * Display membership status when updated
 * Join a room you have been invited to
 * Client sends read receipts to server

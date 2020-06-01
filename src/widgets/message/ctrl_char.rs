@@ -404,13 +404,13 @@ fn main() {
         let mut w = Writer::default();
         mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
-        let expected = "\u{1b}]8;;http://www.google.com/ \u{1b}[33ruma-identifiers \u{1b}[1hello\n\n\u{1b}[1\u{1b}[34┄\u{1b}[1\u{1b}[34table\n\n• one\n• two\n\n\u{1b}[32────────────────────\n\u{1b}[34fn \u{1b}[33main() {\n    \u{1b}[32println!(\"\u{1b}[36hello\");\n}\n\u{1b}[32────────────────────\n";
+        let expected = "\u{1b}]8;;http://www.google.com/ \u{1b}[33ruma-identifiers \u{1b}[1hello\n\n\u{1b}[1\u{1b}[34┄\u{1b}[1\u{1b}[34table\n\n• one\n• two\n\n\u{1b}[32────────────────────\n\u{1b}[34fn \u{1b}[33main() {\n    \u{1b}[32println!(\"\u{1b}[36hello\");\n}\n\u{1b}[32────────────────────";
 
-        assert_eq!(expected, CtrlChars::parse(w.to_string()).to_string())
+        assert_eq!(expected.trim(), CtrlChars::parse(w.to_string()).to_string())
     }
 
     #[test]
-    #[ignore]
+    // #[ignore]
     fn test_formatter2() {
         let input = "[`hi`](http://www.googlelskdnfodaf.com)";
 
@@ -443,7 +443,7 @@ fn main() {
     use rumatui_tui::Terminal;
 
     #[test]
-    #[ignore]
+    // #[ignore]
     fn paragraph_colors() {
         let input = "[google](http://www.google.com) `ruma-identifiers` __hello__
 # table
@@ -532,7 +532,7 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
         let mut w = Writer::default();
         mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
-        let expected = "\u{1b}[3\u{1b}[32In reply to blah blah\n\nhttps://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-roomid-leave doesn\'t seem to have a body\n";
+        let expected = "    \u{1b}[3\u{1b}[32In reply to blah blah\n\nhttps://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-roomid-leave doesn\'t seem to have a body\n";
 
         assert_eq!(expected, CtrlChars::parse(w.to_string()).to_string());
         // println!("{:?}", CtrlChars::parse(w.to_string()).to_string())
@@ -540,6 +540,8 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
 
     #[test]
     #[ignore]
+    // TODO BUG in `muncher` src/muncher.rs:608:19
+    // add bounds check before index
     fn failed_messages() {
         let input = "TWIM: \n# Docker-matrix\n\nThe docker image for synapse v1.12.4rc1 is now on [mvgorcum/docker-matrix:v1.12.4rc1](https://hub.docker.com/r/mvgorcum/docker-matrix/tags)";
 
