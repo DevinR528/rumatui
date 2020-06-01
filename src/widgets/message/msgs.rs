@@ -120,7 +120,8 @@ impl MessageWidget {
                 };
                 let txn_id = unsigned
                     .transaction_id
-                    .as_ref().cloned()
+                    .as_ref()
+                    .cloned()
                     .unwrap_or_default();
 
                 self.add_message(
@@ -348,7 +349,7 @@ impl RenderWidget for MessageWidget {
     fn render<B: Backend>(&mut self, f: &mut Frame<B>, area: Rect) {
         use itertools::Itertools;
 
-        if let None = self.did_overflow {
+        if self.did_overflow.is_none() {
             self.did_overflow = Some(Rc::new(Cell::new(false)));
         }
         if self.at_top.is_none() {

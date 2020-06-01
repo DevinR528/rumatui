@@ -53,7 +53,8 @@ impl<'e> RenderWidget for ErrorWidget<'e> {
                 .title("Error")
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Red)),
-        );
+        )
+        .wrap(true);
         f.render_widget(p, chunks[1])
     }
 }
