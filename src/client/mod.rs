@@ -34,7 +34,6 @@ const SYNC_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Clone)]
 pub struct MatrixClient {
-    /// TODO once matrix-sdk `StateStore` is impled make this work
     pub inner: Client,
     homeserver: Url,
     user: Option<UserId>,
