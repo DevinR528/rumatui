@@ -1,4 +1,4 @@
-# RumaTui
+# rumatui
 ![rumatui-logo](https://github.com/DevinR528/rumatui/blob/master/resources/small_logo.gif)
 ## A command-line Matrix client.
 [![Build Status](https://travis-ci.com/DevinR528/rumatui.svg?branch=master)](https://travis-ci.com/DevinR528/rumatui)
