@@ -6,13 +6,15 @@ use std::time::Duration;
 
 use matrix_sdk::{
     self,
-    api::r0::membership::{forget_room, join_room_by_id, kick_user, leave_room},
-    // api::r0::filter::{LazyLoadOptions, RoomEventFilter},
-    api::r0::message::{create_message_event, get_message_events},
-    api::r0::read_marker::set_read_marker,
-    api::r0::receipt::create_receipt,
-    api::r0::session::login,
-    api::r0::typing::create_typing_event,
+    api::r0::{
+        account::register,
+        message::{create_message_event, get_message_events},
+        membership::{forget_room, join_room_by_id, kick_user, leave_room},
+        read_marker::set_read_marker,
+        receipt::create_receipt,
+        session::login,
+        typing::create_typing_event
+    },
     events::room::message::MessageEventContent,
     identifiers::{EventId, RoomId, UserId},
     Client,
@@ -125,6 +127,17 @@ impl MatrixClient {
 
         self.next_batch = self.inner.sync_token().await;
         Ok((self.inner.joined_rooms(), res))
+    }
+
+    /// Log in to as the specified user.
+    pub(crate) async fn register_user(
+        &mut self,
+        username: String,
+        password: String,
+    ) -> Result<(
+        register::Response,
+    )> {
+        self.inner.register(username, password, None, None).await
     }
 
     /// Manually sync state, provides a default sync token if None is given.
