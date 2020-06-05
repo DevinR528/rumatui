@@ -330,6 +330,7 @@ impl AppWidget {
             self.sync_started = true;
             self.ev_loop.start_sync();
         }
+
         // this will login, send messages, and any other user initiated requests
         match self.ev_msgs.try_recv() {
             Ok(res) => match res {
@@ -401,6 +402,8 @@ impl AppWidget {
             _ => {}
         }
 
+        // this updates the state of the UI based on events from the server
+        // non user initiated events.
         match self.emitter_msgs.try_recv() {
             Ok(res) => match res {
                 StateResult::Member {
@@ -442,7 +445,7 @@ impl AppWidget {
                 StateResult::Name(name, room_id) => self.chat.update_room(&name, &room_id),
                 StateResult::Message(msg, room) => {
                     self.chat.add_message(msg, &room);
-                    if let Some((event, room)) = self.chat.read_receipt(self.last_interaction) {
+                    if let Some((event, room)) = self.chat.read_receipt(self.last_interaction, &room) {
                         if let Err(e) = self
                             .send_jobs
                             .send(UserRequest::ReadReceipt(room, event))
@@ -495,9 +498,9 @@ impl AppWidget {
                         self.chat.add_notify(&notice);
                     }
                 }
-                StateResult::Reaction(relates_to, event_id, room_id, msg) => {
-                    self.chat.set_reaction_event(&room_id, &relates_to, &event_id, &msg)
-                }
+                StateResult::Reaction(relates_to, event_id, room_id, msg) => self
+                    .chat
+                    .set_reaction_event(&room_id, &relates_to, &event_id, &msg),
                 StateResult::Redact(event_id, room_id) => {
                     self.chat.redaction_event(&room_id, &event_id)
                 }
@@ -524,6 +527,9 @@ impl AppWidget {
                 None
             };
             let err = if let Some(room) = room {
+                // the user has interacted with the app
+                self.last_interaction = SystemTime::now();
+                // TODO mark the events we have seen before so we don't send multiple read markers
                 if let Some(event_id) = self.chat.check_unread(room).await {
                     self.send_jobs
                         .send(UserRequest::ReadReceipt(id.clone(), event_id))

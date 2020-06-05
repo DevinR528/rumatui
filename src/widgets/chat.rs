@@ -191,8 +191,15 @@ impl ChatWidget {
         self.msgs.add_notify(msg)
     }
 
-    pub(crate) fn set_reaction_event(&mut self, room: &RoomId, relates_to: &EventId, event_id: &EventId, reaction: &str) {
-        self.msgs.set_reaction_event(room, relates_to, event_id, reaction)
+    pub(crate) fn set_reaction_event(
+        &mut self,
+        room: &RoomId,
+        relates_to: &EventId,
+        event_id: &EventId,
+        reaction: &str,
+    ) {
+        self.msgs
+            .set_reaction_event(room, relates_to, event_id, reaction)
     }
 
     pub(crate) fn add_message(&mut self, msg: Message, room: &RoomId) {
@@ -226,15 +233,20 @@ impl ChatWidget {
         self.msgs.get_sending_message()
     }
 
+    /// `check_unread` is used when the user is active in a room, we check for any messages
+    /// that have not been seen and mark them as seen by sending a read marker/read receipt.
     pub(crate) async fn check_unread(&mut self, room: Arc<RwLock<Room>>) -> Option<EventId> {
         self.msgs.check_unread(room.read().await.deref())
     }
 
+    /// `read_receipt` is used when a message comes in and the user is
+    /// active we immediately send a read marker.
     pub(crate) fn read_receipt(
         &mut self,
         last_interaction: SystemTime,
+        room: &RoomId
     ) -> Option<(EventId, RoomId)> {
-        self.msgs.read_receipt(last_interaction)
+        self.msgs.read_receipt(last_interaction, room)
     }
 
     pub(crate) fn read_to_end(&mut self, event: &EventId) -> bool {

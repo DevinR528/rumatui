@@ -117,7 +117,7 @@ impl From<MatrixError> for Error {
                 MatrixBaseError::MegolmError(err) => Error::Encryption(format!("{}", err)),
                 MatrixBaseError::OlmError(err) => Error::Encryption(format!("{}", err)),
             },
-            _ => Error::Unknown("an Error type was added in matrix-sdk (rumatui BUG)".into()),
+            _ => Error::Unknown("connection to the server was lost or not established".into()),
         }
     }
 }

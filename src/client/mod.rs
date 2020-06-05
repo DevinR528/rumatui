@@ -16,7 +16,7 @@ use matrix_sdk::{
         typing::create_typing_event,
     },
     events::room::message::MessageEventContent,
-    identifiers::{EventId, RoomId, UserId},
+    identifiers::{DeviceId, EventId, RoomId, UserId},
     Client, ClientConfig, JsonStore, RegistrationBuilder, Room, SyncSettings,
 };
 use tokio::sync::RwLock;
@@ -30,6 +30,15 @@ pub mod event_stream;
 pub mod ruma_ext;
 
 const SYNC_TIMEOUT: Duration = Duration::from_secs(30);
+
+#[cfg(target_os = "linux")]
+const RUMATUI_ID: &str = "rumatui command line client (LINUX)";
+
+#[cfg(target_os = "windows")]
+const RUMATUI_ID: &str = "rumatui command line client (WINDOWS)";
+
+#[cfg(target_os = "macos")]
+const RUMATUI_ID: &str = "rumatui command line client (MAC)";
 
 #[derive(Clone)]
 pub struct MatrixClient {
@@ -65,8 +74,8 @@ impl MatrixClient {
         let store: Result<JsonStore> = JsonStore::open(path).map_err(Into::into);
         // reset the client with the state store with username as part of the store path
         let client_config = ClientConfig::default()
-            .proxy("http://localhost:8080")? // for mitmproxy
-            .disable_ssl_verification()
+            // .proxy("http://localhost:8080")? // for mitmproxy
+            // .disable_ssl_verification()
             .state_store(Box::new(store?));
 
         let inner: Result<Client> =
@@ -109,7 +118,10 @@ impl MatrixClient {
         Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
         login::Response,
     )> {
-        let res = self.inner.login(username, password, None, None).await?;
+        let res = self
+            .inner
+            .login(username, password, None, Some(RUMATUI_ID.to_string()))
+            .await?;
 
         self.user = Some(res.user_id.clone());
 
@@ -126,13 +138,19 @@ impl MatrixClient {
         Ok((self.inner.joined_rooms(), res))
     }
 
-    /// Log in to as the specified user.
+    /// Create an account for the Matrix server used when starting the app.
     pub(crate) async fn register_user(
         &mut self,
         username: String,
         password: String,
+        device_id: Option<DeviceId>,
     ) -> Result<register::Response> {
         let mut req = RegistrationBuilder::default();
+
+        if let Some(device) = device_id {
+            req.device_id(&device);
+        }
+
         req.password(&password)
             .username(&username)
             .kind(RegistrationKind::User);

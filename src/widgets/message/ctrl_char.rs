@@ -341,7 +341,10 @@ pub fn process_text<'a>(message: &'a Message) -> Vec<Text<'a>> {
     formatted.extend(body);
     // add the reactions
     if !message.reactions.is_empty() {
-        let reactions = format!("\u{2800}   {}\n", message.reactions.iter().dedup().join(" "));
+        let reactions = format!(
+            "\u{2800}   {}\n",
+            message.reactions.iter().dedup().join(" ")
+        );
         formatted.push(Text::raw(reactions));
     }
     formatted

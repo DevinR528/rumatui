@@ -45,7 +45,7 @@ impl fmt::Display for Reaction {
 
 /// A wrapper to abstract a `RoomEvent::RoomMessage` and the MessageEvent queue
 /// from `matrix_sdk::Room`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Message {
     pub name: String,
     pub text: String,
@@ -187,13 +187,22 @@ impl MessageWidget {
         self.notifications.push_back((None, notify.to_string()));
     }
 
-    pub fn set_reaction_event(&mut self, room: &RoomId, relates_to: &EventId, event_id: &EventId, reaction: &str) {
+    pub fn set_reaction_event(
+        &mut self,
+        room: &RoomId,
+        relates_to: &EventId,
+        event_id: &EventId,
+        reaction: &str,
+    ) {
         if let Some(idx) = self
             .messages
             .iter()
             .position(|(id, m)| &m.event_id == relates_to && room == id)
         {
-            self.messages[idx].1.reactions.push(Reaction { key: reaction.to_string(), event_id: event_id.clone(), });
+            self.messages[idx].1.reactions.push(Reaction {
+                key: reaction.to_string(),
+                event_id: event_id.clone(),
+            });
         }
     }
 
@@ -203,7 +212,9 @@ impl MessageWidget {
                 message.text = "**R**E**D**A**C**T**E**D**".to_string();
             }
             // TODO PR rust for better docs on `.retain()` method yee...
-            message.reactions.retain(|emoji| &emoji.event_id != event_id);
+            message
+                .reactions
+                .retain(|emoji| &emoji.event_id != event_id);
         }
         if let Some(idx) = self
             .messages
@@ -297,20 +308,6 @@ impl MessageWidget {
             .map(|(_, msg)| &msg.event_id)
     }
 
-    pub(crate) fn read_receipt(
-        &mut self,
-        last_interaction: SystemTime,
-    ) -> Option<(EventId, RoomId)> {
-        if last_interaction.elapsed().ok()? < Duration::from_secs(60) {
-            self.messages
-                .iter()
-                .find(|(_id, msg)| msg.read && !msg.sent_receipt)
-                .map(|(id, msg)| (msg.event_id.clone(), id.clone()))
-        } else {
-            None
-        }
-    }
-
     pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) -> bool {
         if self.send_area.intersects(Rect::new(x, y, 1, 1)) {
             if let MouseButton::Left = btn {
@@ -330,12 +327,50 @@ impl MessageWidget {
         }
     }
 
+    // TODO mark when we send a read receipt so we don't double it up
+    pub(crate) fn read_receipt(
+        &mut self,
+        last_interaction: SystemTime,
+        room_id: &RoomId
+    ) -> Option<(EventId, RoomId)> {
+        use itertools::Itertools;
+
+        // TODO use HashMap<RoomId, Vec<Message>> see `check_unread` comment
+        if last_interaction.elapsed().ok()? < Duration::from_secs(5) {
+            self.messages.sort_by(|(_, msg), (_, msg2)| msg.timestamp.cmp(&msg2.timestamp));
+            let text = self.messages
+                .iter()
+                .filter(|(id, _)| id == room_id)
+                .unique_by(|(_id, msg)| &msg.event_id)
+                .collect::<Vec<_>>();
+
+            text
+                .iter()
+                .rfind(|(_id, msg)| msg.read)
+                .map(|(id, msg)| (msg.event_id.clone(), id.clone()))
+        } else {
+            None
+        }
+    }
+
+    // TODO mark when we send a read receipt so we don't double it up
     pub fn check_unread(&mut self, room: &Room) -> Option<EventId> {
+        use itertools::Itertools;
+        
         self.unread_notifications = room.unread_notifications.unwrap_or_default();
 
         self.unread_notifications += room.unread_highlight.unwrap_or_default();
 
-        self.messages
+        // TODO use room hashmaps to hold messages HashMap<RoomId, Vec<Messages>> keep each vec
+        // sorted and less alloc for the render method
+        self.messages.sort_by(|(_, msg), (_, msg2)| msg.timestamp.cmp(&msg2.timestamp));
+        let text = self.messages
+            .iter()
+            .filter(|(id, _)| id == &room.room_id)
+            .unique_by(|(_id, msg)| &msg.event_id)
+            .collect::<Vec<_>>();
+
+        text
             .iter()
             .rfind(|(_id, msg)| msg.read)
             .map(|(_, msg)| msg.event_id.clone())
@@ -431,33 +466,47 @@ impl RenderWidget for MessageWidget {
             self.messages.first().map(|(id, _msg)| id)
         };
 
-        // TODO no alloc
+        // TODO no alloc split messages up by hashmap of roomid to message vec?
         let mut messages = self.messages.clone();
         messages.sort_by(|(_, msg), (_, msg2)| msg.timestamp.cmp(&msg2.timestamp));
         let text = messages
             .iter()
             .filter(|(id, _)| Some(id) == current_room_id)
             .unique_by(|(_id, msg)| &msg.event_id)
-            .flat_map(|(_, msg)| ctrl_char::process_text(msg))
             .collect::<Vec<_>>();
 
         // make sure the messages we have seen are marked read.
-        if !text.is_empty() {
-            for idx in 0..text.len() - 1 {
-                if let Some((_, msg)) = self.messages.get_mut(idx) {
-                    msg.read = true;
-                }
+        for mark_msg in &mut self.messages {
+            // if text has this message then it is displayed on the screen
+            // this message has been read and a read receipt will be sent for it
+            if text.contains(&&*mark_msg) {
+                mark_msg.1.read = true;
             }
         }
 
-        let title = format!("Messages       unread ==>{}", self.unread_notifications.to_string(),);
+        let text = text.iter().flat_map(|(_, msg)| ctrl_char::process_text(msg)).collect::<Vec<_>>();
+
+        let (title, style) = if self.unread_notifications > UInt::MIN {
+            (
+                format!(
+                    "-----Messages-----unread {}",
+                    self.unread_notifications.to_string()
+                ),
+                Style::default().fg(Color::Red).modifier(Modifier::BOLD),
+            )
+        } else {
+            (
+                "-----Messages-----".to_string(),
+                Style::default().fg(Color::Yellow).modifier(Modifier::BOLD),
+            )
+        };
         let messages = Paragraph::new(text.iter())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .border_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
                     .title(&title)
-                    .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
+                    .title_style(style),
             )
             .wrap(true)
             .scroll(self.scroll_pos as u16)

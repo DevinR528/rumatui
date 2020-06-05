@@ -31,18 +31,15 @@ use matrix_sdk::events::{
 use matrix_sdk::{
     self,
     identifiers::{EventId, RoomId, UserId},
-    CustomOrRawEvent,
-    EventEmitter,
-    Room,
-    SyncRoom,
+    CustomOrRawEvent, EventEmitter, Room, SyncRoom,
 };
 use tokio::sync::mpsc;
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
 use crate::client::ruma_ext::{
-    ExtraRoomEventContent, message::EditEventContent, reaction::ReactionEventContent,
-    ExtraMessageEventContent, ExtraReactionEventContent, RumaUnsupportedEvent,
+    message::EditEventContent, reaction::ReactionEventContent, ExtraMessageEventContent,
+    ExtraReactionEventContent, ExtraRoomEventContent, RumaUnsupportedEvent,
 };
 use crate::widgets::message::Message;
 
@@ -228,7 +225,10 @@ impl EventEmitter for EventStream {
                 .send
                 .lock()
                 .await
-                .send(StateResult::Redact(event.redacts.clone(), room.read().await.room_id.clone()))
+                .send(StateResult::Redact(
+                    event.redacts.clone(),
+                    room.read().await.room_id.clone(),
+                ))
                 .await
             {
                 panic!("{}", e)
@@ -393,10 +393,16 @@ impl EventEmitter for EventStream {
                             match event.content {
                                 ExtraRoomEventContent::Message { content } => match content {
                                     ExtraMessageEventContent::EditEvent(EditEventContent {
-                                        body, new_content, relates_to,
+                                        body,
+                                        new_content,
+                                        relates_to,
                                     }) => {
-                                        if new_content.msgtype == "m.text" && relates_to.rel_type == "m.replace" {
-                                            let new_body = if let Some(fmt) = new_content.formatted_body.as_ref() {
+                                        if new_content.msgtype == "m.text"
+                                            && relates_to.rel_type == "m.replace"
+                                        {
+                                            let new_body = if let Some(fmt) =
+                                                new_content.formatted_body.as_ref()
+                                            {
                                                 fmt.to_string()
                                             } else {
                                                 body.to_string()
@@ -407,15 +413,17 @@ impl EventEmitter for EventStream {
                                                 .send
                                                 .lock()
                                                 .await
-                                                .send(StateResult::MessageEdit(new_body, room_id, event_id))
+                                                .send(StateResult::MessageEdit(
+                                                    new_body, room_id, event_id,
+                                                ))
                                                 .await
                                             {
                                                 panic!("{}", e)
                                             }
                                         }
-                                    },
+                                    }
                                 },
-                                ExtraRoomEventContent::Reaction { content: _, } => {},
+                                ExtraRoomEventContent::Reaction { content: _ } => {}
                             }
                         }
                     }
@@ -423,24 +431,35 @@ impl EventEmitter for EventStream {
                         if let Ok(raw) = serde_json::value::to_raw_value(room_event) {
                             // TODO this is dumb don't deserialize then serialize but this should all
                             // be removed once ruma_events 0.22 is released
-                            if let Ok(event) = serde_json::from_str::<RumaUnsupportedEvent>(raw.get()) {
+                            if let Ok(event) =
+                                serde_json::from_str::<RumaUnsupportedEvent>(raw.get())
+                            {
                                 match event.content {
-                                    ExtraRoomEventContent::Message { content: _, } => {},
-                                    ExtraRoomEventContent::Reaction { content: ExtraReactionEventContent {
-                                        relates_to: ReactionEventContent::Annotation { event_id, key, },
-                                    }} => {
+                                    ExtraRoomEventContent::Message { content: _ } => {}
+                                    ExtraRoomEventContent::Reaction {
+                                        content:
+                                            ExtraReactionEventContent {
+                                                relates_to:
+                                                    ReactionEventContent::Annotation { event_id, key },
+                                            },
+                                    } => {
                                         let event_id = event_id.clone();
                                         let room_id = room.read().await.room_id.clone();
                                         if let Err(e) = self
                                             .send
                                             .lock()
                                             .await
-                                            .send(StateResult::Reaction(event_id, event.event_id.clone(), room_id, key.to_string()))
+                                            .send(StateResult::Reaction(
+                                                event_id,
+                                                event.event_id.clone(),
+                                                room_id,
+                                                key.to_string(),
+                                            ))
                                             .await
                                         {
                                             panic!("{}", e)
                                         }
-                                    },
+                                    }
                                 }
                             }
                         }
@@ -449,8 +468,8 @@ impl EventEmitter for EventStream {
                     CustomOrRawEvent::Custom(_event) => {}
                 }
             }
-            SyncRoom::Left(_room) => {},
-            _ => {},
+            SyncRoom::Left(_room) => {}
+            _ => {}
         }
     }
 
