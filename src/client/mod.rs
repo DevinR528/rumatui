@@ -7,21 +7,17 @@ use std::time::Duration;
 use matrix_sdk::{
     self,
     api::r0::{
-        account::register,
-        message::{create_message_event, get_message_events},
+        account::register::{self, RegistrationKind},
         membership::{forget_room, join_room_by_id, kick_user, leave_room},
+        message::{create_message_event, get_message_events},
         read_marker::set_read_marker,
         receipt::create_receipt,
         session::login,
-        typing::create_typing_event
+        typing::create_typing_event,
     },
     events::room::message::MessageEventContent,
     identifiers::{EventId, RoomId, UserId},
-    Client,
-    ClientConfig,
-    JsonStore,
-    Room,
-    SyncSettings,
+    Client, ClientConfig, JsonStore, RegistrationBuilder, Room, SyncSettings,
 };
 use tokio::sync::RwLock;
 use url::Url;
@@ -31,6 +27,7 @@ use crate::error::Result;
 
 pub mod client_loop;
 pub mod event_stream;
+pub mod ruma_ext;
 
 const SYNC_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -68,8 +65,8 @@ impl MatrixClient {
         let store: Result<JsonStore> = JsonStore::open(path).map_err(Into::into);
         // reset the client with the state store with username as part of the store path
         let client_config = ClientConfig::default()
-            // .proxy("http://localhost:8080")? // for mitmproxy
-            // .disable_ssl_verification()
+            .proxy("http://localhost:8080")? // for mitmproxy
+            .disable_ssl_verification()
             .state_store(Box::new(store?));
 
         let inner: Result<Client> =
@@ -134,10 +131,13 @@ impl MatrixClient {
         &mut self,
         username: String,
         password: String,
-    ) -> Result<(
-        register::Response,
-    )> {
-        self.inner.register(username, password, None, None).await
+    ) -> Result<register::Response> {
+        let mut req = RegistrationBuilder::default();
+        req.password(&password)
+            .username(&username)
+            .kind(RegistrationKind::User);
+
+        self.inner.register_user(req).await.map_err(Into::into)
     }
 
     /// Manually sync state, provides a default sync token if None is given.

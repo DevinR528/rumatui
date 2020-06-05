@@ -321,9 +321,11 @@ impl CtrlChars {
 }
 
 /// Parses CSI codes and converts them into `Vec<tui::widgets::Text>` chunks.
-pub fn process_text<'a>(msg: &'a Message) -> Vec<Text<'a>> {
-    let name = format!("{}: ", msg.name);
-    let mut msg = msg.text.to_string();
+pub fn process_text<'a>(message: &'a Message) -> Vec<Text<'a>> {
+    use itertools::Itertools;
+
+    let name = format!("{}: ", message.name);
+    let mut msg = message.text.to_string();
     if msg.contains("    ") {
         msg = msg.replace("    ", "\u{2800}   ");
     }
@@ -337,7 +339,11 @@ pub fn process_text<'a>(msg: &'a Message) -> Vec<Text<'a>> {
 
     let mut formatted = vec![Text::styled(name, Style::default().fg(Color::Magenta))];
     formatted.extend(body);
-
+    // add the reactions
+    if !message.reactions.is_empty() {
+        let reactions = format!("\u{2800}   {}\n", message.reactions.iter().dedup().join(" "));
+        formatted.push(Text::raw(reactions));
+    }
     formatted
 }
 

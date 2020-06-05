@@ -31,9 +31,7 @@ use matrix_sdk::events::{
 use matrix_sdk::{
     self,
     identifiers::{EventId, RoomId, UserId},
-    // ruma_ext::{
-    //     reaction::ReactionEventContent, ExtraMessageEventContent, ExtraReactionEventContent,
-    // },
+    CustomOrRawEvent,
     EventEmitter,
     Room,
     SyncRoom,
@@ -42,6 +40,10 @@ use tokio::sync::mpsc;
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
+use crate::client::ruma_ext::{
+    ExtraRoomEventContent, message::EditEventContent, reaction::ReactionEventContent,
+    ExtraMessageEventContent, ExtraReactionEventContent, RumaUnsupportedEvent,
+};
 use crate::widgets::message::Message;
 
 /// The events sent from the `EventEmitter` are represented by this
@@ -62,7 +64,8 @@ pub enum StateResult {
     Name(String, RoomId),
     FullyRead(EventId, RoomId),
     ReadReceipt(RoomId, BTreeMap<EventId, Receipts>),
-    Reaction(RoomId, EventId, String),
+    Reaction(EventId, EventId, RoomId, String),
+    Redact(EventId, RoomId),
     Typing(RoomId, String),
     Err,
 }
@@ -202,6 +205,7 @@ impl EventEmitter for EventStream {
                                 timestamp: *origin_server_ts,
                                 uuid: Uuid::parse_str(&txn_id).unwrap_or(Uuid::new_v4()),
                                 read: false,
+                                reactions: vec![],
                                 sent_receipt: false,
                             },
                             room.read().await.room_id.clone(),
@@ -218,7 +222,19 @@ impl EventEmitter for EventStream {
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomMessageFeedback` event.
     async fn on_room_message_feedback(&self, _: SyncRoom, _: &FeedbackEvent) {}
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomRedaction` event.
-    async fn on_room_redaction(&self, _: SyncRoom, _: &RedactionEvent) {}
+    async fn on_room_redaction(&self, room: SyncRoom, event: &RedactionEvent) {
+        if let SyncRoom::Joined(room) = room {
+            if let Err(e) = self
+                .send
+                .lock()
+                .await
+                .send(StateResult::Redact(event.redacts.clone(), room.read().await.room_id.clone()))
+                .await
+            {
+                panic!("{}", e)
+            }
+        }
+    }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomPowerLevels` event.
     async fn on_room_power_levels(&self, _: SyncRoom, _: &PowerLevelsEvent) {}
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomTombstone` event.
@@ -291,13 +307,13 @@ impl EventEmitter for EventStream {
 
     // `NonRoomEvent` (this is a type alias from ruma_events) from `IncomingAccountData`
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomMember` event.
-    async fn on_account_presence(&self, _: SyncRoom, _: &PresenceEvent) {}
+    async fn on_non_room_presence(&self, _: SyncRoom, _: &PresenceEvent) {}
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomName` event.
-    async fn on_account_ignored_users(&self, _: SyncRoom, _: &IgnoredUserListEvent) {}
+    async fn on_non_room_ignored_users(&self, _: SyncRoom, _: &IgnoredUserListEvent) {}
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomCanonicalAlias` event.
-    async fn on_account_push_rules(&self, _: SyncRoom, _: &PushRulesEvent) {}
+    async fn on_non_room_push_rules(&self, _: SyncRoom, _: &PushRulesEvent) {}
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomAliases` event.
-    async fn on_account_data_fully_read(&self, room: SyncRoom, event: &FullyReadEvent) {
+    async fn on_non_room_fully_read(&self, room: SyncRoom, event: &FullyReadEvent) {
         if let SyncRoom::Joined(room) = room {
             if let Err(e) = self
                 .send
@@ -316,7 +332,7 @@ impl EventEmitter for EventStream {
     // TODO make the StateResult::Typing variants a list of typing users and make messages in app
     // like every other StateResult. Use Room::compute_display_name or whatever when PR is done
     /// Fires when `AsyncClient` receives a `NonRoomEvent::Typing` event.
-    async fn on_account_data_typing(&self, room: SyncRoom, event: &TypingEvent) {
+    async fn on_non_room_typing(&self, room: SyncRoom, event: &TypingEvent) {
         if let SyncRoom::Joined(room) = room {
             let typing = room
                 .read()
@@ -348,7 +364,7 @@ impl EventEmitter for EventStream {
         }
     }
 
-    async fn on_account_data_receipt(&self, room: SyncRoom, event: &ReceiptEvent) {
+    async fn on_non_room_receipt(&self, room: SyncRoom, event: &ReceiptEvent) {
         if let SyncRoom::Joined(room) = room {
             let room_id = room.read().await.room_id.clone();
             let events = event.content.clone();
@@ -367,6 +383,76 @@ impl EventEmitter for EventStream {
     // `PresenceEvent` is a struct so there is only the one method
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomAliases` event.
     async fn on_presence_event(&self, _: SyncRoom, _event: &PresenceEvent) {}
+
+    async fn on_unrecognized_event(&self, room: SyncRoom, event: &CustomOrRawEvent<'_>) {
+        match room {
+            SyncRoom::Joined(room) => {
+                match event {
+                    CustomOrRawEvent::RawJson(raw) => {
+                        if let Ok(event) = serde_json::from_str::<RumaUnsupportedEvent>(raw.get()) {
+                            match event.content {
+                                ExtraRoomEventContent::Message { content } => match content {
+                                    ExtraMessageEventContent::EditEvent(EditEventContent {
+                                        body, new_content, relates_to,
+                                    }) => {
+                                        if new_content.msgtype == "m.text" && relates_to.rel_type == "m.replace" {
+                                            let new_body = if let Some(fmt) = new_content.formatted_body.as_ref() {
+                                                fmt.to_string()
+                                            } else {
+                                                body.to_string()
+                                            };
+                                            let event_id = relates_to.event_id.clone();
+                                            let room_id = room.read().await.room_id.clone();
+                                            if let Err(e) = self
+                                                .send
+                                                .lock()
+                                                .await
+                                                .send(StateResult::MessageEdit(new_body, room_id, event_id))
+                                                .await
+                                            {
+                                                panic!("{}", e)
+                                            }
+                                        }
+                                    },
+                                },
+                                ExtraRoomEventContent::Reaction { content: _, } => {},
+                            }
+                        }
+                    }
+                    CustomOrRawEvent::CustomRoom(room_event) => {
+                        if let Ok(raw) = serde_json::value::to_raw_value(room_event) {
+                            // TODO this is dumb don't deserialize then serialize but this should all
+                            // be removed once ruma_events 0.22 is released
+                            if let Ok(event) = serde_json::from_str::<RumaUnsupportedEvent>(raw.get()) {
+                                match event.content {
+                                    ExtraRoomEventContent::Message { content: _, } => {},
+                                    ExtraRoomEventContent::Reaction { content: ExtraReactionEventContent {
+                                        relates_to: ReactionEventContent::Annotation { event_id, key, },
+                                    }} => {
+                                        let event_id = event_id.clone();
+                                        let room_id = room.read().await.room_id.clone();
+                                        if let Err(e) = self
+                                            .send
+                                            .lock()
+                                            .await
+                                            .send(StateResult::Reaction(event_id, event.event_id.clone(), room_id, key.to_string()))
+                                            .await
+                                        {
+                                            panic!("{}", e)
+                                        }
+                                    },
+                                }
+                            }
+                        }
+                    }
+                    CustomOrRawEvent::CustomState(_state_event) => {}
+                    CustomOrRawEvent::Custom(_event) => {}
+                }
+            }
+            SyncRoom::Left(_room) => {},
+            _ => {},
+        }
+    }
 
     // // `RumaUnsupportedEvent
     // /// Fires when `Client` receives a `RumaUnsupportedRoomEvent<ExtraRoomEventContent::Reaction>`.

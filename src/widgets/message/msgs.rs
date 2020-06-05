@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
+use std::fmt;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -28,6 +29,20 @@ use crate::{
     widgets::{message::ctrl_char, utils::markdown_to_html, RenderWidget},
 };
 
+/// A reaction event containing the string (emoji) and the event id for the reaction
+/// event not the event it relates to.
+#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+pub struct Reaction {
+    pub key: String,
+    pub event_id: EventId,
+}
+
+impl fmt::Display for Reaction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.key)
+    }
+}
+
 /// A wrapper to abstract a `RoomEvent::RoomMessage` and the MessageEvent queue
 /// from `matrix_sdk::Room`.
 #[derive(Clone, Debug)]
@@ -41,6 +56,8 @@ pub struct Message {
     /// This is true when the user is active and the message appears in the
     /// `MessageWidget` window.
     pub read: bool,
+    /// A vector of all the reactions this "event/message" has received.
+    pub reactions: Vec<Reaction>,
     /// Has the read_receipt been sent.
     pub sent_receipt: bool,
     pub timestamp: SystemTime,
@@ -133,6 +150,7 @@ impl MessageWidget {
                         timestamp: *origin_server_ts,
                         uuid: Uuid::parse_str(&txn_id).unwrap_or(Uuid::new_v4()),
                         read: false,
+                        reactions: vec![],
                         sent_receipt: false,
                     },
                     &room.room_id,
@@ -167,6 +185,33 @@ impl MessageWidget {
 
     pub fn add_notify(&mut self, notify: &str) {
         self.notifications.push_back((None, notify.to_string()));
+    }
+
+    pub fn set_reaction_event(&mut self, room: &RoomId, relates_to: &EventId, event_id: &EventId, reaction: &str) {
+        if let Some(idx) = self
+            .messages
+            .iter()
+            .position(|(id, m)| &m.event_id == relates_to && room == id)
+        {
+            self.messages[idx].1.reactions.push(Reaction { key: reaction.to_string(), event_id: event_id.clone(), });
+        }
+    }
+
+    pub fn redaction_event(&mut self, room: &RoomId, event_id: &EventId) {
+        for (id, message) in &mut self.messages {
+            if &message.event_id == event_id && room == id {
+                message.text = "**R**E**D**A**C**T**E**D**".to_string();
+            }
+            // TODO PR rust for better docs on `.retain()` method yee...
+            message.reactions.retain(|emoji| &emoji.event_id != event_id);
+        }
+        if let Some(idx) = self
+            .messages
+            .iter()
+            .position(|(id, m)| &m.event_id == event_id && room == id)
+        {
+            self.messages[idx].1.text = "**R**E**D**A**C**T**E**D**".to_string();
+        }
     }
 
     pub fn clear_send_msg(&mut self) {
@@ -233,6 +278,7 @@ impl MessageWidget {
                     event_id: EventId::new(&domain).unwrap(),
                     uuid,
                     read: true,
+                    reactions: vec![],
                     sent_receipt: true,
                 };
                 self.add_message(msg, id)
@@ -404,7 +450,7 @@ impl RenderWidget for MessageWidget {
             }
         }
 
-        let title = format!("Messages {}", self.unread_notifications.to_string(),);
+        let title = format!("Messages       unread ==>{}", self.unread_notifications.to_string(),);
         let messages = Paragraph::new(text.iter())
             .block(
                 Block::default()

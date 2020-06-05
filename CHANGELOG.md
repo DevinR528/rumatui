@@ -1,5 +1,11 @@
 # [Unreleased] pre 0.1.0
 
+## 0.1.14
+
+* Message edits
+* Reactions
+* Redactions
+
 ## 0.1.13-alpha
 
 * Errors are now displayed with more helpful messages

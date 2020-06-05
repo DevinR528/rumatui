@@ -1,5 +1,9 @@
 #![allow(dead_code)]
-#![allow(clippy::single_component_path_imports, clippy::or_fun_call, clippy::single_match)]
+#![allow(
+    clippy::single_component_path_imports,
+    clippy::or_fun_call,
+    clippy::single_match
+)]
 
 use std::env;
 use std::io;

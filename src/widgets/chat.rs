@@ -191,6 +191,10 @@ impl ChatWidget {
         self.msgs.add_notify(msg)
     }
 
+    pub(crate) fn set_reaction_event(&mut self, room: &RoomId, relates_to: &EventId, event_id: &EventId, reaction: &str) {
+        self.msgs.set_reaction_event(room, relates_to, event_id, reaction)
+    }
+
     pub(crate) fn add_message(&mut self, msg: Message, room: &RoomId) {
         self.msgs.add_message(msg, room)
     }
@@ -208,6 +212,10 @@ impl ChatWidget {
 
     pub(crate) fn edit_message(&mut self, room: &RoomId, event: &EventId, new_msg: String) {
         self.msgs.edit_message(room, event, new_msg)
+    }
+
+    pub(crate) fn redaction_event(&mut self, room: &RoomId, event: &EventId) {
+        self.msgs.redaction_event(room, event)
     }
 
     pub(crate) fn clear_send_msg(&mut self) {

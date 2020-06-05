@@ -495,7 +495,12 @@ impl AppWidget {
                         self.chat.add_notify(&notice);
                     }
                 }
-                StateResult::Reaction(_room_id, _event_id, _msg) => {}
+                StateResult::Reaction(relates_to, event_id, room_id, msg) => {
+                    self.chat.set_reaction_event(&room_id, &relates_to, &event_id, &msg)
+                }
+                StateResult::Redact(event_id, room_id) => {
+                    self.chat.redaction_event(&room_id, &event_id)
+                }
                 _ => {}
             },
             _ => {}
@@ -598,6 +603,7 @@ impl AppWidget {
                                     timestamp: origin_server_ts,
                                     uuid: Uuid::parse_str(&txn_id).unwrap_or(Uuid::new_v4()),
                                     read: false,
+                                    reactions: vec![],
                                     sent_receipt: false,
                                 };
                                 self.chat.add_message(msg, &room.read().await.room_id)
