@@ -31,7 +31,6 @@ lazy_static = "1.4.0"
 # matrix-sdk-base = { path = "../__forks__/matrix-rust-sdk/matrix_sdk_base" }
 
 matrix-sdk = { git = "https://github.com/DevinR528/matrix-rust-sdk", branch = "rumatui" }
-# matrix-sdk-base = { git = "https://github.com/matrix-org/matrix-rust-sdk/matrix_sdk_base" }
 
 mdcat = "0.18.2"
 muncher = "0.6.0"

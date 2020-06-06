@@ -70,8 +70,8 @@ impl MatrixClient {
         let store: Result<JsonStore> = JsonStore::open(path).map_err(Into::into);
         // reset the client with the state store with username as part of the store path
         let client_config = ClientConfig::default()
-            // .proxy("http://localhost:8080")? // for mitmproxy
-            // .disable_ssl_verification()
+            .proxy("http://localhost:8080")? // for mitmproxy
+            .disable_ssl_verification()
             .state_store(Box::new(store?));
 
         let inner: Result<Client> =
@@ -220,8 +220,10 @@ impl MatrixClient {
 
         match self.inner.room_messages(request).await {
             Ok(res) => {
-                self.last_scroll
-                    .insert(id.clone(), res.end.clone().unwrap());
+                if let Some(end) = &res.end {
+                    self.last_scroll
+                    .insert(id.clone(), end.clone());
+                }
                 Ok(res)
             }
             err => err.map_err(Into::into),

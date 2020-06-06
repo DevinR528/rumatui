@@ -11,7 +11,8 @@ use matrix_sdk::{
     api::r0::{
         membership::{join_room_by_id, leave_room},
         message::{create_message_event, get_message_events},
-        receipt::create_receipt,
+        // receipt::create_receipt,
+        read_marker::set_read_marker,
         session::login,
         typing::create_typing_event,
     },
@@ -66,7 +67,7 @@ pub enum RequestResult {
     DeclineInvite(Result<leave_room::Response>, RoomId),
     LeaveRoom(Result<leave_room::Response>, RoomId),
     Typing(Result<create_typing_event::Response>),
-    ReadReceipt(Result<create_receipt::Response>),
+    ReadReceipt(Result<set_read_marker::Response>),
     Error(Error),
 }
 
@@ -200,7 +201,7 @@ impl MatrixEventHandle {
                         }
                     }
                     UserRequest::ReadReceipt(room_id, event_id) => {
-                        let res = client.read_receipt(&room_id, &event_id).await;
+                        let res = client.read_marker(&room_id, &event_id, Some(&event_id)).await;
                         if let Err(e) = to_app.send(RequestResult::ReadReceipt(res)).await {
                             panic!("client event handler crashed {}", e)
                         }

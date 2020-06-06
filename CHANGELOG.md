@@ -1,10 +1,19 @@
-# [Unreleased] pre 0.1.0
+# Release 0.1.14
 
 ## 0.1.14
 
-* Message edits
-* Reactions
-* Redactions
+* Message edits are shown
+* Reactions display under the respective message
+* Redaction events are handled for reactions (emoji) and messages
+* Note: the above features are only for displaying received events
+  `rumatui` can not yet send these events
+
+##### Bug Fixes
+
+* Send read receipts to mark the correct read message (it was sending random event ids)
+* Send `read_marker` events instead of `read_receipt`
+
+# Pre-release
 
 ## 0.1.13-alpha
 
@@ -19,11 +28,11 @@
 
 ## 0.1.12-alpha
 * Display membership status when updated
-* Join a room you have been invited to
+* Join a room you are invited to
 * Client sends read receipts to server
 * Display when messages have been read
 * Leave a room by pressing Delete key (this should probably be a Ctrl-some key deal...)
-* Specify homeserver to join on start up (before the login screen)
+* Specify homeserver to join on startup (before the login screen)
   * Simply run `rumatui [HOMESERVER]`, defaults to "http://matrix.org"
 * Displays errors, albeit not very helpful or specific
 * Receive and display messages

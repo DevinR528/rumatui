@@ -17,10 +17,21 @@ cargo install rumatui --version 0.1.13-alpha
 
 # Run
 ```bash
-rumatui
+rumatui [homeserver]
 ```
 
+If no `homeserver` is specified, matrix.org is used.
+
 You must have an account on the homeserver you are using (if not create a [Matrix account](https://riot.im/app)) and have joined or been invited to a room.
+
+# Use
+
+Most of `rumatui` is click-able however, there are a few buttons that can be used (this is a terminal after all).
+
+* Esc will exit `rumatui`
+* Enter still works for all buttons except the decline/accept invite
+* Ctrl-s sends a message
+* Delete leaves and forgets the selected room
 
 #### License
 <sup>
