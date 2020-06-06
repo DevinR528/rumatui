@@ -1157,7 +1157,7 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 [[package]]
 name = "matrix-sdk"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=rumatui#a74cef47c2562ea23b207873b5c8b39c5830d62a"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=rumatui#ae655c2207bec124d0f62668d7f8f82cb3afe3be"
 dependencies = [
  "futures-timer",
  "http",
@@ -1174,7 +1174,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-base"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=rumatui#a74cef47c2562ea23b207873b5c8b39c5830d62a"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=rumatui#ae655c2207bec124d0f62668d7f8f82cb3afe3be"
 dependencies = [
  "async-trait",
  "matrix-sdk-common",
@@ -1189,7 +1189,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-common"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=rumatui#a74cef47c2562ea23b207873b5c8b39c5830d62a"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=rumatui#ae655c2207bec124d0f62668d7f8f82cb3afe3be"
 dependencies = [
  "futures-locks",
  "instant",
@@ -1205,7 +1205,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-crypto"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=rumatui#a74cef47c2562ea23b207873b5c8b39c5830d62a"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=rumatui#ae655c2207bec124d0f62668d7f8f82cb3afe3be"
 dependencies = [
  "async-trait",
  "atomic",
@@ -1472,9 +1472,9 @@ checksum = "77af24da69f9d9341038eba93a073b1fdaaa1b788221b00a69bce9e762cb32de"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.57"
+version = "0.9.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7410fef80af8ac071d4f63755c0ab89ac3df0fd1ea91f1d1f37cf5cec4395990"
+checksum = "a842db4709b604f0fe5d1170ae3565899be2ad3d9cbc72dedc789ac0511f78de"
 dependencies = [
  "autocfg",
  "cc",
@@ -1534,18 +1534,18 @@ dependencies = [
 
 [[package]]
 name = "pin-project"
-version = "0.4.19"
+version = "0.4.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba3a1acf4a3e70849f8a673497ef984f043f95d2d8252dcdf74d54e6a1e47e8a"
+checksum = "e75373ff9037d112bb19bc61333a06a159eaeb217660dcfbea7d88e1db823919"
 dependencies = [
  "pin-project-internal",
 ]
 
 [[package]]
 name = "pin-project-internal"
-version = "0.4.19"
+version = "0.4.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "194e88048b71a3e02eb4ee36a6995fed9b8236c11a7bb9f7247a9d9835b3f265"
+checksum = "10b4b44893d3c370407a1d6a5cfde7c41ae0478e31c516c85f67eb3adc51be6d"
 dependencies = [
  "proc-macro2",
  "quote",

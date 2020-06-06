@@ -321,7 +321,7 @@ impl CtrlChars {
 }
 
 /// Parses CSI codes and converts them into `Vec<tui::widgets::Text>` chunks.
-pub fn process_text<'a>(message: &'a mut Message) -> Vec<Text<'a>> {
+pub fn process_text<'a>(message: &'a Message) -> Vec<Text<'a>> {
     use itertools::Itertools;
 
     let name = format!("{}: ", message.name);
@@ -419,7 +419,7 @@ fn main() {
     }
 
     #[test]
-    // #[ignore]
+    #[ignore]
     fn test_formatter2() {
         let input = "[`hi`](http://www.googlelskdnfodaf.com)";
 
@@ -452,7 +452,7 @@ fn main() {
     use rumatui_tui::Terminal;
 
     #[test]
-    // #[ignore]
+    #[ignore]
     fn paragraph_colors() {
         let input = "[google](http://www.google.com) `ruma-identifiers` __hello__
 # table
