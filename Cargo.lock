@@ -1323,9 +1323,9 @@ dependencies = [
 
 [[package]]
 name = "muncher"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcfd94c250d05b274f600588d87cbd73d3a00cae0e5ec1f1b10c45698a542eae"
+checksum = "f0aeee23e39d46940d01b843da99d6e26fb8b3659e33f3c48272aef45d978671"
 
 [[package]]
 name = "native-tls"

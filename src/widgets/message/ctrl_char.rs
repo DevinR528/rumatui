@@ -548,9 +548,7 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
     }
 
     #[test]
-    #[ignore]
-    // TODO BUG in `muncher` src/muncher.rs:608:19
-    // add bounds check before index
+    // #[ignore]
     fn failed_messages() {
         let input = "TWIM: \n# Docker-matrix\n\nThe docker image for synapse v1.12.4rc1 is now on [mvgorcum/docker-matrix:v1.12.4rc1](https://hub.docker.com/r/mvgorcum/docker-matrix/tags)";
 
@@ -569,7 +567,7 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
         let mut w = Writer::default();
         mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
 
-        let expected = "TWIM: \\n# Docker-matrix\\n\\nThe docker image for synapse v1.12.4rc1 is now on \u{1b}]8;;https://hub.docker.com/r/mvgorcum/docker-matrix/tags\n";
+        let expected = "TWIM: \n\n\u{1b}[1\u{1b}[34┄\u{1b}[1\u{1b}[34Docker-matrix\n\nThe docker image for synapse v1.12.4rc1 is now on ]8;;https://hub.docker.com/r/mvgorcum/docker-matrix/tags\u{7}\u{1b}[34mvgorcum/docker-matrix:v1.12.4rc1\u{1b}]8;;";
         assert_eq!(expected, CtrlChars::parse(w.to_string()).to_string());
         // println!("{:#?}", CtrlChars::parse(w.to_string()).to_string())
     }

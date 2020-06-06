@@ -5,6 +5,9 @@
 * Message edits are shown
 * Reactions display under the respective message
 * Redaction events are handled for reactions (emoji) and messages
+* Update dependency
+  * `muncher` 0.6.0 -> 0.6.1
+  
 * Note: the above features are only for displaying received events
   `rumatui` can not yet send these events
 

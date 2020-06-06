@@ -33,7 +33,7 @@ lazy_static = "1.4.0"
 matrix-sdk = { git = "https://github.com/DevinR528/matrix-rust-sdk", branch = "rumatui" }
 
 mdcat = "0.18.2"
-muncher = "0.6.0"
+muncher = "0.6.1"
 regex = "1.3.9"
 
 # turn on rand feature to generate EventId's
