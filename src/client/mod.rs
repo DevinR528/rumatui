@@ -1,8 +1,4 @@
-use std::collections::HashMap;
-use std::fmt;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{collections::HashMap, fmt, path::PathBuf, sync::Arc, time::Duration};
 
 use matrix_sdk::{
     self,

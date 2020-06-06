@@ -1,5 +1,7 @@
-use std::fmt::{self, Display};
-use std::io::{self, ErrorKind, Write};
+use std::{
+    fmt::{self, Display},
+    io::{self, ErrorKind, Write},
+};
 
 use comrak;
 use mdcat::{self, ResourceAccess, Settings, TerminalCapabilities, TerminalSize};

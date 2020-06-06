@@ -5,16 +5,19 @@
     clippy::single_match
 )]
 
-use std::env;
-use std::io;
-use std::time::Duration;
+use std::{
+    env, io, time::Duration,
+};
 
-use termion::event::{Event as TermEvent, Key, MouseButton, MouseEvent};
-use termion::input::MouseTerminal;
-use termion::raw::IntoRawMode;
+use termion::{
+    event::{Event as TermEvent, Key, MouseButton, MouseEvent},
+    input::MouseTerminal, raw::IntoRawMode,
+};
 
-use rumatui_tui::backend::TermionBackend;
-use rumatui_tui::Terminal;
+use rumatui_tui::{
+    backend::TermionBackend,
+    Terminal,
+};
 
 mod client;
 mod error;

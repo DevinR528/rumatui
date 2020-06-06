@@ -1,16 +1,14 @@
 //! Error conditions.
 
-use std::fmt;
-use std::io;
+use std::{fmt, io};
 
 use matrix_sdk::{
     api::{error::ErrorKind, Error as RumaApiError},
-    Error as MatrixError, FromHttpResponseError as RumaResponseError, IntoHttpError, ServerError,
+    BaseError as MatrixBaseError, Error as MatrixError, FromHttpResponseError as RumaResponseError,
+    IntoHttpError, ServerError,
 };
-use matrix_sdk_base::Error as MatrixBaseError;
-use tokio::sync::mpsc::error::SendError;
-// use ruma_client_api::error::ErrorKind;
 use serde_json::Error as JsonError;
+use tokio::sync::mpsc::error::SendError;
 use url::ParseError;
 
 use crate::client::client_loop::UserRequest;

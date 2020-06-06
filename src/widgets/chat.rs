@@ -1,9 +1,11 @@
-use std::cell::{Ref, RefCell};
-use std::collections::HashMap;
-use std::ops::Deref;
-use std::rc::Rc;
-use std::sync::Arc;
-use std::time::SystemTime;
+use std::{
+    cell::{Ref, RefCell},
+    collections::HashMap,
+    ops::Deref,
+    rc::Rc,
+    sync::Arc,
+    time::SystemTime,
+};
 
 use matrix_sdk::{
     events::room::message::MessageEventContent,
@@ -244,17 +246,17 @@ impl ChatWidget {
     pub(crate) fn read_receipt(
         &mut self,
         last_interaction: SystemTime,
-        room: &RoomId
-    ) -> Option<(EventId, RoomId)> {
+        room: &RoomId,
+    ) -> Option<EventId> {
         self.msgs.read_receipt(last_interaction, room)
     }
 
-    pub(crate) fn read_to_end(&mut self, event: &EventId) -> bool {
-        self.msgs.read_to_end(event)
+    pub(crate) fn read_to_end(&mut self, room: &RoomId, event: &EventId) -> bool {
+        self.msgs.read_to_end(room, event)
     }
 
-    pub(crate) fn last_3_msg_event_ids(&self) -> impl Iterator<Item = &EventId> {
-        self.msgs.last_3_msg_event_ids()
+    pub(crate) fn last_3_msg_event_ids(&self, room: &RoomId) -> Vec<&EventId> {
+        self.msgs.last_3_msg_event_ids(room)
     }
 }
 

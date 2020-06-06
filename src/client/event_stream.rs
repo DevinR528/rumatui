@@ -1,6 +1,4 @@
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
-use std::sync::Arc;
+use std::{collections::BTreeMap, convert::TryFrom, sync::Arc};
 
 use matrix_sdk::events::{
     fully_read::FullyReadEvent,

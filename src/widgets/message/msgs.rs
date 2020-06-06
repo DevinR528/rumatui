@@ -1,9 +1,11 @@
-use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, VecDeque};
-use std::fmt;
-use std::rc::Rc;
-use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::{
+    cell::{Cell, RefCell},
+    collections::{HashMap, VecDeque},
+    fmt,
+    rc::Rc,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
 use js_int::UInt;
 use matrix_sdk::events::room::message::{
@@ -84,7 +86,7 @@ pub struct MessageWidget {
     // TODO save this to a local "database" somehow
     /// This is the RoomId of the last used room.
     pub(crate) current_room: Rc<RefCell<Option<RoomId>>>,
-    messages: Vec<(RoomId, Message)>,
+    messages: HashMap<RoomId, Vec<Message>>,
     pub(crate) me: Option<UserId>,
     pub unread_notifications: UInt,
     send_msg: String,
@@ -161,25 +163,26 @@ impl MessageWidget {
     }
 
     pub fn add_message(&mut self, msg: Message, room: &RoomId) {
-        // remove the message echo when user sends a message and we display the text before
-        // the server responds
-        if let Some(idx) = self.messages.iter().position(|(_, m)| m.uuid == msg.uuid) {
-            self.messages[idx] = (room.clone(), msg);
-            return;
+        if let Some(messages) = self.messages.get_mut(room) {
+            // remove the message echo when user sends a message and we display the text before
+            // the server responds
+            if let Some(idx) = messages.iter().position(|m| m.uuid == msg.uuid) {
+                messages[idx] = msg;
+                return;
+            }
         }
-        self.messages.push((room.clone(), msg));
+        self.messages.entry(room.clone()).or_default().push(msg);
+        // TODO scroll seems to keep up but keep an eye on it
         // self.calculate_scroll_down();
     }
 
     pub fn edit_message(&mut self, room: &RoomId, event_id: &EventId, msg: String) {
-        // remove the message echo when user sends a message and we display the text before
-        // the server responds
-        if let Some(idx) = self
-            .messages
-            .iter()
-            .position(|(id, m)| &m.event_id == event_id && room == id)
-        {
-            self.messages[idx].1.text = msg;
+        if let Some(messages) = self.messages.get_mut(room) {
+            // remove the message echo when user sends a message and we display the text before
+            // the server responds
+            if let Some(idx) = messages.iter().position(|m| &m.event_id == event_id) {
+                messages[idx].text = msg;
+            }
         }
     }
 
@@ -194,34 +197,27 @@ impl MessageWidget {
         event_id: &EventId,
         reaction: &str,
     ) {
-        if let Some(idx) = self
-            .messages
-            .iter()
-            .position(|(id, m)| &m.event_id == relates_to && room == id)
-        {
-            self.messages[idx].1.reactions.push(Reaction {
-                key: reaction.to_string(),
-                event_id: event_id.clone(),
-            });
+        if let Some(messages) = self.messages.get_mut(room) {
+            if let Some(idx) = messages.iter().position(|m| &m.event_id == relates_to) {
+                messages[idx].reactions.push(Reaction {
+                    key: reaction.to_string(),
+                    event_id: event_id.clone(),
+                });
+            }
         }
     }
 
     pub fn redaction_event(&mut self, room: &RoomId, event_id: &EventId) {
-        for (id, message) in &mut self.messages {
-            if &message.event_id == event_id && room == id {
-                message.text = "**R**E**D**A**C**T**E**D**".to_string();
+        if let Some(messages) = self.messages.get_mut(room) {
+            for message in messages {
+                if &message.event_id == event_id {
+                    message.text = "**R**E**D**A**C**T**E**D**".to_string();
+                }
+                // TODO PR rust for better docs on `.retain()` method yee...
+                message
+                    .reactions
+                    .retain(|emoji| &emoji.event_id != event_id);
             }
-            // TODO PR rust for better docs on `.retain()` method yee...
-            message
-                .reactions
-                .retain(|emoji| &emoji.event_id != event_id);
-        }
-        if let Some(idx) = self
-            .messages
-            .iter()
-            .position(|(id, m)| &m.event_id == event_id && room == id)
-        {
-            self.messages[idx].1.text = "**R**E**D**A**C**T**E**D**".to_string();
         }
     }
 
@@ -229,7 +225,7 @@ impl MessageWidget {
         self.send_msg.clear();
     }
 
-    // TODO Im sure there is an actual way to do this like Riot or a matrix server
+    // TODO Im sure there is an actual way to do this like Riot
     fn process_message(&self) -> MsgType {
         if self.send_msg.contains('`') {
             MsgType::FormattedText
@@ -298,14 +294,23 @@ impl MessageWidget {
         }
     }
 
-    pub(crate) fn read_to_end(&self, event_id: &EventId) -> bool {
-        self.messages.last().map(|(_, msg)| &msg.event_id) == Some(event_id)
+    pub(crate) fn read_to_end(&self, room: &RoomId, event_id: &EventId) -> bool {
+        if let Some(messages) = self.messages.get(room) {
+            messages.last().map(|msg| &msg.event_id) == Some(event_id)
+        } else {
+            false
+        }
     }
 
-    pub(crate) fn last_3_msg_event_ids(&self) -> impl Iterator<Item = &EventId> {
-        self.messages[self.messages.len() - 4..]
-            .iter()
-            .map(|(_, msg)| &msg.event_id)
+    pub(crate) fn last_3_msg_event_ids(&self, room: &RoomId) -> Vec<&EventId> {
+        if let Some(messages) = self.messages.get(room) {
+            messages[self.messages.len() - 4..]
+                .iter()
+                .map(|msg| &msg.event_id)
+                .collect()
+        } else {
+            vec![]
+        }
     }
 
     pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) -> bool {
@@ -327,53 +332,60 @@ impl MessageWidget {
         }
     }
 
-    // TODO mark when we send a read receipt so we don't double it up
+    // TODO remove this or `check_unread` eventually
     pub(crate) fn read_receipt(
         &mut self,
         last_interaction: SystemTime,
-        room_id: &RoomId
-    ) -> Option<(EventId, RoomId)> {
-        use itertools::Itertools;
-
-        // TODO use HashMap<RoomId, Vec<Message>> see `check_unread` comment
+        room_id: &RoomId,
+    ) -> Option<EventId> {
         if last_interaction.elapsed().ok()? < Duration::from_secs(5) {
-            self.messages.sort_by(|(_, msg), (_, msg2)| msg.timestamp.cmp(&msg2.timestamp));
-            let text = self.messages
-                .iter()
-                .filter(|(id, _)| id == room_id)
-                .unique_by(|(_id, msg)| &msg.event_id)
-                .collect::<Vec<_>>();
+            if let Some(messages) = self.messages.get_mut(room_id) {
+                messages.sort_by(|msg, msg2| msg.timestamp.cmp(&msg2.timestamp));
 
-            text
-                .iter()
-                .rfind(|(_id, msg)| msg.read)
-                .map(|(id, msg)| (msg.event_id.clone(), id.clone()))
+                for msg in messages.iter_mut().rev() {
+                    // if the message is older than 3 days give up
+                    if msg.timestamp.elapsed().ok()? > Duration::from_secs(259200) {
+                        return None;
+                    }
+
+                    if msg.read && !msg.sent_receipt {
+                        msg.sent_receipt = true;
+                        return Some(msg.event_id.clone());
+                    }
+                }
+                None
+            } else {
+                // this is possibly a larger problem as we are looking in a room we aren't joined?
+                None
+            }
         } else {
             None
         }
     }
 
-    // TODO mark when we send a read receipt so we don't double it up
     pub fn check_unread(&mut self, room: &Room) -> Option<EventId> {
-        use itertools::Itertools;
-        
         self.unread_notifications = room.unread_notifications.unwrap_or_default();
 
         self.unread_notifications += room.unread_highlight.unwrap_or_default();
 
-        // TODO use room hashmaps to hold messages HashMap<RoomId, Vec<Messages>> keep each vec
-        // sorted and less alloc for the render method
-        self.messages.sort_by(|(_, msg), (_, msg2)| msg.timestamp.cmp(&msg2.timestamp));
-        let text = self.messages
-            .iter()
-            .filter(|(id, _)| id == &room.room_id)
-            .unique_by(|(_id, msg)| &msg.event_id)
-            .collect::<Vec<_>>();
+        if let Some(messages) = self.messages.get_mut(&room.room_id) {
+            messages.sort_by(|msg, msg2| msg.timestamp.cmp(&msg2.timestamp));
 
-        text
-            .iter()
-            .rfind(|(_id, msg)| msg.read)
-            .map(|(_, msg)| msg.event_id.clone())
+            for msg in messages.iter_mut().rev() {
+                // if the message is older than 1.5 days give up
+                if msg.timestamp.elapsed().ok()? > Duration::from_secs(86400) {
+                    return None;
+                }
+
+                if msg.read && !msg.sent_receipt {
+                    msg.sent_receipt = true;
+                    return Some(msg.event_id.clone());
+                }
+            }
+            None
+        } else {
+            None
+        }
     }
 
     pub fn on_scroll_up(&mut self, x: u16, y: u16) -> bool {
@@ -460,31 +472,31 @@ impl RenderWidget for MessageWidget {
         self.msg_area = chunks[0];
         let b = self.current_room.borrow();
         let current_room_id = if let Some(id) = b.as_ref() {
-            Some(id)
+            Some(id.clone())
         } else {
             // or take the first room in the list, this happens on login
-            self.messages.first().map(|(id, _msg)| id)
+            self.messages.keys().nth(0).cloned()
         };
 
+        let mut msg_copy = vec![];
         // TODO no alloc split messages up by hashmap of roomid to message vec?
-        let mut messages = self.messages.clone();
-        messages.sort_by(|(_, msg), (_, msg2)| msg.timestamp.cmp(&msg2.timestamp));
-        let text = messages
-            .iter()
-            .filter(|(id, _)| Some(id) == current_room_id)
-            .unique_by(|(_id, msg)| &msg.event_id)
-            .collect::<Vec<_>>();
-
-        // make sure the messages we have seen are marked read.
-        for mark_msg in &mut self.messages {
-            // if text has this message then it is displayed on the screen
-            // this message has been read and a read receipt will be sent for it
-            if text.contains(&&*mark_msg) {
-                mark_msg.1.read = true;
+        if let Some(room_id) = current_room_id {
+            if let Some(messages) = self.messages.get_mut(&room_id) {
+                messages.sort_by(|msg, msg2| msg.timestamp.cmp(&msg2.timestamp));
+                // make sure the messages we have seen are marked read.
+                for mark_msg in messages.iter_mut().rev().take(5) {
+                    // this message has been read and a read receipt will be sent for it
+                    mark_msg.read = true;
+                }
+                for msg in messages
+                    .iter_mut()
+                    .unique_by(|msg| msg.event_id.clone())
+                    .flat_map(|msg| ctrl_char::process_text(msg))
+                {
+                    msg_copy.push(msg);
+                }
             }
         }
-
-        let text = text.iter().flat_map(|(_, msg)| ctrl_char::process_text(msg)).collect::<Vec<_>>();
 
         let (title, style) = if self.unread_notifications > UInt::MIN {
             (
@@ -500,7 +512,7 @@ impl RenderWidget for MessageWidget {
                 Style::default().fg(Color::Yellow).modifier(Modifier::BOLD),
             )
         };
-        let messages = Paragraph::new(text.iter())
+        let messages = Paragraph::new(msg_copy.iter())
             .block(
                 Block::default()
                     .borders(Borders::ALL)

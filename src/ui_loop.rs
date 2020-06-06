@@ -1,12 +1,15 @@
-use std::io::{self};
-use std::sync::mpsc;
-use std::thread;
-use std::time::Duration;
+use std::{
+    io,
+    sync::mpsc,
+    thread,
+    time::Duration,
+};
 
-use termion::event::{Event as TermEvent, Key};
-use termion::input::MouseTerminal;
-use termion::input::TermRead;
-use termion::raw::IntoRawMode;
+use termion::{
+    event::{Event as TermEvent, Key},
+    input::{MouseTerminal, TermRead},
+    raw::IntoRawMode,
+};
 
 pub enum Event<I> {
     Input(I),

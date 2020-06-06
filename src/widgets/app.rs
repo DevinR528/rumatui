@@ -1,7 +1,4 @@
-use std::io;
-use std::ops::Deref;
-use std::sync::Arc;
-use std::time::SystemTime;
+use std::{io, ops::Deref, sync::Arc, time::SystemTime};
 
 use matrix_sdk::{
     api::r0::message::get_message_events,
@@ -445,7 +442,7 @@ impl AppWidget {
                 StateResult::Name(name, room_id) => self.chat.update_room(&name, &room_id),
                 StateResult::Message(msg, room) => {
                     self.chat.add_message(msg, &room);
-                    if let Some((event, room)) = self.chat.read_receipt(self.last_interaction, &room) {
+                    if let Some(event) = self.chat.read_receipt(self.last_interaction, &room) {
                         if let Err(e) = self
                             .send_jobs
                             .send(UserRequest::ReadReceipt(room, event))
@@ -459,7 +456,9 @@ impl AppWidget {
                     self.chat.edit_message(&room_id, &event_id, msg);
                 }
                 StateResult::FullyRead(event_id, room_id) => {
-                    if self.chat.read_to_end(&event_id) && self.chat.is_current_room(&room_id) {
+                    if self.chat.read_to_end(&room_id, &event_id)
+                        && self.chat.is_current_room(&room_id)
+                    {
                         // TODO what should be done for fully read events
                     }
                 }
@@ -471,7 +470,7 @@ impl AppWidget {
                 StateResult::ReadReceipt(room_id, events) => {
                     let mut notices = vec![];
                     if self.chat.is_current_room(&room_id) {
-                        for e_id in self.chat.last_3_msg_event_ids() {
+                        for e_id in self.chat.last_3_msg_event_ids(&room_id) {
                             if let Some(rec) = events.get(e_id) {
                                 if let Some(map) = &rec.read {
                                     // TODO keep track so we don't emit duplicate notices for
@@ -529,7 +528,7 @@ impl AppWidget {
             let err = if let Some(room) = room {
                 // the user has interacted with the app
                 self.last_interaction = SystemTime::now();
-                // TODO mark the events we have seen before so we don't send multiple read markers
+
                 if let Some(event_id) = self.chat.check_unread(room).await {
                     self.send_jobs
                         .send(UserRequest::ReadReceipt(id.clone(), event_id))

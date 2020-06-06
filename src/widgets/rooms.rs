@@ -1,17 +1,23 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::ops::{DerefMut, Index, IndexMut};
-use std::rc::Rc;
-use std::sync::Arc;
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    ops::{DerefMut, Index, IndexMut},
+    rc::Rc,
+    sync::Arc,
+};
 
 use itertools::Itertools;
-use matrix_sdk::identifiers::{RoomId, UserId};
-use matrix_sdk::Room;
-use rumatui_tui::backend::Backend;
-use rumatui_tui::layout::{Constraint, Direction, Layout, Rect};
-use rumatui_tui::style::{Color, Modifier, Style};
-use rumatui_tui::widgets::{Block, Borders, List, Paragraph, Text};
-use rumatui_tui::Frame;
+use matrix_sdk::{
+    identifiers::{RoomId, UserId},
+    Room,
+};
+use rumatui_tui::{
+    backend::Backend,
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style},
+    widgets::{Block, Borders, List, Paragraph, Text},
+    Frame,
+};
 use serde::{Deserialize, Serialize};
 use termion::event::MouseButton;
 use tokio::sync::RwLock;

@@ -1,8 +1,6 @@
 use std::io;
 
-use rumatui_tui::backend::Backend;
-use rumatui_tui::layout::Rect;
-use rumatui_tui::{Frame, Terminal};
+use rumatui_tui::{backend::Backend, layout::Rect, Frame, Terminal};
 
 pub mod app;
 pub mod chat;
