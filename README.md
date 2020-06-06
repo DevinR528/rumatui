@@ -1,9 +1,8 @@
-# rumatui
-![rumatui-logo](https://github.com/DevinR528/rumatui/blob/master/resources/small_logo.gif)
+# RumaTui
+![rumatui-logo](https://github.com/DevinR528/RumaTui/blob/master/resources/small_logo.gif)
 ## A command-line Matrix client.
 [![Build Status](https://travis-ci.com/DevinR528/rumatui.svg?branch=master)](https://travis-ci.com/DevinR528/rumatui)
 [![Latest Version](https://img.shields.io/crates/v/rumatui.svg)](https://crates.io/crates/rumatui)
-[![#rumatui](https://img.shields.io/badge/matrix-%23rumatui-purple?style=flat-square)](https://matrix.to/#/#rumatui:matrix.org)
 
 Work In Progress. A Matrix client written using [tui.rs](https://github.com/fdehau/tui-rs) and [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk) to provide a clickable cli to chat.
 
@@ -28,8 +27,6 @@ rumatui [homeserver]
 
 If no `homeserver` is specified, matrix.org is used.
 
-You must have an account on the homeserver you are using (if not create a [Matrix account](https://riot.im/app)) and have already joined or been invited to a room.
-
 # Use
 
 Most of `rumatui` is click-able however, there are a few buttons that can be used (this is a terminal after all).
@@ -42,6 +39,15 @@ Most of `rumatui` is click-able however, there are a few buttons that can be use
 * Left arrow, while at the main chat window, brings up the room search window
 * Enter, while in the room search window, starts the search
 * Ctrl-d, while a room is selected in the room search window, joins the room
+
+# Use
+
+Most of `rumatui` is click-able however, there are a few buttons that can be used (this is a terminal after all).
+
+* Esc will exit `rumatui`
+* Enter still works for all buttons except the decline/accept invite
+* Ctrl-s sends a message
+* Delete leaves and forgets the selected room
 
 #### License
 <sup>
