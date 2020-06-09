@@ -416,6 +416,7 @@ impl AppWidget {
         }
         use matrix_sdk::Error as MatrixError;
         use ruma_client_api::r0::uiaa::{UiaaInfo, UiaaResponse};
+        use crate::client::ruma_ext::auth::{RegisterAuth, SessionObj};
         // this will login, send messages, and any other user initiated requests
         match self.ev_msgs.try_recv() {
             Ok(res) => match res {

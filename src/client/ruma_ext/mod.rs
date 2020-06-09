@@ -6,6 +6,7 @@ use serde_json::Value as JsonValue;
 use matrix_sdk::events::FromRaw;
 use matrix_sdk::identifiers::{EventId, RoomId, UserId};
 
+pub mod auth;
 pub mod message;
 pub mod reaction;
 
