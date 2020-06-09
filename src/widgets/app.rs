@@ -37,10 +37,17 @@ use crate::{
         error::ErrorWidget,
         login::{Login, LoginSelect, LoginWidget},
         message::Message,
+        register::{Register, RegisterSelect, RegisterWidget},
         rooms::Invite,
         DrawWidget, RenderWidget,
     },
 };
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum LoginOrRegister {
+    Login,
+    Register,
+}
 
 pub struct AppWidget {
     /// Title of the app "rumatui".
@@ -59,6 +66,10 @@ pub struct AppWidget {
     pub last_interaction: SystemTime,
     /// The login element. This knows how to render and also holds the state of logging in.
     pub login_w: LoginWidget,
+    /// The register element. This knows how to render and also holds the state of registering.
+    pub register: RegisterWidget,
+    /// Flag to render the login widget or the register widget.
+    pub login_or_register: LoginOrRegister,
     /// The main screen. Holds the state once a user is logged in.
     pub chat: ChatWidget,
     /// the event loop for MatrixClient tasks to run on.
@@ -94,6 +105,8 @@ impl AppWidget {
             typing_notice: false,
             last_interaction: SystemTime::now(),
             login_w: LoginWidget::default(),
+            register: RegisterWidget::default(),
+            login_or_register: LoginOrRegister::Login,
             chat: ChatWidget::default(),
             ev_loop,
             send_jobs,
@@ -104,7 +117,7 @@ impl AppWidget {
     }
 
     pub async fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {
-        if !self.login_w.logged_in {
+        if !self.login_w.logged_in && self.login_or_register == LoginOrRegister::Login {
             self.login_w.on_click(btn, x, y);
         }
         if self.chat.msgs_on_click(btn, x, y) {
@@ -169,10 +182,21 @@ impl AppWidget {
 
     pub async fn on_up(&mut self) {
         if !self.login_w.logged_in {
-            if let LoginSelect::Username = self.login_w.login.selected {
-                self.login_w.login.selected = LoginSelect::Password;
-            } else {
-                self.login_w.login.selected = LoginSelect::Username;
+            match self.login_or_register {
+                LoginOrRegister::Login => {
+                    if let LoginSelect::Username = self.login_w.login.selected {
+                        self.login_w.login.selected = LoginSelect::Password;
+                    } else {
+                        self.login_w.login.selected = LoginSelect::Username;
+                    }
+                }
+                LoginOrRegister::Register => {
+                    if let RegisterSelect::Username = self.register.register.selected {
+                        self.register.register.selected = RegisterSelect::Password;
+                    } else {
+                        self.register.register.selected = RegisterSelect::Username;
+                    }
+                }
             }
         } else if self.chat.is_main_screen() {
             self.chat.room_select_previous();
@@ -182,10 +206,21 @@ impl AppWidget {
 
     pub async fn on_down(&mut self) {
         if !self.login_w.logged_in {
-            if let LoginSelect::Username = self.login_w.login.selected {
-                self.login_w.login.selected = LoginSelect::Password;
-            } else {
-                self.login_w.login.selected = LoginSelect::Username;
+            match self.login_or_register {
+                LoginOrRegister::Login => {
+                    if let LoginSelect::Username = self.login_w.login.selected {
+                        self.login_w.login.selected = LoginSelect::Password;
+                    } else {
+                        self.login_w.login.selected = LoginSelect::Username;
+                    }
+                }
+                LoginOrRegister::Register => {
+                    if let RegisterSelect::Username = self.register.register.selected {
+                        self.register.register.selected = RegisterSelect::Password;
+                    } else {
+                        self.register.register.selected = RegisterSelect::Username;
+                    }
+                }
             }
         } else if self.chat.is_main_screen() {
             self.chat.room_select_next();
@@ -193,32 +228,72 @@ impl AppWidget {
         }
     }
 
-    pub fn on_right(&mut self) {}
+    pub fn on_right(&mut self) {
+        if !self.login_w.logged_in && self.login_or_register == LoginOrRegister::Login {
+            self.login_or_register = LoginOrRegister::Register;
+        } else if !self.login_w.logged_in {
+            self.login_or_register = LoginOrRegister::Login;
+        }
+    }
 
-    pub fn on_left(&mut self) {}
+    pub fn on_left(&mut self) {
+        if !self.login_w.logged_in && self.login_or_register == LoginOrRegister::Login {
+            self.login_or_register = LoginOrRegister::Register;
+        } else if !self.login_w.logged_in {
+            self.login_or_register = LoginOrRegister::Login;
+        }
+    }
 
     async fn add_char(&mut self, c: char) {
         if self.error.is_none() {
             if !self.login_w.logged_in {
-                if c == '\n' && self.login_w.try_login() {
-                    let Login {
-                        username, password, ..
-                    } = &self.login_w.login;
-                    self.login_w.logging_in = true;
-                    if let Err(e) = self
-                        .send_jobs
-                        .send(UserRequest::Login(username.into(), password.into()))
-                        .await
-                    {
-                        self.set_error(Error::from(e));
-                    } else {
-                        self.login_w.clear_login();
+                match self.login_or_register {
+                    LoginOrRegister::Login => {
+                        if c == '\n' && self.login_w.try_login() {
+                            let Login {
+                                username, password, ..
+                            } = &self.login_w.login;
+                            self.login_w.logging_in = true;
+                            if let Err(e) = self
+                                .send_jobs
+                                .send(UserRequest::Login(username.into(), password.into()))
+                                .await
+                            {
+                                self.set_error(Error::from(e));
+                            } else {
+                                self.login_w.clear_login();
+                            }
+                            return;
+                        }
+                        if let LoginSelect::Username = self.login_w.login.selected {
+                            self.login_w.login.username.push(c);
+                        } else {
+                            self.login_w.login.password.push(c);
+                        }
                     }
-                }
-                if let LoginSelect::Username = self.login_w.login.selected {
-                    self.login_w.login.username.push(c);
-                } else {
-                    self.login_w.login.password.push(c);
+                    LoginOrRegister::Register => {
+                        if c == '\n' && self.register.try_register() {
+                            let Register {
+                                username, password, ..
+                            } = &self.register.register;
+                            self.register.registering = true;
+                            if let Err(e) = self
+                                .send_jobs
+                                .send(UserRequest::Register(username.into(), password.into()))
+                                .await
+                            {
+                                self.set_error(Error::from(e));
+                            } else {
+                                self.register.clear_register();
+                            }
+                            return;
+                        }
+                        if let RegisterSelect::Username = self.register.register.selected {
+                            self.register.register.username.push(c);
+                        } else {
+                            self.register.register.password.push(c);
+                        }
+                    }
                 }
             } else if self.chat.is_main_screen() {
                 // send typing notice to the server
@@ -244,10 +319,21 @@ impl AppWidget {
 
     pub fn on_backspace(&mut self) {
         if !self.login_w.logged_in {
-            if let LoginSelect::Username = self.login_w.login.selected {
-                self.login_w.login.username.pop();
-            } else {
-                self.login_w.login.password.pop();
+            match self.login_or_register {
+                LoginOrRegister::Login => {
+                    if let LoginSelect::Username = self.login_w.login.selected {
+                        self.login_w.login.username.pop();
+                    } else {
+                        self.login_w.login.password.pop();
+                    }
+                }
+                LoginOrRegister::Register => {
+                    if let RegisterSelect::Username = self.register.register.selected {
+                        self.register.register.username.pop();
+                    } else {
+                        self.register.register.password.pop();
+                    }
+                }
             }
         } else if self.chat.is_main_screen() {
             self.chat.remove_char();
@@ -337,11 +423,24 @@ impl AppWidget {
                         self.set_error(e);
                     }
                     Ok((rooms, resp)) => {
+                        self.login_w.logging_in = false;
                         self.login_w.logged_in = true;
                         self.chat.set_main_screen(true);
-                        self.login_w.logging_in = false;
                         self.chat.set_current_user(&resp.user_id);
                         self.chat.set_room_state(rooms).await;
+                    }
+                },
+                RequestResult::Register(res) => match res {
+                    Err(e) => {
+                        self.login_w.logging_in = false;
+                        self.set_error(e);
+                    }
+                    Ok(resp) => {
+                        self.login_w.logging_in = false;
+                        self.login_w.logged_in = true;
+                        self.chat.set_main_screen(true);
+                        self.chat.set_current_user(&resp.user_id);
+                        // TODO need to impl room search...
                     }
                 },
                 // TODO this has the EventId which we need to keep
@@ -772,7 +871,7 @@ impl DrawWidget for AppWidget {
                 )]
             } else if !self.login_w.logged_in {
                 vec![Text::styled(
-                    "Login to a Matrix Server",
+                    "Login or hit the left or right arrow keys to register!",
                     Style::new().fg(Color::Green),
                 )]
             } else if self.chat.is_joining_room() {
@@ -816,7 +915,10 @@ impl DrawWidget for AppWidget {
                         .unwrap_or(String::from("matrix.org"));
                     self.login_w.homeserver = Some(domain);
                 }
-                self.login_w.render(&mut f, chunks2[0])
+                match self.login_or_register {
+                    LoginOrRegister::Login => self.login_w.render(&mut f, chunks2[0]),
+                    LoginOrRegister::Register => self.register.render(&mut f, chunks2[0]),
+                }
             } else {
                 self.chat.render(&mut f, chunks2[0])
             }

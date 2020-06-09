@@ -7,6 +7,7 @@ pub mod chat;
 mod error;
 pub mod login;
 pub mod message;
+pub mod register;
 pub mod rooms;
 pub mod utils;
 

@@ -98,6 +98,7 @@ impl From<MatrixError> for Error {
                     // This should be the most common error kind and some should be recoverable.
                     ServerError::Known(RumaApiError { kind, message, .. }) => match kind {
                         ErrorKind::Forbidden => Error::RumaResponse(LOGIN_MSG.to_string()),
+                        ErrorKind::UserInUse => Error::RumaResponse(format!("{}", message)),
                         _ => Error::RumaResponse(format!("{}", message)),
                     },
                     ServerError::Unknown(err) => Error::Unknown(format!("{}", err)),

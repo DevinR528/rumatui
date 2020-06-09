@@ -13,8 +13,9 @@ use matrix_sdk::{
     },
     events::room::message::MessageEventContent,
     identifiers::{DeviceId, EventId, RoomId, UserId},
-    Client, ClientConfig, JsonStore, RegistrationBuilder, Room, SyncSettings,
+    Client, ClientConfig, Error as MatrixError, JsonStore, RegistrationBuilder, Room, SyncSettings,
 };
+use ruma_client_api::r0::uiaa::{UiaaInfo, UiaaResponse};
 use tokio::sync::RwLock;
 use url::Url;
 use uuid::Uuid;
@@ -145,13 +146,62 @@ impl MatrixClient {
 
         if let Some(device) = device_id {
             req.device_id(&device);
+        } else {
+            req.initial_device_display_name(RUMATUI_ID);
         }
 
         req.password(&password)
             .username(&username)
             .kind(RegistrationKind::User);
 
-        self.inner.register_user(req).await.map_err(Into::into)
+        // auth types for uiaa
+        // m.login.password
+        // m.login.recaptcha
+        // m.login.oauth2
+        // m.login.email.identity
+        // m.login.msisdn
+        // m.login.token
+        // m.login.dummy
+
+        // fallback site
+
+        match self.inner.register_user(req).await {
+            Err(error) => {
+                match &error {
+                    MatrixError::UiaaError(matrix_sdk::FromHttpResponseError::Http(
+                        matrix_sdk::ServerError::Known(UiaaResponse::AuthResponse(UiaaInfo {
+                            auth_error: _,
+                            params,
+                            flows: _,
+                            completed: _,
+                            session,
+                        })),
+                    )) => {
+                        let auth_body = serde_json::json! {{
+                            "auth": {
+                                "session": session,
+                            }
+                        }};
+                        let map: HashMap<String, Box<serde_json::value::RawValue>> =
+                            serde_json::from_str(params.get()).unwrap();
+                        for auth in map.keys() {
+                            let fallback = format!(
+                                "{}_matrix/client/r0/auth/{}/fallback/web?session={}",
+                                self.homeserver,
+                                auth,
+                                session.as_ref().unwrap()
+                            );
+                            if let Ok(_) = webbrowser::open(&fallback) {
+
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                Err(error.into())
+            }
+            Ok(ok) => Ok(ok),
+        }
     }
 
     /// Manually sync state, provides a default sync token if None is given.
@@ -221,8 +271,7 @@ impl MatrixClient {
         match self.inner.room_messages(request).await {
             Ok(res) => {
                 if let Some(end) = &res.end {
-                    self.last_scroll
-                    .insert(id.clone(), end.clone());
+                    self.last_scroll.insert(id.clone(), end.clone());
                 }
                 Ok(res)
             }

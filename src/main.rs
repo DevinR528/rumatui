@@ -5,19 +5,15 @@
     clippy::single_match
 )]
 
-use std::{
-    env, io, time::Duration,
-};
+use std::{env, io, time::Duration};
 
 use termion::{
     event::{Event as TermEvent, Key, MouseButton, MouseEvent},
-    input::MouseTerminal, raw::IntoRawMode,
+    input::MouseTerminal,
+    raw::IntoRawMode,
 };
 
-use rumatui_tui::{
-    backend::TermionBackend,
-    Terminal,
-};
+use rumatui_tui::{backend::TermionBackend, Terminal};
 
 mod client;
 mod error;
@@ -69,6 +65,8 @@ fn main() -> Result<(), failure::Error> {
                             Key::Ctrl(c) if c == 's' => app.on_send().await,
                             Key::Up => app.on_up().await,
                             Key::Down => app.on_down().await,
+                            Key::Left => app.on_left(),
+                            Key::Right => app.on_right(),
                             Key::Backspace => app.on_backspace(),
                             Key::Delete => app.on_delete().await,
                             Key::Char(c) => app.on_key(c).await,

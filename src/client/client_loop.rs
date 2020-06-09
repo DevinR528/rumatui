@@ -9,6 +9,7 @@ use std::{
 
 use matrix_sdk::{
     api::r0::{
+        account::register,
         membership::{join_room_by_id, leave_room},
         message::{create_message_event, get_message_events},
         // receipt::create_receipt,
@@ -42,6 +43,7 @@ use crate::{
 #[derive(Debug)]
 pub enum UserRequest {
     Login(String, String),
+    Register(String, String),
     SendMessage(RoomId, MessageEventContent, Uuid),
     RoomMsgs(RoomId),
     AcceptInvite(RoomId),
@@ -61,6 +63,7 @@ pub enum RequestResult {
             login::Response,
         )>,
     ),
+    Register(Result<register::Response>),
     SendMessage(Result<create_message_event::Response>),
     RoomMsgs(Result<(get_message_events::Response, Arc<RwLock<Room>>)>),
     AcceptInvite(Result<join_room_by_id::Response>),
@@ -137,6 +140,12 @@ impl MatrixEventHandle {
                             panic!("client event handler crashed {}", e)
                         }
                     }
+                    UserRequest::Register(u, p) => {
+                        let res = client.register_user(u, p, None).await;
+                        if let Err(e) = to_app.send(RequestResult::Register(res)).await {
+                            panic!("client event handler crashed {}", e)
+                        }
+                    }
                     UserRequest::SendMessage(room, msg, uuid) => {
                         let res = client.send_message(&room, msg, uuid).await;
                         if let Err(e) = to_app.send(RequestResult::SendMessage(res)).await {
@@ -201,7 +210,9 @@ impl MatrixEventHandle {
                         }
                     }
                     UserRequest::ReadReceipt(room_id, event_id) => {
-                        let res = client.read_marker(&room_id, &event_id, Some(&event_id)).await;
+                        let res = client
+                            .read_marker(&room_id, &event_id, Some(&event_id))
+                            .await;
                         if let Err(e) = to_app.send(RequestResult::ReadReceipt(res)).await {
                             panic!("client event handler crashed {}", e)
                         }

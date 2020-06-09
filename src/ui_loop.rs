@@ -1,9 +1,4 @@
-use std::{
-    io,
-    sync::mpsc,
-    thread,
-    time::Duration,
-};
+use std::{io, sync::mpsc, thread, time::Duration};
 
 use termion::{
     event::{Event as TermEvent, Key},

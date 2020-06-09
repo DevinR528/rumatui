@@ -7,79 +7,47 @@ use rumatui_tui::{
 };
 use termion::event::MouseButton;
 
-use crate::widgets::RenderWidget;
+use crate::widgets::{login::Loading, RenderWidget};
 
-#[derive(Clone, Copy, Debug)]
-pub struct Loading {
-    pub count: usize,
-    pub add: bool,
-}
-
-impl Default for Loading {
-    fn default() -> Self {
-        Self {
-            count: 1,
-            add: true,
-        }
-    }
-}
-
-impl Loading {
-    pub fn tick(&mut self, max: u16) {
-        let max = (max - 1) as usize;
-        if self.count > max {
-            self.add = false;
-        }
-        if self.count == 1 {
-            self.add = true;
-        }
-
-        if self.add {
-            self.count += 1;
-        } else {
-            self.count -= 1;
-        }
-    }
-}
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum LoginSelect {
+pub enum RegisterSelect {
     Username = 0,
     Password,
 }
-impl Default for LoginSelect {
+impl Default for RegisterSelect {
     fn default() -> Self {
         Self::Username
     }
 }
 #[derive(Clone, Debug, Default)]
-pub struct Login {
-    pub selected: LoginSelect,
+pub struct Register {
+    pub selected: RegisterSelect,
     pub username: String,
     pub password: String,
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct LoginWidget {
+pub struct RegisterWidget {
     user_area: Rect,
     password_area: Rect,
-    pub login: Login,
-    pub logging_in: bool,
-    pub logged_in: bool,
+    pub register: Register,
+    pub registering: bool,
+    pub registered: bool,
     pub waiting: Loading,
     pub homeserver: Option<String>,
 }
 
-impl LoginWidget {
-    pub(crate) fn try_login(&self) -> bool {
-        LoginSelect::Password == self.login.selected
-            && !self.login.password.is_empty()
-            && !self.login.username.is_empty()
+impl RegisterWidget {
+    pub(crate) fn try_register(&self) -> bool {
+        RegisterSelect::Password == self.register.selected
+            && !self.register.password.is_empty()
+            && !self.register.username.is_empty()
     }
 
-    pub(crate) fn clear_login(&mut self) {
-        // self.login.username.clear();
-        // self.login.password.clear();
+    pub(crate) fn clear_register(&mut self) {
+        // self.register.username.clear();
+        // self.register.password.clear();
     }
 
     /// If right mouse button and clicked within the area of the username or
@@ -87,15 +55,15 @@ impl LoginWidget {
     pub fn on_click(&mut self, btn: MouseButton, x: u16, y: u16) {
         if let MouseButton::Left = btn {
             if self.user_area.intersects(Rect::new(x, y, 1, 1)) {
-                self.login.selected = LoginSelect::Username;
+                self.register.selected = RegisterSelect::Username;
             } else if self.password_area.intersects(Rect::new(x, y, 1, 1)) {
-                self.login.selected = LoginSelect::Password;
+                self.register.selected = RegisterSelect::Password;
             }
         }
     }
 }
 
-impl RenderWidget for LoginWidget {
+impl RenderWidget for RegisterWidget {
     fn render<B>(&mut self, f: &mut Frame<B>, area: Rect)
     where
         B: Backend,
@@ -113,9 +81,9 @@ impl RenderWidget for LoginWidget {
             .split(area);
 
         let server = self.homeserver.as_deref().unwrap_or("matrix.org");
-        let login = &format!("Log in to {}", server);
+        let register = &format!("Register account on {}", server);
         let blk = Block::default()
-            .title(login)
+            .title(register)
             .title_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
             .borders(Borders::ALL);
         f.render_widget(blk, chunks[1]);
@@ -145,10 +113,10 @@ impl RenderWidget for LoginWidget {
             )
             .split(height_chunk[1]);
 
-        if self.logging_in {
+        if self.registering {
             self.waiting.tick(width_chunk1[1].width);
             let blk = Block::default()
-                .title("Logging in")
+                .title("Registering")
                 .border_style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD))
                 .borders(Borders::ALL);
 
@@ -162,7 +130,7 @@ impl RenderWidget for LoginWidget {
 
             f.render_widget(p, width_chunk1[1]);
         } else {
-            let (high_user, high_pass) = if self.login.selected == LoginSelect::Username {
+            let (high_user, high_pass) = if self.register.selected == RegisterSelect::Username {
                 (
                     Block::default()
                         .title("User Name")
@@ -198,7 +166,7 @@ impl RenderWidget for LoginWidget {
 
             // User name
             let t = [Text::styled(
-                &self.login.username,
+                &self.register.username,
                 Style::default().fg(Color::Cyan),
             )];
             let p = Paragraph::new(t.iter()).block(high_user);
@@ -207,7 +175,7 @@ impl RenderWidget for LoginWidget {
 
             // Password from here down
             let t2 = [Text::styled(
-                "*".repeat(self.login.password.len()),
+                "*".repeat(self.register.password.len()),
                 Style::default().fg(Color::Cyan),
             )];
             let p2 = Paragraph::new(t2.iter()).block(high_pass);
