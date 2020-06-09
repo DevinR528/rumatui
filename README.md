@@ -3,6 +3,7 @@
 ## A command-line Matrix client.
 [![Build Status](https://travis-ci.com/DevinR528/rumatui.svg?branch=master)](https://travis-ci.com/DevinR528/rumatui)
 [![Latest Version](https://img.shields.io/crates/v/rumatui.svg)](https://crates.io/crates/rumatui)
+[![#rumatui](https://img.shields.io/badge/matrix-%23rumatui-purple?style=flat-square)](https://matrix.to/#/#rumatui:matrix.org)
 
 Work In Progress. A Matrix client written using [tui.rs](https://github.com/fdehau/tui-rs) and [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk) to provide a clickable cli to chat.
 
