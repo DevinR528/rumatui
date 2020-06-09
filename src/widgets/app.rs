@@ -41,6 +41,7 @@ use crate::{
         rooms::Invite,
         DrawWidget, RenderWidget,
     },
+    ui_loop::UiEventHandle,
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -408,12 +409,13 @@ impl AppWidget {
     }
 
     /// This checks once then continues returns to continue the ui loop.
-    pub async fn on_tick(&mut self) {
+    pub async fn on_tick(&mut self, event_hndl: &UiEventHandle) {
         if self.login_w.logged_in && !self.sync_started {
             self.sync_started = true;
             self.ev_loop.start_sync();
         }
-
+        use matrix_sdk::Error as MatrixError;
+        use ruma_client_api::r0::uiaa::{UiaaInfo, UiaaResponse};
         // this will login, send messages, and any other user initiated requests
         match self.ev_msgs.try_recv() {
             Ok(res) => match res {
@@ -431,9 +433,38 @@ impl AppWidget {
                     }
                 },
                 RequestResult::Register(res) => match res {
-                    Err(e) => {
-                        self.login_w.logging_in = false;
-                        self.set_error(e);
+                    Err(error) => match &error {
+                        Error::MatrixUiaaError(MatrixError::UiaaError(matrix_sdk::FromHttpResponseError::Http(
+                            matrix_sdk::ServerError::Known(UiaaResponse::AuthResponse(UiaaInfo {
+                                auth_error: _,
+                                params,
+                                flows: _,
+                                completed: _,
+                                session,
+                            }))),
+                        )) => {
+                            let client = reqwest::Client::new();
+
+                            let auth_body = serde_json::json! {{
+                                "auth": {
+                                    "session": session,
+                                }
+                            }}.to_string();
+                            let map: std::collections::HashMap<String, Box<serde_json::value::RawValue>> =
+                                serde_json::from_str(params.get()).unwrap();
+                            for auth in map.keys() {
+                                let fallback = format!(
+                                    "{}/_matrix/client/r0/auth/{}/fallback/web?session={}",
+                                    self.homeserver,
+                                    auth,
+                                    session.as_ref().unwrap()
+                                );
+                                if webbrowser::open(&fallback).is_ok() {
+                                    while let Ok(crate::ui_loop::Event::Tick) = event_hndl.next() {}
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                     Ok(resp) => {
                         self.login_w.logging_in = false;

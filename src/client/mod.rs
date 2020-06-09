@@ -13,9 +13,8 @@ use matrix_sdk::{
     },
     events::room::message::MessageEventContent,
     identifiers::{DeviceId, EventId, RoomId, UserId},
-    Client, ClientConfig, Error as MatrixError, JsonStore, RegistrationBuilder, Room, SyncSettings,
+    Client, ClientConfig, JsonStore, RegistrationBuilder, Room, SyncSettings,
 };
-use ruma_client_api::r0::uiaa::{UiaaInfo, UiaaResponse};
 use tokio::sync::RwLock;
 use url::Url;
 use uuid::Uuid;
@@ -165,43 +164,7 @@ impl MatrixClient {
 
         // fallback site
 
-        match self.inner.register_user(req).await {
-            Err(error) => {
-                match &error {
-                    MatrixError::UiaaError(matrix_sdk::FromHttpResponseError::Http(
-                        matrix_sdk::ServerError::Known(UiaaResponse::AuthResponse(UiaaInfo {
-                            auth_error: _,
-                            params,
-                            flows: _,
-                            completed: _,
-                            session,
-                        })),
-                    )) => {
-                        let auth_body = serde_json::json! {{
-                            "auth": {
-                                "session": session,
-                            }
-                        }};
-                        let map: HashMap<String, Box<serde_json::value::RawValue>> =
-                            serde_json::from_str(params.get()).unwrap();
-                        for auth in map.keys() {
-                            let fallback = format!(
-                                "{}_matrix/client/r0/auth/{}/fallback/web?session={}",
-                                self.homeserver,
-                                auth,
-                                session.as_ref().unwrap()
-                            );
-                            if let Ok(_) = webbrowser::open(&fallback) {
-
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-                Err(error.into())
-            }
-            Ok(ok) => Ok(ok),
-        }
+        self.inner.register_user(req).await.map_err(Into::into)
     }
 
     /// Manually sync state, provides a default sync token if None is given.

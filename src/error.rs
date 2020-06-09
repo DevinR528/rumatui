@@ -42,6 +42,7 @@ pub enum Error {
     NeedAuth(String),
     Unknown(String),
     Channel(String),
+    MatrixUiaaError(MatrixError),
 }
 
 impl fmt::Display for Error {
@@ -82,6 +83,7 @@ impl fmt::Display for Error {
                 "The receiving end of a channel shutdown while still receiving messages.\n{}",
                 msg
             ),
+            Self::MatrixUiaaError(_err) => write!(f, "whoaaaa"),
         }
     }
 }
@@ -116,6 +118,7 @@ impl From<MatrixError> for Error {
                 MatrixBaseError::MegolmError(err) => Error::Encryption(format!("{}", err)),
                 MatrixBaseError::OlmError(err) => Error::Encryption(format!("{}", err)),
             },
+            MatrixError::UiaaError(_) => Error::MatrixUiaaError(error),
             _ => Error::Unknown("connection to the server was lost or not established".into()),
         }
     }

@@ -92,7 +92,7 @@ fn main() -> Result<(), failure::Error> {
                     TermEvent::Unsupported(_) => {}
                 },
                 Event::Tick => {
-                    app.on_tick().await;
+                    app.on_tick(&events).await;
                 }
             }
 

@@ -54,7 +54,6 @@ unicode-segmentation = "1.6.0"
 url = "2.1.1"
 uuid = { version = "0.8.1", features = ["v4"] }
 
-http = "0.2.1"
 reqwest = "0.10.4"
 
 [dependencies.pulldown-cmark]

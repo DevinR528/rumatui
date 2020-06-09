@@ -2009,6 +2009,7 @@ dependencies = [
  "muncher",
  "pulldown-cmark",
  "regex",
+ "reqwest",
  "ruma-client-api",
  "ruma-identifiers",
  "rumatui-tui 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
