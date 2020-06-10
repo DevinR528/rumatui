@@ -167,6 +167,32 @@ impl MatrixClient {
         self.inner.register_user(req).await.map_err(Into::into)
     }
 
+    pub(crate) async fn send_uiaa_ping(
+        &mut self,
+        session: String,
+    ) -> Result<ruma_ext::auth::Response> {
+        self.inner
+            .send_uiaa(ruma_ext::auth::Request {
+                auth: ruma_ext::auth::SessionObj { session },
+            })
+            .await
+            .map_err(Into::into)
+    }
+
+    pub(crate) async fn send_uiaa_dummy(
+        &mut self,
+        session: String,
+    ) -> Result<ruma_ext::auth::dummy::Response> {
+        self.inner
+            .send_uiaa(ruma_ext::auth::dummy::Request {
+                ev_type: "m.login.dummy".to_string(),
+                session: session.to_string(),
+                // auth: ruma_ext::auth::SessionObj { session },
+            })
+            .await
+            .map_err(Into::into)
+    }
+
     /// Manually sync state, provides a default sync token if None is given.
     ///
     /// This can be useful when joining a room, we need the state from before our sync_token.

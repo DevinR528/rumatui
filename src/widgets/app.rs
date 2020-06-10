@@ -32,6 +32,7 @@ use crate::{
         event_stream::{EventStream, StateResult},
     },
     error::Error,
+    ui_loop::UiEventHandle,
     widgets::{
         chat::ChatWidget,
         error::ErrorWidget,
@@ -41,7 +42,6 @@ use crate::{
         rooms::Invite,
         DrawWidget, RenderWidget,
     },
-    ui_loop::UiEventHandle,
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -82,6 +82,7 @@ pub struct AppWidget {
     /// The result of any MatrixClient job.
     pub emitter_msgs: mpsc::Receiver<StateResult>,
     pub error: Option<Error>,
+    registration: Option<String>,
 }
 
 impl AppWidget {
@@ -114,6 +115,7 @@ impl AppWidget {
             ev_msgs: recv,
             emitter_msgs,
             error: None,
+            registration: None,
         }
     }
 
@@ -416,7 +418,7 @@ impl AppWidget {
         }
         use matrix_sdk::Error as MatrixError;
         use ruma_client_api::r0::uiaa::{UiaaInfo, UiaaResponse};
-        use crate::client::ruma_ext::auth::{RegisterAuth, SessionObj};
+
         // this will login, send messages, and any other user initiated requests
         match self.ev_msgs.try_recv() {
             Ok(res) => match res {
@@ -435,25 +437,28 @@ impl AppWidget {
                 },
                 RequestResult::Register(res) => match res {
                     Err(error) => match &error {
-                        Error::MatrixUiaaError(MatrixError::UiaaError(matrix_sdk::FromHttpResponseError::Http(
-                            matrix_sdk::ServerError::Known(UiaaResponse::AuthResponse(UiaaInfo {
-                                auth_error: _,
-                                params,
-                                flows: _,
-                                completed: _,
-                                session,
-                            }))),
+                        Error::MatrixUiaaError(MatrixError::UiaaError(
+                            matrix_sdk::FromHttpResponseError::Http(
+                                matrix_sdk::ServerError::Known(UiaaResponse::AuthResponse(
+                                    UiaaInfo {
+                                        params,
+                                        flows: _,
+                                        completed,
+                                        session,
+                                        ..
+                                    },
+                                )),
+                            ),
                         )) => {
-                            let client = reqwest::Client::new();
+                            if self.registration.is_none() {
+                                self.registration.replace(session.as_ref().unwrap().clone());
+                            }
+                            let map: std::collections::HashMap<
+                                String,
+                                Box<serde_json::value::RawValue>,
+                            > = serde_json::from_str(params.get()).unwrap();
 
-                            let auth_body = serde_json::json! {{
-                                "auth": {
-                                    "session": session,
-                                }
-                            }}.to_string();
-                            let map: std::collections::HashMap<String, Box<serde_json::value::RawValue>> =
-                                serde_json::from_str(params.get()).unwrap();
-                            for auth in map.keys() {
+                            for auth in map.keys().filter(|auth| !completed.contains(auth)) {
                                 let fallback = format!(
                                     "{}/_matrix/client/r0/auth/{}/fallback/web?session={}",
                                     self.homeserver,
@@ -462,11 +467,30 @@ impl AppWidget {
                                 );
                                 if webbrowser::open(&fallback).is_ok() {
                                     while let Ok(crate::ui_loop::Event::Tick) = event_hndl.next() {}
+                                    let _ = self
+                                        .send_jobs
+                                        .send(UserRequest::UiaaPing(
+                                            self.registration.as_ref().unwrap().clone(),
+                                        ))
+                                        .await;
+                                    // we bail out until completed filters all flow stages
+                                    // meaning we are done registering
+                                    return;
                                 }
                             }
+                            println!("HERE");
+                            let _ = self
+                                .send_jobs
+                                .send(UserRequest::UiaaDummy(
+                                    self.registration.as_ref().unwrap().clone(),
+                                ))
+                                .await;
                         }
-                        _ => {}
-                    }
+                        _ => {
+                            self.login_w.logging_in = false;
+                            self.set_error(error);
+                        }
+                    },
                     Ok(resp) => {
                         self.login_w.logging_in = false;
                         self.login_w.logged_in = true;

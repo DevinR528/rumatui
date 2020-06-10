@@ -83,7 +83,7 @@ impl fmt::Display for Error {
                 "The receiving end of a channel shutdown while still receiving messages.\n{}",
                 msg
             ),
-            Self::MatrixUiaaError(_err) => write!(f, "whoaaaa"),
+            Self::MatrixUiaaError(err) => write!(f, "whoaaaa {}", err),
         }
     }
 }

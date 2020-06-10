@@ -51,6 +51,8 @@ pub enum UserRequest {
     LeaveRoom(RoomId),
     Typing(RoomId, UserId),
     ReadReceipt(RoomId, EventId),
+    UiaaPing(String),
+    UiaaDummy(String),
     Quit,
 }
 unsafe impl Send for UserRequest {}
@@ -143,6 +145,24 @@ impl MatrixEventHandle {
                     UserRequest::Register(u, p) => {
                         let res = client.register_user(u, p, None).await;
                         if let Err(e) = to_app.send(RequestResult::Register(res)).await {
+                            panic!("client event handler crashed {}", e)
+                        }
+                    }
+                    UserRequest::UiaaPing(sess) => {
+                        let res = client.send_uiaa_ping(sess).await;
+                        if let Err(e) = to_app
+                            .send(RequestResult::Register(res.map(Into::into)))
+                            .await
+                        {
+                            panic!("client event handler crashed {}", e)
+                        }
+                    }
+                    UserRequest::UiaaDummy(sess) => {
+                        let res = client.send_uiaa_dummy(sess).await;
+                        if let Err(e) = to_app
+                            .send(RequestResult::Register(res.map(Into::into)))
+                            .await
+                        {
                             panic!("client event handler crashed {}", e)
                         }
                     }
