@@ -32,7 +32,7 @@ use crate::{
         event_stream::{EventStream, StateResult},
     },
     error::Error,
-    ui_loop::UiEventHandle,
+    ui_loop::{Event, UiEventHandle},
     widgets::{
         chat::ChatWidget,
         error::ErrorWidget,
@@ -161,10 +161,10 @@ impl AppWidget {
             if self.chat.msgs_on_scroll_up(x, y) {
                 if !self.scrolling {
                     self.scrolling = true;
-                    let room_id = self.chat.to_current_room_id().unwrap();
-
-                    if let Err(e) = self.send_jobs.send(UserRequest::RoomMsgs(room_id)).await {
-                        self.set_error(e.into())
+                    if let Some(room_id) = self.chat.to_current_room_id() {
+                        if let Err(e) = self.send_jobs.send(UserRequest::RoomMsgs(room_id)).await {
+                            self.set_error(e.into())
+                        }
                     }
                 }
             } else if self.chat.room_on_scroll_up(x, y) {
@@ -232,18 +232,27 @@ impl AppWidget {
     }
 
     pub fn on_right(&mut self) {
-        if !self.login_w.logged_in && self.login_or_register == LoginOrRegister::Login {
-            self.login_or_register = LoginOrRegister::Register;
-        } else if !self.login_w.logged_in {
-            self.login_or_register = LoginOrRegister::Login;
+        if !self.login_w.logged_in {
+            if self.login_or_register == LoginOrRegister::Login {
+                self.login_or_register = LoginOrRegister::Register;
+            } else {
+                self.login_or_register = LoginOrRegister::Login;
+            }
         }
     }
 
+    /// If not logged in toggle login and registration.
+    ///
+    /// If we are at the main screen (after login) go to the room search
+    /// window.
     pub fn on_left(&mut self) {
-        if !self.login_w.logged_in && self.login_or_register == LoginOrRegister::Login {
-            self.login_or_register = LoginOrRegister::Register;
-        } else if !self.login_w.logged_in {
-            self.login_or_register = LoginOrRegister::Login;
+        if !self.login_w.logged_in {
+            if self.login_or_register == LoginOrRegister::Login {
+                self.login_or_register = LoginOrRegister::Register;
+            } else {
+                self.login_or_register = LoginOrRegister::Login;
+            }
+        } else if self.chat.is_main_screen() {
         }
     }
 
@@ -299,7 +308,6 @@ impl AppWidget {
                     }
                 }
             } else if self.chat.is_main_screen() {
-                // send typing notice to the server
                 let room_id = self.chat.to_current_room_id();
                 if !self.typing_notice {
                     self.typing_notice = true;
@@ -441,8 +449,8 @@ impl AppWidget {
                             matrix_sdk::FromHttpResponseError::Http(
                                 matrix_sdk::ServerError::Known(UiaaResponse::AuthResponse(
                                     UiaaInfo {
-                                        params,
-                                        flows: _,
+                                        params: _,
+                                        flows,
                                         completed,
                                         session,
                                         ..
@@ -450,41 +458,43 @@ impl AppWidget {
                                 )),
                             ),
                         )) => {
-                            if self.registration.is_none() {
-                                self.registration.replace(session.as_ref().unwrap().clone());
-                            }
-                            let map: std::collections::HashMap<
-                                String,
-                                Box<serde_json::value::RawValue>,
-                            > = serde_json::from_str(params.get()).unwrap();
+                            if let Some(session) = session {
+                                let stages = flows
+                                    .iter()
+                                    .find(|f| f.stages.contains(&"m.login.dummy".to_string()))
+                                    .map(|f| f.stages.clone())
+                                    .unwrap_or_else(|| flows[0].stages.clone());
 
-                            for auth in map.keys().filter(|auth| !completed.contains(auth)) {
-                                let fallback = format!(
-                                    "{}/_matrix/client/r0/auth/{}/fallback/web?session={}",
-                                    self.homeserver,
-                                    auth,
-                                    session.as_ref().unwrap()
-                                );
-                                if webbrowser::open(&fallback).is_ok() {
-                                    while let Ok(crate::ui_loop::Event::Tick) = event_hndl.next() {}
-                                    let _ = self
-                                        .send_jobs
-                                        .send(UserRequest::UiaaPing(
-                                            self.registration.as_ref().unwrap().clone(),
-                                        ))
-                                        .await;
-                                    // we bail out until completed filters all flow stages
-                                    // meaning we are done registering
-                                    return;
+                                for auth in stages.iter().filter(|auth| !completed.contains(auth)) {
+                                    if auth == "m.login.dummy" {
+                                        // TODO do something probably panic as the channel has closed
+                                        let _ = self
+                                            .send_jobs
+                                            .send(UserRequest::UiaaDummy(session.clone()))
+                                            .await;
+                                        // we are done Yay, the next response will be a Ok(response) from register
+                                        return;
+                                    }
+
+                                    let fallback = format!(
+                                        "{}/_matrix/client/r0/auth/{}/fallback/web?session={}",
+                                        self.homeserver, auth, session
+                                    );
+                                    if webbrowser::open(&fallback).is_ok() {
+                                        // wait here for the user to finish registration stage in the browser
+                                        // then on interaction send Uiaa ping
+                                        while let Ok(Event::Tick) = event_hndl.next() {}
+
+                                        let _ = self
+                                            .send_jobs
+                                            .send(UserRequest::UiaaPing(session.clone()))
+                                            .await;
+                                        // we bail out until completed filters all flow stages
+                                        // meaning we are done registering
+                                        return;
+                                    }
                                 }
                             }
-                            println!("HERE");
-                            let _ = self
-                                .send_jobs
-                                .send(UserRequest::UiaaDummy(
-                                    self.registration.as_ref().unwrap().clone(),
-                                ))
-                                .await;
                         }
                         _ => {
                             self.login_w.logging_in = false;
@@ -829,7 +839,7 @@ impl AppWidget {
                 self.notify_and_leave(
                     &room.read().await.room_id,
                     for_me,
-                    format!("you rejected an invitation"),
+                    "you rejected an invitation".to_string(),
                     format!(
                         "{} rejected an invitation to {}",
                         receiver.localpart(),

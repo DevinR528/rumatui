@@ -21,6 +21,8 @@ use uuid::Uuid;
 
 use crate::error::Result;
 
+use ruma_ext::auth::{self, dummy, SessionObj};
+
 pub mod client_loop;
 pub mod event_stream;
 pub mod ruma_ext;
@@ -167,27 +169,22 @@ impl MatrixClient {
         self.inner.register_user(req).await.map_err(Into::into)
     }
 
-    pub(crate) async fn send_uiaa_ping(
-        &mut self,
-        session: String,
-    ) -> Result<ruma_ext::auth::Response> {
+    pub(crate) async fn send_uiaa_ping(&mut self, session: String) -> Result<auth::Response> {
         self.inner
-            .send_uiaa(ruma_ext::auth::Request {
-                auth: ruma_ext::auth::SessionObj { session },
+            .send_uiaa(auth::Request {
+                auth: SessionObj { session },
             })
             .await
             .map_err(Into::into)
     }
 
-    pub(crate) async fn send_uiaa_dummy(
-        &mut self,
-        session: String,
-    ) -> Result<ruma_ext::auth::dummy::Response> {
+    pub(crate) async fn send_uiaa_dummy(&mut self, session: String) -> Result<dummy::Response> {
         self.inner
-            .send_uiaa(ruma_ext::auth::dummy::Request {
-                ev_type: "m.login.dummy".to_string(),
-                session: session.to_string(),
-                // auth: ruma_ext::auth::SessionObj { session },
+            .send_uiaa(dummy::Request {
+                auth: dummy::Dummy {
+                    ev_type: "m.login.dummy".to_string(),
+                    session: session.to_string(),
+                },
             })
             .await
             .map_err(Into::into)

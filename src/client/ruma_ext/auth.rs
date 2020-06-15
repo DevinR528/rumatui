@@ -47,10 +47,12 @@ pub mod dummy {
         account::register::Response as RegisterResponse, uiaa::UiaaResponse,
     };
 
-    use super::SessionObj;
-
     #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-    pub struct Dummy {}
+    pub struct Dummy {
+        #[serde(rename = "type")]
+        pub ev_type: String,
+        pub session: String,
+    }
 
     ruma_api::ruma_api! {
         metadata {
@@ -63,10 +65,7 @@ pub mod dummy {
         }
 
         request {
-            #[serde(rename = "type")]
-            pub ev_type: String,
-            pub session: String,
-            // pub auth: SessionObj,
+            pub auth: Dummy,
         }
 
         response {

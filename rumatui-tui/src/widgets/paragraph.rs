@@ -182,7 +182,9 @@ where
                 Box::new(scroller)
             }
             ScrollMode::Tail => {
-                let over = self.has_overflown.unwrap_or(Rc::new(Cell::new(false)));
+                let over = self
+                    .has_overflown
+                    .unwrap_or_else(|| Rc::new(Cell::new(false)));
 
                 let scroller = TailScroller::new(
                     self.scroll,
@@ -207,7 +209,9 @@ where
                     }
                 }
                 Some(ScrolledLine::Overflow) => {
-                    self.at_top.as_ref().map(|t| t.set(true));
+                    if let Some(top) = self.at_top.as_ref() {
+                        top.set(true);
+                    }
 
                     if let Some(c) = self.scroll_overflow_char {
                         buf.get_mut(text_area.left(), text_area.top() + y)
