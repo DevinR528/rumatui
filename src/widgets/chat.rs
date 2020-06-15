@@ -25,6 +25,7 @@ use crate::{
     error::Result,
     widgets::{
         message::{Message, MessageWidget},
+        room_search::RoomSearchWidget,
         rooms::{Invitation, Invite, RoomsWidget},
         RenderWidget,
     },
@@ -34,12 +35,24 @@ use crate::{
 pub struct ChatWidget {
     current_room: Rc<RefCell<Option<RoomId>>>,
     me: Option<UserId>,
-    room: RoomsWidget,
-    msgs: MessageWidget,
+    rooms_widget: RoomsWidget,
+    messages_widget: MessageWidget,
+    room_search_widget: RoomSearchWidget,
+    room_search: bool,
     main_screen: bool,
     sending_message: bool,
     joining_room: bool,
     leaving_room: bool,
+}
+
+impl ChatWidget {
+    pub(crate) fn is_room_search(&self) -> bool {
+        self.room_search
+    }
+
+    pub(crate) fn set_room_search(&mut self, value: bool) {
+        self.room_search = value;
+    }
 }
 
 impl ChatWidget {
@@ -89,7 +102,7 @@ impl ChatWidget {
 
     pub(crate) fn set_current_room_id(&mut self, room: &RoomId) {
         self.current_room = Rc::new(RefCell::new(Some(room.clone())));
-        self.msgs.current_room = Rc::clone(&self.current_room);
+        self.messages_widget.current_room = Rc::clone(&self.current_room);
     }
 
     pub(crate) fn as_current_user(&self) -> Option<&UserId> {
@@ -102,95 +115,95 @@ impl ChatWidget {
 
     pub(crate) fn set_current_user(&mut self, user: &UserId) {
         self.me = Some(user.clone());
-        self.msgs.me = Some(user.clone());
+        self.messages_widget.me = Some(user.clone());
     }
 
     pub(crate) fn as_invite(&self) -> Option<&Invitation> {
-        self.room.invite.as_ref()
+        self.rooms_widget.invite.as_ref()
     }
 
     pub(crate) fn rooms(&self) -> &HashMap<RoomId, Arc<RwLock<Room>>> {
-        &self.room.rooms
+        &self.rooms_widget.rooms
     }
 
     pub(crate) async fn set_room_state(
         &mut self,
         rooms: Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
     ) {
-        self.msgs
+        self.messages_widget
             .populate_initial_msgs(rooms.read().await.deref())
             .await;
-        self.room.populate_rooms(rooms).await;
-        self.msgs.current_room = Rc::clone(&self.room.current_room);
-        self.current_room = Rc::clone(&self.room.current_room);
+        self.rooms_widget.populate_rooms(rooms).await;
+        self.messages_widget.current_room = Rc::clone(&self.rooms_widget.current_room);
+        self.current_room = Rc::clone(&self.rooms_widget.current_room);
     }
 
     pub(crate) fn update_room(&mut self, name: &str, room: &RoomId) {
-        self.room.update_room(name, room)
+        self.rooms_widget.update_room(name, room)
     }
 
     pub(crate) fn room_on_click(&mut self, btn: MouseButton, x: u16, y: u16) -> Invite {
-        self.room.on_click(btn, x, y)
+        self.rooms_widget.on_click(btn, x, y)
     }
 
     pub(crate) fn room_on_scroll_up(&mut self, x: u16, y: u16) -> bool {
-        self.room.on_scroll_up(x, y)
+        self.rooms_widget.on_scroll_up(x, y)
     }
 
     pub(crate) fn room_on_scroll_down(&mut self, x: u16, y: u16) -> bool {
-        self.room.on_scroll_down(x, y)
+        self.rooms_widget.on_scroll_down(x, y)
     }
 
     pub(crate) fn room_select_previous(&mut self) {
-        self.room.select_previous()
+        self.rooms_widget.select_previous()
     }
 
     pub(crate) fn room_select_next(&mut self) {
-        self.room.select_next()
+        self.rooms_widget.select_next()
     }
 
     pub(crate) fn remove_invite(&mut self) {
-        self.room.remove_invite()
+        self.rooms_widget.remove_invite()
     }
 
     pub(crate) async fn add_room(&mut self, room: Arc<RwLock<Room>>) {
-        self.room.add_room(room).await
+        self.rooms_widget.add_room(room).await
     }
 
     pub(crate) fn remove_room(&mut self, room: &RoomId) {
-        self.room.remove_room(room)
+        self.rooms_widget.remove_room(room)
     }
 
     pub(crate) async fn invited(&mut self, sender: UserId, room: Arc<RwLock<Room>>) {
-        self.room.invited(sender, room).await
+        self.rooms_widget.invited(sender, room).await
     }
 
     pub(crate) fn msgs_on_click(&mut self, btn: MouseButton, x: u16, y: u16) -> bool {
-        self.msgs.on_click(btn, x, y)
+        self.messages_widget.on_click(btn, x, y)
     }
 
     pub(crate) fn msgs_on_scroll_up(&mut self, x: u16, y: u16) -> bool {
-        self.msgs.on_scroll_up(x, y)
+        self.messages_widget.on_scroll_up(x, y)
     }
 
     pub(crate) fn msgs_on_scroll_down(&mut self, x: u16, y: u16) {
-        self.msgs.on_scroll_down(x, y)
+        self.messages_widget.on_scroll_down(x, y)
     }
 
     pub(crate) fn reset_scroll(&mut self) {
-        self.msgs.reset_scroll()
+        self.messages_widget.reset_scroll()
     }
 
     pub(crate) fn add_char(&mut self, ch: char) {
-        self.msgs.add_char(ch)
+        self.messages_widget.add_char(ch)
     }
 
     pub(crate) fn remove_char(&mut self) {
-        self.msgs.remove_char()
+        self.messages_widget.remove_char()
     }
 
     pub(crate) fn add_notify(&mut self, msg: &str) {
-        self.msgs.add_notify(msg)
+        self.messages_widget.add_notify(msg)
     }
 
     pub(crate) fn set_reaction_event(
@@ -200,12 +213,12 @@ impl ChatWidget {
         event_id: &EventId,
         reaction: &str,
     ) {
-        self.msgs
+        self.messages_widget
             .set_reaction_event(room, relates_to, event_id, reaction)
     }
 
     pub(crate) fn add_message(&mut self, msg: Message, room: &RoomId) {
-        self.msgs.add_message(msg, room)
+        self.messages_widget.add_message(msg, room)
     }
 
     pub(crate) fn echo_sent_msg(
@@ -216,29 +229,30 @@ impl ChatWidget {
         uuid: Uuid,
         content: MessageEventContent,
     ) {
-        self.msgs.echo_sent_msg(id, name, homeserver, uuid, content)
+        self.messages_widget
+            .echo_sent_msg(id, name, homeserver, uuid, content)
     }
 
     pub(crate) fn edit_message(&mut self, room: &RoomId, event: &EventId, new_msg: String) {
-        self.msgs.edit_message(room, event, new_msg)
+        self.messages_widget.edit_message(room, event, new_msg)
     }
 
     pub(crate) fn redaction_event(&mut self, room: &RoomId, event: &EventId) {
-        self.msgs.redaction_event(room, event)
+        self.messages_widget.redaction_event(room, event)
     }
 
     pub(crate) fn clear_send_msg(&mut self) {
-        self.msgs.clear_send_msg()
+        self.messages_widget.clear_send_msg()
     }
 
     pub(crate) fn get_sending_message(&self) -> Result<MessageEventContent> {
-        self.msgs.get_sending_message()
+        self.messages_widget.get_sending_message()
     }
 
     /// `check_unread` is used when the user is active in a room, we check for any messages
     /// that have not been seen and mark them as seen by sending a read marker/read receipt.
     pub(crate) async fn check_unread(&mut self, room: Arc<RwLock<Room>>) -> Option<EventId> {
-        self.msgs.check_unread(room.read().await.deref())
+        self.messages_widget.check_unread(room.read().await.deref())
     }
 
     /// `read_receipt` is used when a message comes in and the user is
@@ -248,15 +262,15 @@ impl ChatWidget {
         last_interaction: SystemTime,
         room: &RoomId,
     ) -> Option<EventId> {
-        self.msgs.read_receipt(last_interaction, room)
+        self.messages_widget.read_receipt(last_interaction, room)
     }
 
     pub(crate) fn read_to_end(&mut self, room: &RoomId, event: &EventId) -> bool {
-        self.msgs.read_to_end(room, event)
+        self.messages_widget.read_to_end(room, event)
     }
 
     pub(crate) fn last_3_msg_event_ids(&self, room: &RoomId) -> Vec<&EventId> {
-        self.msgs.last_3_msg_event_ids(room)
+        self.messages_widget.last_3_msg_event_ids(room)
     }
 }
 
@@ -270,7 +284,12 @@ impl RenderWidget for ChatWidget {
             .direction(Direction::Horizontal)
             .split(area);
 
-        self.room.render(f, chunks[0]);
-        self.msgs.render(f, chunks[1]);
+        self.rooms_widget.render(f, chunks[0]);
+
+        if self.is_room_search() {
+            self.room_search_widget.render(f, chunks[1]);
+        } else {
+            self.messages_widget.render(f, chunks[1]);
+        }
     }
 }

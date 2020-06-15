@@ -8,6 +8,7 @@ mod error;
 pub mod login;
 pub mod message;
 pub mod register;
+pub mod room_search;
 pub mod rooms;
 pub mod utils;
 

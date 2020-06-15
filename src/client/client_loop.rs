@@ -58,6 +58,7 @@ pub enum UserRequest {
 unsafe impl Send for UserRequest {}
 
 /// Either a `UserRequest` succeeds or fails with the given result.
+#[allow(clippy::type_complexity)]
 pub enum RequestResult {
     Login(
         Result<(

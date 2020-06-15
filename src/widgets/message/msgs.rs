@@ -236,12 +236,9 @@ impl MessageWidget {
 
     pub fn get_sending_message(&self) -> Result<MessageEventContent> {
         match self.process_message() {
-            MsgType::PlainText => Ok(MessageEventContent::Text(TextMessageEventContent {
-                body: self.send_msg.clone(),
-                format: None,
-                formatted_body: None,
-                relates_to: None,
-            })),
+            MsgType::PlainText => Ok(MessageEventContent::Text(
+                TextMessageEventContent::new_plain(&self.send_msg),
+            )),
             MsgType::FormattedText => Ok(MessageEventContent::Text(TextMessageEventContent {
                 body: self.send_msg.clone(),
                 format: Some("org.matrix.custom.html".into()),
@@ -475,7 +472,7 @@ impl RenderWidget for MessageWidget {
             Some(id.clone())
         } else {
             // or take the first room in the list, this happens on login
-            self.messages.keys().nth(0).cloned()
+            self.messages.keys().next().cloned()
         };
 
         let mut msg_copy = vec![];

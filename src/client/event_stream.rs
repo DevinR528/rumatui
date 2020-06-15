@@ -112,7 +112,7 @@ impl EventStream {
         }
     }
 }
-
+#[allow(clippy::eval_order_dependence)]
 #[async_trait::async_trait]
 impl EventEmitter for EventStream {
     /// Send a membership change event to the ui thread.

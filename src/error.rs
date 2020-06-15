@@ -92,6 +92,7 @@ impl std::error::Error for Error {}
 
 /// This is the most important error conversion as most of the user facing errors are here.
 impl From<MatrixError> for Error {
+    #[allow(clippy::useless_format)]
     fn from(error: MatrixError) -> Self {
         match error {
             MatrixError::AuthenticationRequired => Error::NeedAuth(AUTH_MSG.to_string()),
