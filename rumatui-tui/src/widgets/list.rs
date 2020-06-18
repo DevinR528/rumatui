@@ -7,6 +7,7 @@ use crate::layout::{Corner, Rect};
 use crate::style::Style;
 use crate::widgets::{Block, StatefulWidget, Text, Widget};
 
+#[derive(Copy, Clone, Debug)]
 pub struct ListState {
     offset: usize,
     selected: Option<usize>,

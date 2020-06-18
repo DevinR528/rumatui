@@ -2,6 +2,10 @@
 
 ## 0.1.14
 
+* Room search is now available
+  * Public rooms can be joined from the room search window 
+* A user can register from the new register window
+  * This features complete User Interactive Authentication
 * Message edits are shown
 * Reactions display under the respective message
 * Redaction events are handled for reactions (emoji) and messages

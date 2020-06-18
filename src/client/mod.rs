@@ -4,6 +4,7 @@ use matrix_sdk::{
     self,
     api::r0::{
         account::register::{self, RegistrationKind},
+        directory::get_public_rooms_filtered::{self, Filter, RoomNetwork},
         membership::{forget_room, join_room_by_id, kick_user, leave_room},
         message::{create_message_event, get_message_events},
         read_marker::set_read_marker,
@@ -13,7 +14,7 @@ use matrix_sdk::{
     },
     events::room::message::MessageEventContent,
     identifiers::{DeviceId, EventId, RoomId, UserId},
-    Client, ClientConfig, JsonStore, RegistrationBuilder, Room, SyncSettings,
+    Client, ClientConfig, JsonStore, RegistrationBuilder, Room, RoomSearchBuilder, SyncSettings,
 };
 use tokio::sync::RwLock;
 use url::Url;
@@ -263,6 +264,34 @@ impl MatrixClient {
             }
             err => err.map_err(Into::into),
         }
+    }
+
+    pub(crate) async fn get_rooms_filtered(
+        &mut self,
+        filter: &str,
+        network: RoomNetwork,
+        token: Option<String>,
+    ) -> Result<get_public_rooms_filtered::Response> {
+        let filter = if filter.is_empty() {
+            None
+        } else {
+            Some(filter.to_string())
+        };
+        let mut request = RoomSearchBuilder::new();
+        request
+            .filter(Filter {
+                generic_search_term: filter,
+            })
+            .room_network(network);
+
+        if let Some(tkn) = token {
+            request.since(tkn);
+        }
+
+        self.inner
+            .get_public_rooms_filtered(request)
+            .await
+            .map_err(Into::into)
     }
 
     /// Joins the specified room.

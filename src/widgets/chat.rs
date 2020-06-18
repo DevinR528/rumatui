@@ -8,6 +8,7 @@ use std::{
 };
 
 use matrix_sdk::{
+    api::r0::directory::get_public_rooms_filtered::{self, RoomNetwork},
     events::room::message::MessageEventContent,
     identifiers::{EventId, RoomId, UserId},
     Room,
@@ -52,6 +53,54 @@ impl ChatWidget {
 
     pub(crate) fn set_room_search(&mut self, value: bool) {
         self.room_search = value;
+    }
+
+    pub(crate) fn push_search_text(&mut self, ch: char) {
+        self.room_search_widget.push_search_text(ch);
+    }
+
+    pub(crate) fn pop_search_text(&mut self) {
+        self.room_search_widget.pop_search_text();
+    }
+
+    pub(crate) fn try_room_search(&self) -> bool {
+        self.room_search_widget.try_room_search()
+    }
+
+    pub(crate) fn search_term(&self) -> &str {
+        self.room_search_widget.search_term()
+    }
+
+    pub(crate) fn selected_room_search(&mut self) -> Option<RoomId> {
+        self.room_search_widget.selected_room()
+    }
+
+    pub(crate) fn clear_room_search(&mut self) {
+        self.room_search_widget.clear_search_result()
+    }
+
+    pub(crate) fn room_search_results(&mut self, resp: get_public_rooms_filtered::Response) {
+        self.room_search_widget.room_search_results(resp)
+    }
+
+    pub(crate) fn room_search_scroll_up(&mut self, x: u16, y: u16) -> bool {
+        self.room_search_widget.on_scroll_up(x, y)
+    }
+
+    pub(crate) fn room_search_scroll_down(&mut self, x: u16, y: u16) -> bool {
+        self.room_search_widget.on_scroll_down(x, y)
+    }
+
+    pub(crate) fn room_search_select_previous(&mut self) {
+        self.room_search_widget.select_previous()
+    }
+
+    pub(crate) fn room_search_select_next(&mut self) {
+        self.room_search_widget.select_next()
+    }
+
+    pub(crate) fn room_search_next_request(&mut self) -> Option<(String, RoomNetwork, String)> {
+        self.room_search_widget.next_request()
     }
 }
 
@@ -103,6 +152,8 @@ impl ChatWidget {
     pub(crate) fn set_current_room_id(&mut self, room: &RoomId) {
         self.current_room = Rc::new(RefCell::new(Some(room.clone())));
         self.messages_widget.current_room = Rc::clone(&self.current_room);
+        self.room_search_widget
+            .set_current_room_id(Rc::clone(&self.current_room));
     }
 
     pub(crate) fn as_current_user(&self) -> Option<&UserId> {

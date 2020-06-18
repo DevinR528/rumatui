@@ -10,6 +10,7 @@ use std::{
 use matrix_sdk::{
     api::r0::{
         account::register,
+        directory::get_public_rooms_filtered::{self, RoomNetwork},
         membership::{join_room_by_id, leave_room},
         message::{create_message_event, get_message_events},
         // receipt::create_receipt,
@@ -48,9 +49,11 @@ pub enum UserRequest {
     RoomMsgs(RoomId),
     AcceptInvite(RoomId),
     DeclineInvite(RoomId),
+    JoinRoom(RoomId),
     LeaveRoom(RoomId),
     Typing(RoomId, UserId),
     ReadReceipt(RoomId, EventId),
+    RoomSearch(String, RoomNetwork, Option<String>),
     UiaaPing(String),
     UiaaDummy(String),
     Quit,
@@ -72,8 +75,10 @@ pub enum RequestResult {
     AcceptInvite(Result<join_room_by_id::Response>),
     DeclineInvite(Result<leave_room::Response>, RoomId),
     LeaveRoom(Result<leave_room::Response>, RoomId),
+    JoinRoom(Result<RoomId>),
     Typing(Result<create_typing_event::Response>),
     ReadReceipt(Result<set_read_marker::Response>),
+    RoomSearch(Result<get_public_rooms_filtered::Response>),
     Error(Error),
 }
 
@@ -204,6 +209,22 @@ impl MatrixEventHandle {
                             }
                         }
                     },
+                    UserRequest::RoomSearch(filter, network, tkn) => {
+                        match client.get_rooms_filtered(&filter, network, tkn).await {
+                            Ok(res) => {
+                                if let Err(e) =
+                                    to_app.send(RequestResult::RoomSearch(Ok(res))).await
+                                {
+                                    panic!("client event handler crashed {}", e)
+                                }
+                            }
+                            Err(err) => {
+                                if let Err(e) = to_app.send(RequestResult::Error(err)).await {
+                                    panic!("client event handler crashed {}", e)
+                                }
+                            }
+                        }
+                    }
                     UserRequest::AcceptInvite(room_id) => {
                         let res = client.join_room_by_id(&room_id).await;
                         if let Err(e) = to_app.send(RequestResult::AcceptInvite(res)).await {
@@ -228,6 +249,34 @@ impl MatrixEventHandle {
                             panic!("client event handler crashed {}", e)
                         } else if let Err(e) = client.forget_room(&room_id).await {
                             panic!("client event handler crashed {}", e)
+                        }
+                    }
+                    UserRequest::JoinRoom(room_id) => {
+                        match client.join_room_by_id(&room_id).await {
+                            Ok(res) => {
+                                let room_id = &res.room_id;
+                                // let room = Arc::clone(
+                                //     client
+                                //         .inner
+                                //         .joined_rooms()
+                                //         .read()
+                                //         .await
+                                //         .get(room_id)
+                                //         .unwrap(),
+                                // );
+                                if let Err(e) = to_app
+                                    .send(RequestResult::JoinRoom(Ok(room_id.clone())))
+                                    .await
+                                {
+                                    panic!("client event handler crashed {}", e)
+                                }
+                            }
+                            Err(err) => {
+                                if let Err(e) = to_app.send(RequestResult::JoinRoom(Err(err))).await
+                                {
+                                    panic!("client event handler crashed {}", e)
+                                }
+                            }
                         }
                     }
                     UserRequest::ReadReceipt(room_id, event_id) => {

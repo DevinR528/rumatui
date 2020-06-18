@@ -47,7 +47,7 @@ termion = "1.5.5"
 tokio = { version = "0.2.21", features = ["macros", "rt-threaded", "sync", "process"] }
 
 # crates.io published fork of tui
-rumatui-tui = "0.8.0"
+rumatui-tui = { path = "./rumatui-tui", version = "0.8.1" }
 
 webbrowser = "0.5.2"
 url = "2.1.1"

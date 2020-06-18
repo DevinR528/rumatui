@@ -49,6 +49,11 @@ impl<I: std::fmt::Debug> ListState<I> {
         self.items.is_empty()
     }
 
+    pub(crate) fn clear(&mut self) {
+        self.selected = 0;
+        self.items.clear();
+    }
+
     /// Scrolls back up the list
     pub fn select_previous(&mut self) {
         if self.selected != 0 {
@@ -65,6 +70,11 @@ impl<I: std::fmt::Debug> ListState<I> {
             self.selected += 1
         }
     }
+    /// Gets the index of the selected item.
+    pub fn selected_idx(&self) -> usize {
+        self.selected
+    }
+
     pub fn get_selected(&self) -> Option<&I> {
         self.items.get(self.selected)
     }

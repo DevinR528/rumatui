@@ -1,7 +1,7 @@
 use std::{io, ops::Deref, sync::Arc, time::SystemTime};
 
 use matrix_sdk::{
-    api::r0::message::get_message_events,
+    api::r0::{directory::get_public_rooms_filtered::RoomNetwork, message::get_message_events},
     events::{
         collections::all::RoomEvent,
         room::{
@@ -169,16 +169,34 @@ impl AppWidget {
                 }
             } else if self.chat.room_on_scroll_up(x, y) {
                 self.chat.reset_scroll()
+            } else if self.chat.room_search_scroll_up(x, y) {
+                // TODO any UI updates while scrolled up
             }
         }
     }
 
+    // TODO flatten this out a bit
     pub async fn on_scroll_down(&mut self, x: u16, y: u16) {
         if self.chat.is_main_screen() {
-            self.chat.msgs_on_scroll_down(x, y);
-            // TODO make each widget's scroll method more similar
-            if self.chat.room_on_scroll_down(x, y) {
-                self.chat.reset_scroll()
+            if self.chat.is_room_search() {
+                if self.chat.room_search_scroll_down(x, y) {
+                    if let Some((filter, network, next_tkn)) = self.chat.room_search_next_request()
+                    {
+                        if let Err(e) = self
+                            .send_jobs
+                            .send(UserRequest::RoomSearch(filter, network, Some(next_tkn)))
+                            .await
+                        {
+                            self.set_error(e.into())
+                        }
+                    }
+                }
+            } else {
+                self.chat.msgs_on_scroll_down(x, y);
+                // TODO make each widget's scroll method more similar to messages or room?
+                if self.chat.room_on_scroll_down(x, y) {
+                    self.chat.reset_scroll()
+                }
             }
         }
     }
@@ -202,8 +220,12 @@ impl AppWidget {
                 }
             }
         } else if self.chat.is_main_screen() {
-            self.chat.room_select_previous();
-            self.chat.reset_scroll()
+            if self.chat.is_room_search() {
+                self.chat.room_search_select_previous();
+            } else {
+                self.chat.room_select_previous();
+                self.chat.reset_scroll()
+            }
         }
     }
 
@@ -226,8 +248,12 @@ impl AppWidget {
                 }
             }
         } else if self.chat.is_main_screen() {
-            self.chat.room_select_next();
-            self.chat.reset_scroll()
+            if self.chat.is_room_search() {
+                self.chat.room_search_select_next()
+            } else {
+                self.chat.room_select_next();
+                self.chat.reset_scroll()
+            }
         }
     }
 
@@ -254,6 +280,7 @@ impl AppWidget {
             }
         } else if self.chat.is_main_screen() {
             if !self.chat.is_room_search() {
+                // panic!("{:?}", self.chat.rooms());
                 self.chat.set_room_search(true);
             } else {
                 self.chat.set_room_search(false);
@@ -314,6 +341,20 @@ impl AppWidget {
                 }
             } else if self.chat.is_main_screen() {
                 if self.chat.is_room_search() {
+                    if c == '\n' && self.chat.try_room_search() {
+                        let filter = self.chat.search_term().to_string();
+                        if let Err(e) = self
+                            .send_jobs
+                            .send(UserRequest::RoomSearch(filter, RoomNetwork::Matrix, None))
+                            .await
+                        {
+                            self.set_error(Error::from(e));
+                        } else {
+                            self.chat.clear_room_search();
+                        }
+                        return;
+                    }
+                    self.chat.push_search_text(c)
                 } else {
                     // send typing notice to the server
                     let room_id = self.chat.to_current_room_id();
@@ -357,7 +398,11 @@ impl AppWidget {
                 }
             }
         } else if self.chat.is_main_screen() {
-            self.chat.remove_char();
+            if self.chat.is_room_search() {
+                self.chat.pop_search_text()
+            } else {
+                self.chat.remove_char();
+            }
         }
     }
 
@@ -557,6 +602,13 @@ impl AppWidget {
                     self.chat.set_leaving_room(false);
                     self.chat.remove_room(&room_id)
                 }
+                RequestResult::JoinRoom(room) => match room {
+                    Ok(room) => {
+                        // self.chat.add_room(room).await;
+                        self.chat.set_room_search(false);
+                    }
+                    Err(e) => self.set_error(e),
+                },
                 RequestResult::Typing(res) => {
                     if let Err(e) = res {
                         self.set_error(e);
@@ -568,6 +620,10 @@ impl AppWidget {
                         self.set_error(e);
                     }
                 }
+                RequestResult::RoomSearch(res) => match res {
+                    Err(e) => self.set_error(e),
+                    Ok(res) => self.chat.room_search_results(res),
+                },
                 // sync error
                 RequestResult::Error(err) => self.set_error(err),
             },
@@ -718,6 +774,21 @@ impl AppWidget {
 
             if let Err(e) = err {
                 self.set_error(e);
+            }
+        }
+    }
+
+    pub async fn on_ctrl_d(&mut self) {
+        if self.chat.is_room_search() {
+            if let Some(room_id) = self.chat.selected_room_search() {
+                if let Err(err) = self
+                    .send_jobs
+                    .send(UserRequest::JoinRoom(room_id))
+                    .await
+                    .map_err(Into::into)
+                {
+                    self.set_error(err);
+                }
             }
         }
     }
