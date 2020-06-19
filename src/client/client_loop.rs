@@ -247,23 +247,17 @@ impl MatrixEventHandle {
                             .await
                         {
                             panic!("client event handler crashed {}", e)
-                        } else if let Err(e) = client.forget_room(&room_id).await {
-                            panic!("client event handler crashed {}", e)
+                        } else if let Err(error) = client.forget_room(&room_id).await {
+                            // forget room failed so send that to the UI
+                            if let Err(e) = to_app.send(RequestResult::Error(error)).await {
+                                panic!("client event handler crashed {}", e)
+                            }
                         }
                     }
                     UserRequest::JoinRoom(room_id) => {
                         match client.join_room_by_id(&room_id).await {
                             Ok(res) => {
                                 let room_id = &res.room_id;
-                                // let room = Arc::clone(
-                                //     client
-                                //         .inner
-                                //         .joined_rooms()
-                                //         .read()
-                                //         .await
-                                //         .get(room_id)
-                                //         .unwrap(),
-                                // );
                                 if let Err(e) = to_app
                                     .send(RequestResult::JoinRoom(Ok(room_id.clone())))
                                     .await

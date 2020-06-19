@@ -69,10 +69,6 @@ unsafe impl Send for StateResult {}
 #[derive(Clone, Debug)]
 pub struct EventStream {
     /// Send messages to the UI loop.
-    ///
-    /// This is an Arc only to derive Clone which is only to
-    /// trick the borrow checker into thinking adding EventStream in a loop is okay
-    /// as it is done only for Login which will only happen once in the loop.
     send: Arc<Mutex<mpsc::Sender<StateResult>>>,
 }
 unsafe impl Send for EventStream {}
@@ -175,7 +171,7 @@ impl EventEmitter for EventStream {
                     formatted_body,
                     ..
                 }) => {
-                    let msg = if let Some(_fmted) = formatted_body {
+                    let msg = if formatted_body.is_some() {
                         crate::widgets::utils::markdown_to_terminal(msg_body)
                             .unwrap_or(msg_body.clone())
                     } else {
@@ -378,8 +374,7 @@ impl EventEmitter for EventStream {
         }
     }
 
-    // `PresenceEvent` is a struct so there is only the one method
-    /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomAliases` event.
+    /// Fires when `AsyncClient` receives a `PresenceEvent` event.
     async fn on_presence_event(&self, _: SyncRoom, _event: &PresenceEvent) {}
 
     async fn on_unrecognized_event(&self, room: SyncRoom, event: &CustomOrRawEvent<'_>) {
@@ -398,10 +393,11 @@ impl EventEmitter for EventStream {
                                         if new_content.msgtype == "m.text"
                                             && relates_to.rel_type == "m.replace"
                                         {
-                                            let new_body = if let Some(fmt) =
-                                                new_content.formatted_body.as_ref()
-                                            {
-                                                fmt.to_string()
+                                            let new_body = if new_content.formatted_body.is_some() {
+                                                crate::widgets::utils::markdown_to_terminal(&body)
+                                                    // this shouldn't fail but as a back up we just use
+                                                    // the unformatted message body
+                                                    .unwrap_or(body.clone())
                                             } else {
                                                 body.to_string()
                                             };

@@ -149,24 +149,6 @@ impl ChatWidget {
         self.current_room.borrow().clone()
     }
 
-    // pub(crate) async fn set_room_state(
-    //     &mut self,
-    //     rooms: Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
-    // ) {
-    //     let room_id = self
-    //         .rooms_widget
-    //         .populate_rooms(Arc::clone(&rooms))
-    //         .await
-    //         .cloned();
-    //     if let Some(id) = room_id {
-    //         println!("{}", id.to_string());
-    //         self.set_current_room_id(&id)
-    //     }
-    //     self.messages_widget
-    //         .populate_initial_msgs(rooms.read().await.deref())
-    //         .await;
-    // }
-
     pub(crate) async fn set_room_state(
         &mut self,
         rooms: Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
