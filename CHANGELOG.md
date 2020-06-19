@@ -5,8 +5,9 @@
 * Room search is now available
   * Public rooms can be joined from the room search window 
 * A user can register from the new register window
-  * This features complete User Interactive Authentication
+  * This features complete User Interactive Authentication by opening a web browser
 * Message edits are shown
+  * When markdown is part of the message they are properly formatted
 * Reactions display under the respective message
 * Redaction events are handled for reactions (emoji) and messages
 * Update dependency

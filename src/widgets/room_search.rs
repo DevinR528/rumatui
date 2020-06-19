@@ -207,7 +207,7 @@ impl RenderWidget for RoomSearchWidget {
         f.render_widget(list, chunks[1]);
 
         let mut topic = found_topic.unwrap_or_default();
-        topic.push_str("  ~~~~~~~~~  ");
+        topic.push_str("    ");
 
         let t = vec![
             Text::styled(&topic, Style::default().fg(Color::Blue)),
