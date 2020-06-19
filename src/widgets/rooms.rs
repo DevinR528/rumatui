@@ -87,6 +87,15 @@ impl<I: std::fmt::Debug> ListState<I> {
     }
 }
 
+impl ListState<(String, RoomId)> {
+    pub(crate) fn add_unique(&mut self, name: String, room_id: RoomId) {
+        // TODO not great to clone for a Eq...
+        if !self.items.contains(&(name.clone(), room_id.clone())) {
+            self.items.push((name, room_id));
+        }
+    }
+}
+
 impl<I> Index<usize> for ListState<I> {
     type Output = I;
     fn index(&self, idx: usize) -> &Self::Output {
@@ -136,7 +145,7 @@ impl RoomsWidget {
     pub(crate) async fn populate_rooms(
         &mut self,
         rooms: Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
-    ) {
+    ) -> Option<&RoomId> {
         self.rooms = rooms.read().await.clone();
         let mut items: Vec<(String, RoomId)> = Vec::default();
         for (id, room) in &self.rooms {
@@ -152,11 +161,8 @@ impl RoomsWidget {
             items.push((r.display_name(), id.clone()));
         }
 
-        if let Some((_name, id)) = items.first() {
-            *self.current_room.borrow_mut() = Some(id.clone());
-        }
-
         self.names = ListState::new(items);
+        self.names.items.first().map(|r| &r.1)
     }
 
     pub(crate) async fn add_room(&mut self, room: Arc<RwLock<Room>>) {
@@ -165,7 +171,8 @@ impl RoomsWidget {
         let room_id = r.room_id.clone();
 
         self.rooms.insert(room_id.clone(), Arc::clone(&room));
-        self.names.items.push((name, room_id));
+
+        self.names.add_unique(name, room_id)
     }
 
     pub(crate) fn remove_room(&mut self, room_id: &RoomId) {
@@ -246,6 +253,12 @@ impl RoomsWidget {
         self.names.select_previous();
         if let Some((_name, id)) = self.names.get_selected() {
             *self.current_room.borrow_mut() = Some(id.clone());
+        }
+    }
+
+    pub fn set_room_selected(&mut self, room_id: &RoomId) {
+        if let Some(idx) = self.names.items.iter().position(|(_, id)| room_id == id) {
+            self.names.selected = idx;
         }
     }
 }

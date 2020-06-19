@@ -36,7 +36,7 @@ use crate::{
 pub struct ChatWidget {
     current_room: Rc<RefCell<Option<RoomId>>>,
     me: Option<UserId>,
-    rooms_widget: RoomsWidget,
+    pub rooms_widget: RoomsWidget,
     messages_widget: MessageWidget,
     room_search_widget: RoomSearchWidget,
     room_search: bool,
@@ -149,11 +149,40 @@ impl ChatWidget {
         self.current_room.borrow().clone()
     }
 
+    // pub(crate) async fn set_room_state(
+    //     &mut self,
+    //     rooms: Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
+    // ) {
+    //     let room_id = self
+    //         .rooms_widget
+    //         .populate_rooms(Arc::clone(&rooms))
+    //         .await
+    //         .cloned();
+    //     if let Some(id) = room_id {
+    //         println!("{}", id.to_string());
+    //         self.set_current_room_id(&id)
+    //     }
+    //     self.messages_widget
+    //         .populate_initial_msgs(rooms.read().await.deref())
+    //         .await;
+    // }
+
+    pub(crate) async fn set_room_state(
+        &mut self,
+        rooms: Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
+    ) {
+        self.messages_widget
+            .populate_initial_msgs(rooms.read().await.deref())
+            .await;
+        self.rooms_widget.populate_rooms(rooms).await;
+        self.messages_widget.current_room = Rc::clone(&self.rooms_widget.current_room);
+        self.current_room = Rc::clone(&self.rooms_widget.current_room);
+        self.room_search_widget.current_room = Rc::clone(&self.rooms_widget.current_room);
+    }
+
     pub(crate) fn set_current_room_id(&mut self, room: &RoomId) {
-        self.current_room = Rc::new(RefCell::new(Some(room.clone())));
-        self.messages_widget.current_room = Rc::clone(&self.current_room);
-        self.room_search_widget
-            .set_current_room_id(Rc::clone(&self.current_room));
+        self.rooms_widget.set_room_selected(room);
+        *self.current_room.borrow_mut() = Some(room.clone());
     }
 
     pub(crate) fn as_current_user(&self) -> Option<&UserId> {
@@ -175,18 +204,6 @@ impl ChatWidget {
 
     pub(crate) fn rooms(&self) -> &HashMap<RoomId, Arc<RwLock<Room>>> {
         &self.rooms_widget.rooms
-    }
-
-    pub(crate) async fn set_room_state(
-        &mut self,
-        rooms: Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
-    ) {
-        self.messages_widget
-            .populate_initial_msgs(rooms.read().await.deref())
-            .await;
-        self.rooms_widget.populate_rooms(rooms).await;
-        self.messages_widget.current_room = Rc::clone(&self.rooms_widget.current_room);
-        self.current_room = Rc::clone(&self.rooms_widget.current_room);
     }
 
     pub(crate) fn update_room(&mut self, name: &str, room: &RoomId) {

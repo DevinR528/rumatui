@@ -20,7 +20,7 @@ use crate::widgets::{rooms::ListState, RenderWidget};
 #[derive(Clone, Debug, Default)]
 pub struct RoomSearchWidget {
     /// This is the RoomId of the last used room, the room to show on startup.
-    current_room: Rc<RefCell<Option<RoomId>>>,
+    pub(crate) current_room: Rc<RefCell<Option<RoomId>>>,
     /// List of displayable room name and room id
     names: ListState<PublicRoomsChunk>,
     list_state: ListTrack,
@@ -42,8 +42,13 @@ impl RoomSearchWidget {
         self.next_batch_tkn.as_deref()
     }
 
-    pub(crate) fn set_current_room_id(&mut self, room: Rc<RefCell<Option<RoomId>>>) {
+    pub(crate) fn set_current_room_id(
+        &mut self,
+        room: Rc<RefCell<Option<RoomId>>>,
+    ) -> Rc<RefCell<Option<RoomId>>> {
+        let copy = Rc::clone(&room);
         self.current_room = room;
+        copy
     }
 
     pub(crate) fn push_search_text(&mut self, ch: char) {

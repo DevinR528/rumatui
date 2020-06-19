@@ -280,7 +280,6 @@ impl AppWidget {
             }
         } else if self.chat.is_main_screen() {
             if !self.chat.is_room_search() {
-                // panic!("{:?}", self.chat.rooms());
                 self.chat.set_room_search(true);
             } else {
                 self.chat.set_room_search(false);
@@ -603,8 +602,9 @@ impl AppWidget {
                     self.chat.remove_room(&room_id)
                 }
                 RequestResult::JoinRoom(room) => match room {
-                    Ok(room) => {
-                        // self.chat.add_room(room).await;
+                    Ok(_) => {
+                        // We wait for the MemberEvent to update the state of the client
+                        // before we add the room to the RoomsWidget
                         self.chat.set_room_search(false);
                     }
                     Err(e) => self.set_error(e),
