@@ -2013,7 +2013,7 @@ dependencies = [
 
 [[package]]
 name = "rumatui"
-version = "0.1.13-alpha"
+version = "0.1.14"
 dependencies = [
  "async-trait",
  "chrono",

@@ -73,8 +73,8 @@ impl MatrixClient {
         let store: Result<JsonStore> = JsonStore::open(path).map_err(Into::into);
         // reset the client with the state store with username as part of the store path
         let client_config = ClientConfig::default()
-            .proxy("http://localhost:8080")? // for mitmproxy
-            .disable_ssl_verification()
+            // .proxy("http://localhost:8080")? // for mitmproxy
+            // .disable_ssl_verification()
             .state_store(Box::new(store?));
 
         let inner: Result<Client> =
