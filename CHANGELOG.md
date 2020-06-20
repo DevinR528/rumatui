@@ -1,4 +1,8 @@
-# Release 0.1.14
+# Release 0.1.15
+
+##### Bug Fixes
+
+* Remove http proxy left in from testing
 
 ## 0.1.14
 

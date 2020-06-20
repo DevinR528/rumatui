@@ -41,15 +41,6 @@ Most of `rumatui` is click-able however, there are a few buttons that can be use
 * Enter, while in the room search window, starts the search
 * Ctrl-d, while a room is selected in the room search window, joins the room
 
-# Use
-
-Most of `rumatui` is click-able however, there are a few buttons that can be used (this is a terminal after all).
-
-* Esc will exit `rumatui`
-* Enter still works for all buttons except the decline/accept invite
-* Ctrl-s sends a message
-* Delete leaves and forgets the selected room
-
 #### License
 <sup>
 Licensed under either of <a href="LICENSE-APACHE">Apache License, Version
