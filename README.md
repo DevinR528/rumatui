@@ -12,6 +12,11 @@ Work In Progress. A Matrix client written using [tui.rs](https://github.com/fdeh
 This project is still very much a work in progress. Please file issues, but I will preemptively say the error messages need work, and the code needs to be refactored to be a little more reader-friendly. Thanks for giving it a go!
 
 # Install
+For the latest and greatest
+```bash
+cargo install --git https://github.com/DevinR528/rumatui --branch room-search
+```
+Or the slightly safer approach
 ```bash
 cargo install rumatui --version 0.1.13-alpha
 ```
@@ -33,6 +38,10 @@ Most of `rumatui` is click-able however, there are a few buttons that can be use
 * Enter still works for all buttons except the decline/accept invite
 * Ctrl-s sends a message
 * Delete leaves and forgets the selected room
+* Left/right arrows, while at the login window, toggles login/register window
+* Left arrow, while at the main chat window, brings up the room search window
+* Enter, while in the room search window, starts the search
+* Ctrl-d, while a room is selected in the room search window, joins the room
 
 #### License
 <sup>
