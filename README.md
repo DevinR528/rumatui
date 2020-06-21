@@ -14,7 +14,7 @@ This project is still very much a work in progress. Please file issues, but I wi
 # Install
 For the latest and greatest
 ```bash
-cargo install --git https://github.com/DevinR528/rumatui --branch room-search
+cargo install --git https://github.com/DevinR528/rumatui
 ```
 Or the slightly safer approach
 ```bash
@@ -23,7 +23,7 @@ cargo install rumatui --version 0.1.13-alpha
 
 # Run
 ```bash
-rumatui [homeserver]
+rumatui [HOMESERVER | OPTIONS]
 ```
 
 If no `homeserver` is specified, matrix.org is used.

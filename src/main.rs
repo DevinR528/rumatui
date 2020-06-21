@@ -5,7 +5,7 @@
     clippy::single_match
 )]
 
-use std::{env, io, time::Duration};
+use std::{env, io, process, time::Duration};
 
 use termion::{
     event::{Event as TermEvent, Key, MouseButton, MouseEvent},
@@ -23,9 +23,21 @@ mod widgets;
 use ui_loop::{Config, Event, UiEventHandle};
 use widgets::{app::AppWidget, DrawWidget};
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 fn main() -> Result<(), failure::Error> {
     // when this is "" empty matrix.org is used
-    let server = env::args().nth(1).unwrap_or(String::default());
+    let server = if let Some(arg) = env::args().nth(1) {
+        if arg.contains("help") || arg == "-h" {
+            print_help();
+            process::exit(0)
+        } else {
+            // we assume this is a server address
+            arg
+        }
+    } else {
+        String::new()
+    };
 
     let mut runtime = tokio::runtime::Builder::new()
         .basic_scheduler()
@@ -105,4 +117,28 @@ fn main() -> Result<(), failure::Error> {
         }
         Ok(())
     })
+}
+
+#[rustfmt::skip]
+#[allow(clippy::print_literal)]
+fn print_help() {
+    println!(
+        "rumatui {} \n\n{}{}{}{}{}{}",
+        VERSION,
+        "USAGE:\n",
+        "   rumatui [HOMESERVER]\n\n",
+        "OPTIONS:\n",
+        "   -h, --help      Prints help information\n\n",
+        "KEY-BINDINGS:",
+r#"
+    * Esc will exit `rumatui`
+    * Enter still works for all buttons except the decline/accept invite
+    * Ctrl-s sends a message
+    * Delete leaves and forgets the selected room
+    * Left/right arrows, while at the login window, toggles login/register window
+    * Left arrow, while at the main chat window, brings up the room search window
+    * Enter, while in the room search window, starts the search
+    * Ctrl-d, while a room is selected in the room search window, joins the room
+"#,
+    )
 }

@@ -26,11 +26,7 @@ lazy_static = "1.4.0"
 # matrix-sdk = "0.1.0"
 # matrix-sdk-base = { version = "0.1.0", features = ["messages"] }
 
-# matrix-sdk = { path = "../__forks__/matrix-rust-sdk/matrix_sdk" }
-# matrix-sdk-base = { path = "../__forks__/matrix-rust-sdk/matrix_sdk_base" }
-
 matrix-sdk = { git = "https://github.com/DevinR528/matrix-rust-sdk", branch = "rumatui" }
-# matrix-sdk = { git = "https://github.com/matrix-org/matrix-rust-sdk" }
 
 mdcat = "0.18.2"
 muncher = "0.6.1"
@@ -44,7 +40,7 @@ ruma-api = "0.16.1"
 serde = { version = "1.0.111", features = ["derive"] }
 serde_json = "1.0.52"
 termion = "1.5.5"
-tokio = { version = "0.2.21", features = ["macros", "rt-threaded", "sync", "process"] }
+tokio = { version = "0.2.21", features = ["macros", "rt-threaded", "sync"] }
 
 # crates.io published fork of tui
 rumatui-tui = { path = "./rumatui-tui", version = "0.8.1" }

@@ -1,3 +1,7 @@
+#[Unreleased]
+
+* Add help output `rumatui [-h/--help]`
+
 # Release 0.1.15
 
 ##### Bug Fixes
