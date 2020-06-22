@@ -16,7 +16,8 @@ For the latest and greatest
 ```bash
 cargo install --git https://github.com/DevinR528/rumatui
 ```
-Or the slightly safer approach
+
+Or the slightly safer approach but with fewer features (see [CHANGELOG](https://github.com/DevinR528/rumatui/blob/master/CHANGELOG.md#0113-alpha))
 ```bash
 cargo install rumatui --version 0.1.13-alpha
 ```
@@ -25,6 +26,8 @@ cargo install rumatui --version 0.1.13-alpha
 ```bash
 rumatui [HOMESERVER | OPTIONS]
 ```
+
+Options are limited to `-h/--help` for now.
 
 If no `homeserver` is specified, matrix.org is used.
 

@@ -1,10 +1,11 @@
-#[Unreleased]
+# [0.1.16]
 
 * Add help output `rumatui [-h/--help]`
+* Add license files to the release package
 
 # Release 0.1.15
 
-##### Bug Fixes
+### Bug Fixes
 
 * Remove http proxy left in from testing
 
@@ -24,7 +25,7 @@
 * Note: the above features are only for displaying received events
   `rumatui` can not yet send these events
 
-##### Bug Fixes
+### Bug Fixes
 
 * Send read receipts to mark the correct read message (it was sending random event ids)
 * Send `read_marker` events instead of `read_receipt`
