@@ -175,9 +175,14 @@ impl EventEmitter for EventStream {
                     formatted,
                     ..
                 }) => {
-                    let msg = if formatted.is_some() {
-                        crate::widgets::utils::markdown_to_terminal(msg_body)
-                            .unwrap_or(msg_body.clone())
+                    let msg = if formatted
+                        .as_ref()
+                        .map(|f| f.body.to_string())
+                        .unwrap_or(String::new())
+                        != msg_body.to_string()
+                    {
+                        // crate::widgets::utils::markdown_to_terminal(msg_body)
+                        None.unwrap_or(msg_body.clone())
                     } else {
                         msg_body.clone()
                     };
@@ -460,10 +465,10 @@ impl EventEmitter for EventStream {
                                             && relates_to.rel_type == "m.replace"
                                         {
                                             let new_body = if new_content.formatted_body.is_some() {
-                                                crate::widgets::utils::markdown_to_terminal(&body)
-                                                    // this shouldn't fail but as a back up we just use
-                                                    // the unformatted message body
-                                                    .unwrap_or(body.clone())
+                                                // crate::widgets::utils::markdown_to_terminal(&body)
+                                                // this shouldn't fail but as a back up we just use
+                                                // the unformatted message body
+                                                None.unwrap_or(body.clone())
                                             } else {
                                                 body.to_string()
                                             };

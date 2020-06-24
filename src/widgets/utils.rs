@@ -34,24 +34,26 @@ impl Display for Writer {
     }
 }
 
+lazy_static::lazy_static! {
+    pub static ref SETTINGS: Settings = {
+        let syntax_set = SyntaxSet::load_defaults_newlines();
+        Settings {
+            terminal_capabilities: TerminalCapabilities::detect(),
+            terminal_size: TerminalSize::detect().unwrap(),
+            resource_access: ResourceAccess::LocalOnly,
+            syntax_set,
+        }
+    };
+}
+
 pub(crate) fn markdown_to_terminal(input: &str) -> Result<String> {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TASKLISTS);
     options.insert(Options::ENABLE_STRIKETHROUGH);
     let parser = Parser::new_ext(&input, options);
-    let syntax_set = SyntaxSet::load_defaults_nonewlines();
 
-    let settings = Settings {
-        terminal_capabilities: TerminalCapabilities::detect(),
-        terminal_size: TerminalSize::detect().ok_or(Error::from(io::Error::new(
-            ErrorKind::Other,
-            "could not detect terminal",
-        )))?,
-        resource_access: ResourceAccess::LocalOnly,
-        syntax_set,
-    };
     let mut w = Writer::default();
-    mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser)
+    mdcat::push_tty(&SETTINGS, &mut w, &std::path::Path::new("/"), parser)
         .map_err(|e| Error::from(io::Error::new(ErrorKind::Other, e.to_string())))?;
 
     Ok(w.to_string())

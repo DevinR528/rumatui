@@ -135,9 +135,14 @@ impl MessageWidget {
                 formatted,
                 ..
             }) => {
-                let msg = if let Some(_fmted) = formatted {
-                    crate::widgets::utils::markdown_to_terminal(msg_body)
-                        .unwrap_or(msg_body.clone())
+                let msg = if formatted
+                    .as_ref()
+                    .map(|f| f.body.to_string())
+                    .unwrap_or(String::new())
+                    != msg_body.to_string()
+                {
+                    // crate::widgets::utils::markdown_to_terminal(msg_body)
+                    None.unwrap_or(msg_body.clone())
                 } else {
                     msg_body.clone()
                 };
@@ -267,8 +272,14 @@ impl MessageWidget {
             MessageEventContent::Text(TextMessageEventContent {
                 body, formatted, ..
             }) => {
-                let msg = if let Some(_fmted) = formatted {
-                    crate::widgets::utils::markdown_to_terminal(&body).unwrap_or(body.clone())
+                let msg = if formatted
+                    .as_ref()
+                    .map(|f| f.body.to_string())
+                    .unwrap_or(String::new())
+                    != body.to_string()
+                {
+                    // crate::widgets::utils::markdown_to_terminal(&body).unwrap_or(body.clone())
+                    None.unwrap_or(body.clone())
                 } else {
                     body
                 };

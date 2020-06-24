@@ -837,9 +837,14 @@ impl AppWidget {
                                 formatted,
                                 ..
                             }) => {
-                                let msg = if formatted.is_some() {
-                                    crate::widgets::utils::markdown_to_terminal(&msg_body)
-                                        .unwrap_or(msg_body.clone())
+                                let msg = if formatted
+                                    .as_ref()
+                                    .map(|f| f.body.to_string())
+                                    .unwrap_or(String::new())
+                                    != msg_body.to_string()
+                                {
+                                    // crate::widgets::utils::markdown_to_terminal(&msg_body)
+                                    None.unwrap_or(msg_body.clone())
                                 } else {
                                     msg_body.clone()
                                 };
