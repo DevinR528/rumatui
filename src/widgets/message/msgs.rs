@@ -1,6 +1,7 @@
 use std::{
     cell::{Cell, RefCell},
     collections::{HashMap, VecDeque},
+    convert::TryFrom,
     fmt,
     rc::Rc,
     sync::Arc,
@@ -8,11 +9,14 @@ use std::{
 };
 
 use js_int::UInt;
-use matrix_sdk::events::room::message::{
-    MessageEvent, MessageEventContent, TextMessageEventContent,
+use matrix_sdk::events::{
+    room::message::{
+        FormattedBody, MessageEventContent, MessageFormat, RelatesTo, TextMessageEventContent,
+    },
+    MessageEventStub,
 };
 use matrix_sdk::{
-    identifiers::{EventId, RoomId, UserId},
+    identifiers::{EventId, RoomId, ServerName, UserId},
     Room,
 };
 use rumatui_tui::{
@@ -111,8 +115,8 @@ impl MessageWidget {
     }
 
     // TODO factor out with AppWidget::process_room_events and MessageWidget::echo_sent_msg
-    fn add_message_event(&mut self, event: &MessageEvent, room: &Room) {
-        let MessageEvent {
+    fn add_message_event(&mut self, event: &MessageEventStub<MessageEventContent>, room: &Room) {
+        let MessageEventStub {
             content,
             sender,
             event_id,
@@ -128,10 +132,10 @@ impl MessageWidget {
         match content {
             MessageEventContent::Text(TextMessageEventContent {
                 body: msg_body,
-                formatted_body,
+                formatted,
                 ..
             }) => {
-                let msg = if let Some(_fmted) = formatted_body {
+                let msg = if let Some(_fmted) = formatted {
                     crate::widgets::utils::markdown_to_terminal(msg_body)
                         .unwrap_or(msg_body.clone())
                 } else {
@@ -241,9 +245,11 @@ impl MessageWidget {
             )),
             MsgType::FormattedText => Ok(MessageEventContent::Text(TextMessageEventContent {
                 body: self.send_msg.clone(),
-                format: Some("org.matrix.custom.html".into()),
-                formatted_body: Some(markdown_to_html(&self.send_msg)),
-                relates_to: None,
+                formatted: Some(FormattedBody {
+                    format: MessageFormat::Html,
+                    body: markdown_to_html(&self.send_msg),
+                }),
+                relates_to: None::<RelatesTo>,
             })),
             _ => todo!("implement more sending messages"),
         }
@@ -259,11 +265,9 @@ impl MessageWidget {
     ) {
         match content {
             MessageEventContent::Text(TextMessageEventContent {
-                body,
-                formatted_body,
-                ..
+                body, formatted, ..
             }) => {
-                let msg = if let Some(_fmted) = formatted_body {
+                let msg = if let Some(_fmted) = formatted {
                     crate::widgets::utils::markdown_to_terminal(&body).unwrap_or(body.clone())
                 } else {
                     body
@@ -279,7 +283,7 @@ impl MessageWidget {
                     user: self.me.as_ref().unwrap().clone(),
                     timestamp,
                     name,
-                    event_id: EventId::new(&domain).unwrap(),
+                    event_id: EventId::new(ServerName::try_from(domain).unwrap().as_ref()),
                     uuid,
                     read: true,
                     reactions: vec![],
@@ -476,7 +480,6 @@ impl RenderWidget for MessageWidget {
         };
 
         let mut msg_copy = vec![];
-        // TODO no alloc split messages up by hashmap of roomid to message vec?
         if let Some(room_id) = current_room_id {
             if let Some(messages) = self.messages.get_mut(&room_id) {
                 messages.sort_by(|msg, msg2| msg.timestamp.cmp(&msg2.timestamp));

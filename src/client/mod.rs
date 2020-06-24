@@ -73,8 +73,8 @@ impl MatrixClient {
         let store: Result<JsonStore> = JsonStore::open(path).map_err(Into::into);
         // reset the client with the state store with username as part of the store path
         let client_config = ClientConfig::default()
-            // .proxy("http://localhost:8080")? // for mitmproxy
-            // .disable_ssl_verification()
+            .proxy("http://localhost:8080")? // for mitmproxy
+            .disable_ssl_verification()
             .state_store(Box::new(store?));
 
         let inner: Result<Client> =
@@ -247,7 +247,7 @@ impl MatrixClient {
             from,
             to: None,
             dir: get_message_events::Direction::Backward,
-            limit: js_int::UInt::new(30),
+            limit: js_int::uint!(30),
             filter: None,
             // filter: Some(RoomEventFilter {
             //     lazy_load_options: LazyLoadOptions::Enabled { include_redundant_members: false, },

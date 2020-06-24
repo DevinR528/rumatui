@@ -316,6 +316,7 @@ impl RenderWidget for RoomsWidget {
                 }
             })
             .skip(offset as usize);
+        panic!();
         let list = List::new(items)
             .block(
                 Block::default()

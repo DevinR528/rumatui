@@ -1,5 +1,8 @@
 use matrix_sdk::identifiers::{DeviceId, UserId};
-use ruma_client_api::r0::{account::register::Response as RegisterResponse, uiaa::UiaaResponse};
+use matrix_sdk::{
+    api::r0::{account::register::Response as RegisterResponse, uiaa::UiaaResponse},
+    ruma_api,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -43,8 +46,9 @@ impl Into<RegisterResponse> for Response {
 
 pub mod dummy {
     use matrix_sdk::identifiers::{DeviceId, UserId};
-    use ruma_client_api::r0::{
-        account::register::Response as RegisterResponse, uiaa::UiaaResponse,
+    use matrix_sdk::{
+        api::r0::{account::register::Response as RegisterResponse, uiaa::UiaaResponse},
+        ruma_api,
     };
 
     #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
