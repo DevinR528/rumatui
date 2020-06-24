@@ -176,12 +176,11 @@ impl EventEmitter for EventStream {
                     ..
                 }) => {
                     let msg = 
-                    // if formatted
-                    //     .as_ref()
-                    //     .map(|f| f.body.to_string())
-                    //     .unwrap_or(String::new())
-                    //     != body.to_string()
-                    if body.contains("`")
+                    if formatted
+                        .as_ref()
+                        .map(|f| f.body.to_string())
+                        .unwrap_or(String::new())
+                        != body.to_string()
                     {
                         crate::widgets::utils::markdown_to_terminal(body)
                             .unwrap_or(body.clone())
@@ -546,47 +545,4 @@ impl EventEmitter for EventStream {
             _ => {}
         }
     }
-
-    // // `RumaUnsupportedEvent
-    // /// Fires when `Client` receives a `RumaUnsupportedRoomEvent<ExtraRoomEventContent::Reaction>`.
-    // async fn on_reaction_event(&self, room: SyncRoom, event: &ExtraReactionEventContent) {
-    //     if let SyncRoom::Joined(room) = room {
-    //         let ReactionEventContent::Annotation { event_id, key } = &event.relates_to;
-    //         let event_id = event_id.clone();
-    //         let room_id = room.read().await.room_id.clone();
-    //         if let Err(e) = self
-    //             .send
-    //             .lock()
-    //             .await
-    //             .send(StateResult::Reaction(room_id, event_id, key.to_string()))
-    //             .await
-    //         {
-    //             panic!("{}", e)
-    //         }
-    //     }
-    // }
-    // /// Fires when `Client` receives a `RumaUnsupportedRoomEvent<ExtraRoomEventContent::MessageEdit>`.
-    // async fn on_message_edit_event(&self, room: SyncRoom, event: &ExtraMessageEventContent) {
-    //     if let SyncRoom::Joined(room) = room {
-    //         let ExtraMessageEventContent::EditEvent(edit) = event;
-    //         if edit.new_content.msgtype == "m.text" && edit.relates_to.rel_type == "m.replace" {
-    //             let new_body = if let Some(fmt) = edit.new_content.formatted_body.as_ref() {
-    //                 fmt.to_string()
-    //             } else {
-    //                 edit.body.to_string()
-    //             };
-    //             let event_id = edit.relates_to.event_id.clone();
-    //             let room_id = room.read().await.room_id.clone();
-    //             if let Err(e) = self
-    //                 .send
-    //                 .lock()
-    //                 .await
-    //                 .send(StateResult::MessageEdit(new_body, room_id, event_id))
-    //                 .await
-    //             {
-    //                 panic!("{}", e)
-    //             }
-    //         }
-    //     }
-    // }
 }

@@ -131,20 +131,15 @@ impl MessageWidget {
         };
         match content {
             MessageEventContent::Text(TextMessageEventContent {
-                body,
-                formatted,
-                ..
+                body, formatted, ..
             }) => {
-                let msg = 
-                // if formatted
-                //     .as_ref()
-                //     .map(|f| f.body.to_string())
-                //     .unwrap_or(String::new())
-                //     != body.to_string()
-                if body.contains("`")
+                let msg = if formatted
+                    .as_ref()
+                    .map(|f| f.body.to_string())
+                    .unwrap_or(String::new())
+                    != body.to_string()
                 {
-                    crate::widgets::utils::markdown_to_terminal(body)
-                        .unwrap_or(body.clone())
+                    crate::widgets::utils::markdown_to_terminal(body).unwrap_or(body.clone())
                 // None.unwrap_or(body.clone())
                 } else {
                     body.clone()
@@ -275,13 +270,11 @@ impl MessageWidget {
             MessageEventContent::Text(TextMessageEventContent {
                 body, formatted, ..
             }) => {
-                let msg = 
-                // if formatted
-                //     .as_ref()
-                //     .map(|f| f.body.to_string())
-                //     .unwrap_or(String::new())
-                //     != body.to_string()
-                if body.contains("`")
+                let msg = if formatted
+                    .as_ref()
+                    .map(|f| f.body.to_string())
+                    .unwrap_or(String::new())
+                    != body.to_string()
                 {
                     crate::widgets::utils::markdown_to_terminal(&body).unwrap_or(body.clone())
                 // None.unwrap_or(body.clone())

@@ -46,29 +46,21 @@ lazy_static::lazy_static! {
     };
 }
 
-// pub(crate) fn markdown_to_terminal(input: &str) -> Result<String> {
-//     let mut options = Options::empty();
-//     options.insert(Options::ENABLE_TASKLISTS);
-//     options.insert(Options::ENABLE_STRIKETHROUGH);
-//     let parser = Parser::new_ext(&input, options);
+#[allow(dead_code, non_snake_case)]
+pub(crate) fn markdown_to_terminal_OOM(input: &str) -> Result<String> {
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_TASKLISTS);
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    let parser = Parser::new_ext(&input, options);
 
-//     let mut w = Writer::default();
-//     mdcat::push_tty(&SETTINGS, &mut w, &std::path::Path::new("/"), parser)
-//         .map_err(|e| Error::from(io::Error::new(ErrorKind::Other, e.to_string())))?;
+    let mut w = Writer::default();
+    mdcat::push_tty(&SETTINGS, &mut w, &std::path::Path::new("/"), parser)
+        .map_err(|e| Error::from(io::Error::new(ErrorKind::Other, e.to_string())))?;
 
-//     Ok(w.to_string())
-// }
+    Ok(w.to_string())
+}
 
 pub(crate) fn markdown_to_terminal(input: &str) -> Result<String> {
-    // let mut options = Options::empty();
-    // options.insert(Options::ENABLE_TASKLISTS);
-    // options.insert(Options::ENABLE_STRIKETHROUGH);
-    // let parser = Parser::new_ext(&input, options);
-
-    // let mut w = Writer::default();
-    // mdcat::push_tty(&SETTINGS, &mut w, &std::path::Path::new("/"), parser)
-    //     .map_err(|e| Error::from(io::Error::new(ErrorKind::Other, e.to_string())))?;
-
     Ok(input.to_string())
 }
 

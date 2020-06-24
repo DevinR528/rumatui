@@ -1942,6 +1942,7 @@ dependencies = [
  "muncher",
  "pulldown-cmark",
  "regex",
+ "ruma-api",
  "rumatui-tui",
  "serde",
  "serde_json",

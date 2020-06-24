@@ -1,8 +1,5 @@
+use matrix_sdk::api::r0::{account::register::Response as RegisterResponse, uiaa::UiaaResponse};
 use matrix_sdk::identifiers::{DeviceId, UserId};
-use matrix_sdk::{
-    api::r0::{account::register::Response as RegisterResponse, uiaa::UiaaResponse},
-    ruma_api,
-};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
