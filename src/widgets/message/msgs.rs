@@ -131,20 +131,23 @@ impl MessageWidget {
         };
         match content {
             MessageEventContent::Text(TextMessageEventContent {
-                body: msg_body,
+                body,
                 formatted,
                 ..
             }) => {
-                let msg = if formatted
-                    .as_ref()
-                    .map(|f| f.body.to_string())
-                    .unwrap_or(String::new())
-                    != msg_body.to_string()
+                let msg = 
+                // if formatted
+                //     .as_ref()
+                //     .map(|f| f.body.to_string())
+                //     .unwrap_or(String::new())
+                //     != body.to_string()
+                if body.contains("`")
                 {
-                    // crate::widgets::utils::markdown_to_terminal(msg_body)
-                    None.unwrap_or(msg_body.clone())
+                    crate::widgets::utils::markdown_to_terminal(body)
+                        .unwrap_or(body.clone())
+                // None.unwrap_or(body.clone())
                 } else {
-                    msg_body.clone()
+                    body.clone()
                 };
                 let txn_id = unsigned
                     .transaction_id
@@ -272,14 +275,16 @@ impl MessageWidget {
             MessageEventContent::Text(TextMessageEventContent {
                 body, formatted, ..
             }) => {
-                let msg = if formatted
-                    .as_ref()
-                    .map(|f| f.body.to_string())
-                    .unwrap_or(String::new())
-                    != body.to_string()
+                let msg = 
+                // if formatted
+                //     .as_ref()
+                //     .map(|f| f.body.to_string())
+                //     .unwrap_or(String::new())
+                //     != body.to_string()
+                if body.contains("`")
                 {
-                    // crate::widgets::utils::markdown_to_terminal(&body).unwrap_or(body.clone())
-                    None.unwrap_or(body.clone())
+                    crate::widgets::utils::markdown_to_terminal(&body).unwrap_or(body.clone())
+                // None.unwrap_or(body.clone())
                 } else {
                     body
                 };

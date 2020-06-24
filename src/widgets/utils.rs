@@ -3,7 +3,7 @@ use std::{
     io::{self, ErrorKind, Write},
 };
 
-use comrak;
+use comrak::{self, ComrakOptions};
 use mdcat::{self, ResourceAccess, Settings, TerminalCapabilities, TerminalSize};
 use pulldown_cmark::{Options, Parser};
 use syntect::parsing::SyntaxSet;
@@ -36,7 +36,7 @@ impl Display for Writer {
 
 lazy_static::lazy_static! {
     pub static ref SETTINGS: Settings = {
-        let syntax_set = SyntaxSet::load_defaults_newlines();
+        let syntax_set = SyntaxSet::default();
         Settings {
             terminal_capabilities: TerminalCapabilities::detect(),
             terminal_size: TerminalSize::detect().unwrap(),
@@ -46,19 +46,32 @@ lazy_static::lazy_static! {
     };
 }
 
+// pub(crate) fn markdown_to_terminal(input: &str) -> Result<String> {
+//     let mut options = Options::empty();
+//     options.insert(Options::ENABLE_TASKLISTS);
+//     options.insert(Options::ENABLE_STRIKETHROUGH);
+//     let parser = Parser::new_ext(&input, options);
+
+//     let mut w = Writer::default();
+//     mdcat::push_tty(&SETTINGS, &mut w, &std::path::Path::new("/"), parser)
+//         .map_err(|e| Error::from(io::Error::new(ErrorKind::Other, e.to_string())))?;
+
+//     Ok(w.to_string())
+// }
+
 pub(crate) fn markdown_to_terminal(input: &str) -> Result<String> {
-    let mut options = Options::empty();
-    options.insert(Options::ENABLE_TASKLISTS);
-    options.insert(Options::ENABLE_STRIKETHROUGH);
-    let parser = Parser::new_ext(&input, options);
+    // let mut options = Options::empty();
+    // options.insert(Options::ENABLE_TASKLISTS);
+    // options.insert(Options::ENABLE_STRIKETHROUGH);
+    // let parser = Parser::new_ext(&input, options);
 
-    let mut w = Writer::default();
-    mdcat::push_tty(&SETTINGS, &mut w, &std::path::Path::new("/"), parser)
-        .map_err(|e| Error::from(io::Error::new(ErrorKind::Other, e.to_string())))?;
+    // let mut w = Writer::default();
+    // mdcat::push_tty(&SETTINGS, &mut w, &std::path::Path::new("/"), parser)
+    //     .map_err(|e| Error::from(io::Error::new(ErrorKind::Other, e.to_string())))?;
 
-    Ok(w.to_string())
+    Ok(input.to_string())
 }
 
 pub(crate) fn markdown_to_html(input: &str) -> String {
-    comrak::markdown_to_html(input, &comrak::ComrakOptions::default())
+    comrak::markdown_to_html(input, &ComrakOptions::default())
 }

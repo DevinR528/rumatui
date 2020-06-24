@@ -171,20 +171,23 @@ impl EventEmitter for EventStream {
             };
             match content {
                 MessageEventContent::Text(TextMessageEventContent {
-                    body: msg_body,
+                    body,
                     formatted,
                     ..
                 }) => {
-                    let msg = if formatted
-                        .as_ref()
-                        .map(|f| f.body.to_string())
-                        .unwrap_or(String::new())
-                        != msg_body.to_string()
+                    let msg = 
+                    // if formatted
+                    //     .as_ref()
+                    //     .map(|f| f.body.to_string())
+                    //     .unwrap_or(String::new())
+                    //     != body.to_string()
+                    if body.contains("`")
                     {
-                        // crate::widgets::utils::markdown_to_terminal(msg_body)
-                        None.unwrap_or(msg_body.clone())
+                        crate::widgets::utils::markdown_to_terminal(body)
+                            .unwrap_or(body.clone())
+                    // None.unwrap_or(body.clone())
                     } else {
-                        msg_body.clone()
+                        body.clone()
                     };
                     let txn_id = unsigned
                         .transaction_id
@@ -464,11 +467,15 @@ impl EventEmitter for EventStream {
                                         if new_content.msgtype == "m.text"
                                             && relates_to.rel_type == "m.replace"
                                         {
-                                            let new_body = if new_content.formatted_body.is_some() {
-                                                // crate::widgets::utils::markdown_to_terminal(&body)
-                                                // this shouldn't fail but as a back up we just use
-                                                // the unformatted message body
-                                                None.unwrap_or(body.clone())
+                                            let new_body = 
+                                            // if new_content.formatted_body.is_some()
+                                            if body.contains("`")
+                                            {
+                                                crate::widgets::utils::markdown_to_terminal(&body)
+                                                    // this shouldn't fail but as a back up we just use
+                                                    // the unformatted message body
+                                                    .unwrap_or(body.clone())
+                                            // None.unwrap_or(body.clone())
                                             } else {
                                                 body.to_string()
                                             };
