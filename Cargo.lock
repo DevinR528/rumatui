@@ -1245,7 +1245,9 @@ checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 
 [[package]]
 name = "mdcat"
-version = "0.19.0"
+version = "0.18.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14fff01d1a4aa5bb1c3824a6e1e509e5757a8403059122088da6f095e49ff5a0"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -1254,7 +1256,6 @@ dependencies = [
  "fehler",
  "gethostname",
  "image",
- "lazy_static",
  "mime",
  "pulldown-cmark",
  "reqwest",

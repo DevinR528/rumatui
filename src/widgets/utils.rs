@@ -47,7 +47,7 @@ lazy_static::lazy_static! {
 }
 
 #[allow(dead_code, non_snake_case)]
-pub(crate) fn markdown_to_terminal_OOM(input: &str) -> Result<String> {
+pub(crate) fn markdown_to_terminal(input: &str) -> Result<String> {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TASKLISTS);
     options.insert(Options::ENABLE_STRIKETHROUGH);
@@ -60,7 +60,7 @@ pub(crate) fn markdown_to_terminal_OOM(input: &str) -> Result<String> {
     Ok(w.to_string())
 }
 
-pub(crate) fn markdown_to_terminal(input: &str) -> Result<String> {
+pub(crate) fn markdown_to_terminal_UN_OOM(input: &str) -> Result<String> {
     Ok(input.to_string())
 }
 

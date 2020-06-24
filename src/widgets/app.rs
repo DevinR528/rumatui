@@ -804,13 +804,11 @@ impl AppWidget {
     ) {
         for ev in events.chunk {
             if let Ok(ref e) = serde_json::from_str::<AnyRoomEventStub>(ev.json().get()) {
-                drop(ev);
                 // matrix-sdk does not mutate the room on past events
                 // rooms are only mutated for present events, so we must handle the past
                 // events so when saved to the database the room is accurate with the current state
-                room.write()
-                    .await
-                    .receive_timeline_event(&e, &room.read().await.room_id);
+                let room_id = room.read().await.room_id.clone();
+                room.write().await.receive_timeline_event(&e, &room_id);
 
                 match e {
                     AnyRoomEventStub::Message(AnyMessageEventStub::RoomMessage(msg)) => {
