@@ -60,10 +60,6 @@ pub(crate) fn markdown_to_terminal(input: &str) -> Result<String> {
     Ok(w.to_string())
 }
 
-pub(crate) fn markdown_to_terminal_UN_OOM(input: &str) -> Result<String> {
-    Ok(input.to_string())
-}
-
 pub(crate) fn markdown_to_html(input: &str) -> String {
     comrak::markdown_to_html(input, &ComrakOptions::default())
 }
