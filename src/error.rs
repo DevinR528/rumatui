@@ -43,6 +43,7 @@ pub enum Error {
     Unknown(String),
     Channel(String),
     MatrixUiaaError(MatrixError),
+    Rumatui(&'static str),
 }
 
 impl fmt::Display for Error {
@@ -84,6 +85,7 @@ impl fmt::Display for Error {
                 msg
             ),
             Self::MatrixUiaaError(err) => write!(f, "whoaaaa {}", err),
+            Self::Rumatui(msg) => write!(f, "An error occurred in `rumatui`.\n{}", msg),
         }
     }
 }

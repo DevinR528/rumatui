@@ -217,6 +217,7 @@ impl ChatWidget {
     }
 
     pub(crate) async fn add_room(&mut self, room: Arc<RwLock<Room>>) {
+        self.messages_widget.add_room(Arc::clone(&room)).await;
         self.rooms_widget.add_room(room).await
     }
 

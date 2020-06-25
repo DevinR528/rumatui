@@ -513,6 +513,15 @@ impl AppWidget {
                             ),
                         )) => {
                             if let Some(session) = session {
+                                // auth types for uiaa stages
+                                // m.login.password
+                                // m.login.recaptcha
+                                // m.login.oauth2
+                                // m.login.email.identity
+                                // m.login.msisdn
+                                // m.login.token
+                                // m.login.dummy
+
                                 let stages = flows
                                     .iter()
                                     .find(|f| f.stages.contains(&"m.login.dummy".to_string()))

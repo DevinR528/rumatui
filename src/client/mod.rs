@@ -156,17 +156,6 @@ impl MatrixClient {
             .username(&username)
             .kind(RegistrationKind::User);
 
-        // auth types for uiaa
-        // m.login.password
-        // m.login.recaptcha
-        // m.login.oauth2
-        // m.login.email.identity
-        // m.login.msisdn
-        // m.login.token
-        // m.login.dummy
-
-        // fallback site
-
         self.inner.register_user(req).await.map_err(Into::into)
     }
 
