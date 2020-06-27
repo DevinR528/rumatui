@@ -1174,7 +1174,7 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 [[package]]
 name = "matrix-sdk"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#20c07507b991ec26cf7aa01add826ecd5049d523"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#4cd488fda5c44cb2a825c1461d26616593b51ed5"
 dependencies = [
  "futures-timer",
  "http",
@@ -1192,7 +1192,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-base"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#20c07507b991ec26cf7aa01add826ecd5049d523"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#4cd488fda5c44cb2a825c1461d26616593b51ed5"
 dependencies = [
  "async-trait",
  "matrix-sdk-common",
@@ -1208,7 +1208,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-common"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#20c07507b991ec26cf7aa01add826ecd5049d523"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#4cd488fda5c44cb2a825c1461d26616593b51ed5"
 dependencies = [
  "futures-locks",
  "instant",
@@ -1221,7 +1221,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-common-macros"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#20c07507b991ec26cf7aa01add826ecd5049d523"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#4cd488fda5c44cb2a825c1461d26616593b51ed5"
 dependencies = [
  "quote",
  "syn",
@@ -1230,7 +1230,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-crypto"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#20c07507b991ec26cf7aa01add826ecd5049d523"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#4cd488fda5c44cb2a825c1461d26616593b51ed5"
 dependencies = [
  "async-trait",
  "atomic",

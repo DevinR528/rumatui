@@ -276,12 +276,10 @@ impl ChatWidget {
         &mut self,
         id: &RoomId,
         name: String,
-        homeserver: &str,
         uuid: Uuid,
         content: MessageEventContent,
     ) {
-        self.messages_widget
-            .echo_sent_msg(id, name, homeserver, uuid, content)
+        self.messages_widget.echo_sent_msg(id, name, uuid, content)
     }
 
     pub(crate) fn edit_message(&mut self, room: &RoomId, event: &EventId, new_msg: String) {

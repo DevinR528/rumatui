@@ -364,7 +364,7 @@ impl AppWidget {
                     let room_id = self.chat.to_current_room_id();
                     let seen = self.last_interaction.elapsed().unwrap_or_default()
                         > Duration::from_secs(2);
-                    if !self.typing_notice {
+                    if !self.typing_notice && seen {
                         self.typing_notice = true;
                         if let (Some(me), Some(room_id)) = (self.chat.to_current_user(), room_id) {
                             if let Err(e) =
@@ -443,11 +443,11 @@ impl AppWidget {
                         // find the room the message was just sent to
                         let local_message = if let Some(room) = self.chat.rooms().get(&room_id) {
                             let r = room.read().await;
-                            let matrix_sdk::Room { members, .. } = r.deref();
+                            let matrix_sdk::Room { joined_members, .. } = r.deref();
                             let name = if let Some(mem) =
-                                members.get(self.chat.as_current_user().unwrap())
+                                joined_members.get(self.chat.as_current_user().unwrap())
                             {
-                                mem.name.clone()
+                                mem.name()
                             } else {
                                 self.chat.as_current_user().unwrap().localpart().into()
                             };
@@ -457,13 +457,7 @@ impl AppWidget {
                         };
 
                         if let Some(name) = local_message {
-                            self.chat.echo_sent_msg(
-                                &room_id,
-                                name,
-                                &self.homeserver,
-                                uuid,
-                                message,
-                            );
+                            self.chat.echo_sent_msg(&room_id, name, uuid, message);
                         }
                         self.chat.clear_send_msg();
                         Ok(())
@@ -839,9 +833,9 @@ impl AppWidget {
 
                         let name = {
                             let m = room.read().await;
-                            m.members
+                            m.joined_members
                                 .get(&sender)
-                                .map(|m| m.name.to_string())
+                                .map(|m| m.name())
                                 .unwrap_or(sender.localpart().to_string())
                         };
 
@@ -874,7 +868,7 @@ impl AppWidget {
                                     user: sender.clone(),
                                     text: msg,
                                     event_id: event_id.clone(),
-                                    timestamp: origin_server_ts.clone(),
+                                    timestamp: *origin_server_ts,
                                     uuid: Uuid::parse_str(&txn_id).unwrap_or(Uuid::new_v4()),
                                     read: false,
                                     reactions: vec![],

@@ -14,10 +14,10 @@ use matrix_sdk::events::{
     room::message::{
         FormattedBody, MessageEventContent, MessageFormat, RelatesTo, TextMessageEventContent,
     },
-    MessageEventStub,
+    AnyMessageEventStub, MessageEventStub,
 };
 use matrix_sdk::{
-    identifiers::{EventId, RoomId, ServerName, UserId},
+    identifiers::{EventId, RoomId, UserId},
     Room,
 };
 use rumatui_tui::{
@@ -111,8 +111,12 @@ impl MessageWidget {
             self.unread_notifications = room.unread_notifications.unwrap_or_default();
             self.unread_notifications += room.unread_highlight.unwrap_or_default();
 
+            // TODO handle redactions
             for msg in room.messages.iter() {
-                self.add_message_event(msg, &room);
+                match &msg.deref() {
+                    AnyMessageEventStub::RoomMessage(event) => self.add_message_event(event, &room),
+                    _ => {}
+                }
             }
         }
     }
@@ -132,8 +136,8 @@ impl MessageWidget {
             unsigned,
             ..
         } = event;
-        let name = if let Some(mem) = room.members.get(&sender) {
-            mem.name.clone()
+        let name = if let Some(mem) = room.joined_members.get(&sender) {
+            mem.name()
         } else {
             sender.localpart().into()
         };
@@ -298,7 +302,6 @@ impl MessageWidget {
         &mut self,
         id: &RoomId,
         name: String,
-        homeserver: &str,
         uuid: Uuid,
         content: MessageEventContent,
     ) {
@@ -318,11 +321,7 @@ impl MessageWidget {
                     body
                 };
                 let timestamp = SystemTime::now();
-                let domain = url::Url::parse(homeserver)
-                    .ok()
-                    .and_then(|url| url.domain().map(|s| s.to_string()))
-                    // this is probably an error at this point
-                    .unwrap_or(String::from("matrix.org"));
+
                 let msg = Message {
                     text: msg,
                     user: self.me.as_ref().unwrap().clone(),

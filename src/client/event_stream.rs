@@ -164,8 +164,8 @@ impl EventEmitter for EventStream {
                 ..
             } = event;
 
-            let name = if let Some(mem) = room.read().await.members.get(&sender) {
-                mem.name.clone()
+            let name = if let Some(mem) = room.read().await.joined_members.get(&sender) {
+                mem.name()
             } else {
                 sender.localpart().into()
             };
@@ -400,7 +400,7 @@ impl EventEmitter for EventStream {
             let typing = room
                 .read()
                 .await
-                .members
+                .joined_members
                 .iter()
                 .filter(|(id, _)| event.content.user_ids.contains(id))
                 .map(|(_, mem)| mem.name.to_string())

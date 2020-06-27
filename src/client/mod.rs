@@ -14,7 +14,8 @@ use matrix_sdk::{
     },
     events::room::message::MessageEventContent,
     identifiers::{DeviceId, EventId, RoomId, UserId},
-    Client, ClientConfig, JsonStore, RegistrationBuilder, Room, RoomSearchBuilder, SyncSettings,
+    Client, ClientConfig, JsonStore, RegistrationBuilder, Room, RoomListFilterBuilder,
+    SyncSettings,
 };
 use tokio::sync::RwLock;
 use url::Url;
@@ -73,8 +74,8 @@ impl MatrixClient {
         let store: Result<JsonStore> = JsonStore::open(path).map_err(Into::into);
         // reset the client with the state store with username as part of the store path
         let client_config = ClientConfig::default()
-            .proxy("http://localhost:8080")? // for mitmproxy
-            .disable_ssl_verification()
+            // .proxy("http://localhost:8080")? // for mitmproxy
+            // .disable_ssl_verification()
             .state_store(Box::new(store?));
 
         let inner: Result<Client> =
@@ -266,7 +267,7 @@ impl MatrixClient {
         } else {
             Some(filter.to_string())
         };
-        let mut request = RoomSearchBuilder::new();
+        let mut request = RoomListFilterBuilder::new();
         request
             .filter(Filter {
                 generic_search_term: filter,
@@ -278,7 +279,7 @@ impl MatrixClient {
         }
 
         self.inner
-            .get_public_rooms_filtered(request)
+            .public_rooms_filtered(request)
             .await
             .map_err(Into::into)
     }
