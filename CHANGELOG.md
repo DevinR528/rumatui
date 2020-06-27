@@ -1,3 +1,8 @@
+# [Unreleased]
+
+* Add memory for send message textbox
+  * When switching rooms whatever has been typed for that room will be kept when the user returns
+
 # [0.1.17]
 
 * Ignore all `widgets::ctrl_chars` tests for Nix packaging

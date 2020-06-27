@@ -450,13 +450,7 @@ impl AppWidget {
                         };
 
                         if let Some(name) = local_message {
-                            self.chat.echo_sent_msg(
-                                &room_id,
-                                name,
-                                &self.homeserver,
-                                uuid,
-                                message,
-                            );
+                            self.chat.echo_sent_msg(&room_id, name, uuid, message);
                         }
                         self.chat.clear_send_msg();
                         Ok(())

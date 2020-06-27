@@ -1,7 +1,9 @@
 use std::{
     cell::{Cell, RefCell},
     collections::{HashMap, VecDeque},
+    convert::TryFrom,
     fmt,
+    ops::Deref,
     rc::Rc,
     sync::Arc,
     time::{Duration, SystemTime},
@@ -27,7 +29,7 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::{
-    error::Result,
+    error::{Error, Result},
     widgets::{message::ctrl_char, utils::markdown_to_html, RenderWidget},
 };
 
@@ -89,7 +91,7 @@ pub struct MessageWidget {
     messages: HashMap<RoomId, Vec<Message>>,
     pub(crate) me: Option<UserId>,
     pub unread_notifications: UInt,
-    send_msg: String,
+    send_msgs: HashMap<RoomId, String>,
     notifications: VecDeque<(Option<SystemTime>, String)>,
     scroll_pos: usize,
     did_overflow: Option<Rc<Cell<bool>>>,
@@ -100,14 +102,21 @@ impl MessageWidget {
     pub async fn populate_initial_msgs(&mut self, rooms: &HashMap<RoomId, Arc<RwLock<Room>>>) {
         for room in rooms.values() {
             let room = room.read().await;
-            self.unread_notifications = room.unread_notifications.unwrap_or_default();
 
+            self.send_msgs.insert(room.room_id.clone(), String::new());
+
+            self.unread_notifications = room.unread_notifications.unwrap_or_default();
             self.unread_notifications += room.unread_highlight.unwrap_or_default();
 
             for msg in room.messages.iter() {
                 self.add_message_event(msg, &room);
             }
         }
+    }
+
+    pub async fn add_room(&mut self, room: Arc<RwLock<Room>>) {
+        self.send_msgs
+            .insert(room.read().await.room_id.clone(), String::new());
     }
 
     // TODO factor out with AppWidget::process_room_events and MessageWidget::echo_sent_msg
@@ -222,30 +231,58 @@ impl MessageWidget {
     }
 
     pub fn clear_send_msg(&mut self) {
-        self.send_msg.clear();
-    }
-
-    // TODO Im sure there is an actual way to do this like Riot
-    fn process_message(&self) -> MsgType {
-        if self.send_msg.contains('`') {
-            MsgType::FormattedText
-        } else {
-            MsgType::PlainText
+        if let Some(room_id) = self.current_room.borrow().deref() {
+            if let Some(msg) = self.send_msgs.get_mut(room_id) {
+                msg.clear()
+            }
         }
     }
 
+    // TODO Im sure there is an actual way to do this like Riot
+    // TODO fix message text box hashmap
+    fn process_message(&self) -> Result<MsgType> {
+        if let Some(room_id) = self.current_room.borrow().deref() {
+            if let Some(msg) = self.send_msgs.get(room_id) {
+                if msg.contains('`') {
+                    Ok(MsgType::FormattedText)
+                } else {
+                    Ok(MsgType::PlainText)
+                }
+            } else {
+                Err(Error::Rumatui(
+                    "The room was added to the send_msgs HashMap rumatui BUG",
+                ))
+            }
+        } else {
+            Err(Error::Rumatui("No current room has been set rumatui BUG"))
+        }
+    }
+
+    // TODO fix message text box hashmap
     pub fn get_sending_message(&self) -> Result<MessageEventContent> {
-        match self.process_message() {
-            MsgType::PlainText => Ok(MessageEventContent::Text(
-                TextMessageEventContent::new_plain(&self.send_msg),
-            )),
-            MsgType::FormattedText => Ok(MessageEventContent::Text(TextMessageEventContent {
-                body: self.send_msg.clone(),
-                format: Some("org.matrix.custom.html".into()),
-                formatted_body: Some(markdown_to_html(&self.send_msg)),
-                relates_to: None,
-            })),
-            _ => todo!("implement more sending messages"),
+        if let Some(room_id) = self.current_room.borrow().deref() {
+            if let Some(to_send) = self.send_msgs.get(room_id) {
+                match self.process_message()? {
+                    MsgType::PlainText => Ok(MessageEventContent::Text(
+                        TextMessageEventContent::new_plain(to_send.as_str()),
+                    )),
+                    MsgType::FormattedText => {
+                        Ok(MessageEventContent::Text(TextMessageEventContent {
+                            body: to_send.clone(),
+                            format: Some("org.matrix.custom.html".into()),
+                            formatted_body: Some(markdown_to_html(&to_send)),
+                            relates_to: None,
+                        }))
+                    }
+                    _ => todo!("implement more sending messages"),
+                }
+            } else {
+                Err(Error::Rumatui(
+                    "The room was added to the send_msgs HashMap rumatui BUG",
+                ))
+            }
+        } else {
+            Err(Error::Rumatui("No current room has been set rumatui BUG"))
         }
     }
 
@@ -253,7 +290,6 @@ impl MessageWidget {
         &mut self,
         id: &RoomId,
         name: String,
-        homeserver: &str,
         uuid: Uuid,
         content: MessageEventContent,
     ) {
@@ -269,17 +305,13 @@ impl MessageWidget {
                     body
                 };
                 let timestamp = SystemTime::now();
-                let domain = url::Url::parse(homeserver)
-                    .ok()
-                    .and_then(|url| url.domain().map(|s| s.to_string()))
-                    // this is probably an error at this point
-                    .unwrap_or(String::from("matrix.org"));
+
                 let msg = Message {
                     text: msg,
                     user: self.me.as_ref().unwrap().clone(),
                     timestamp,
                     name,
-                    event_id: EventId::new(&domain).unwrap(),
+                    event_id: EventId::try_from("$fakeeventid:rumatui.client").unwrap(),
                     uuid,
                     read: true,
                     reactions: vec![],
@@ -335,7 +367,7 @@ impl MessageWidget {
         last_interaction: SystemTime,
         room_id: &RoomId,
     ) -> Option<EventId> {
-        if last_interaction.elapsed().ok()? < Duration::from_secs(5) {
+        if last_interaction.elapsed().ok()? < Duration::from_secs(2) {
             if let Some(messages) = self.messages.get_mut(room_id) {
                 messages.sort_by(|msg, msg2| msg.timestamp.cmp(&msg2.timestamp));
 
@@ -362,7 +394,6 @@ impl MessageWidget {
 
     pub fn check_unread(&mut self, room: &Room) -> Option<EventId> {
         self.unread_notifications = room.unread_notifications.unwrap_or_default();
-
         self.unread_notifications += room.unread_highlight.unwrap_or_default();
 
         if let Some(messages) = self.messages.get_mut(&room.room_id) {
@@ -426,12 +457,18 @@ impl MessageWidget {
         }
     }
 
+    // TODO fix message text box hashmap
     pub fn add_char(&mut self, ch: char) {
-        self.send_msg.push(ch);
+        self.send_msgs
+            .get_mut(self.current_room.borrow().as_ref().unwrap())
+            .map(|m| m.push(ch));
     }
 
+    // TODO fix message text box hashmap
     pub fn remove_char(&mut self) {
-        self.send_msg.pop();
+        self.send_msgs
+            .get_mut(self.current_room.borrow().as_ref().unwrap())
+            .map(|m| m.pop());
     }
 }
 
@@ -445,7 +482,19 @@ impl RenderWidget for MessageWidget {
         if self.at_top.is_none() {
             self.at_top = Some(Rc::new(Cell::new(false)));
         }
-        let mut lines = self.send_msg.chars().filter(|c| *c == '\n').count();
+
+        // TODO handle getting the textbox message better
+        let sending_text = if let Some(room_id) = self.current_room.borrow().as_ref() {
+            self.send_msgs
+                .get(room_id)
+                // TODO
+                .cloned()
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+
+        let mut lines = sending_text.chars().filter(|c| *c == '\n').count();
         if lines <= 1 {
             lines = 2;
         }
@@ -557,7 +606,7 @@ impl RenderWidget for MessageWidget {
         f.render_widget(notification, chunks[1]);
 
         let t3 = vec![
-            Text::styled(&self.send_msg, Style::default().fg(Color::Blue)),
+            Text::styled(&sending_text, Style::default().fg(Color::Blue)),
             Text::styled(
                 "<",
                 Style::default()
