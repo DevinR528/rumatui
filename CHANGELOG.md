@@ -1,7 +1,7 @@
 # [0.1.17]
 
 * Ignore all `widgets::ctrl_chars` tests for Nix packaging
-* Use matrix-org/master for matrix-rust-sdk
+* Use matrix-org/matrix-rust-sdk at master for sdk dependency
 
 # [0.1.16]
 
