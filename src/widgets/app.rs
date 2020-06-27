@@ -1,4 +1,9 @@
-use std::{io, ops::Deref, sync::Arc, time::SystemTime};
+use std::{
+    io,
+    ops::Deref,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
 use matrix_sdk::{
     api::r0::{directory::get_public_rooms_filtered::RoomNetwork, message::get_message_events},
@@ -357,6 +362,8 @@ impl AppWidget {
                 } else {
                     // send typing notice to the server
                     let room_id = self.chat.to_current_room_id();
+                    let seen = self.last_interaction.elapsed().unwrap_or_default()
+                        > Duration::from_secs(2);
                     if !self.typing_notice {
                         self.typing_notice = true;
                         if let (Some(me), Some(room_id)) = (self.chat.to_current_user(), room_id) {

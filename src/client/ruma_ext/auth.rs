@@ -42,11 +42,10 @@ impl Into<RegisterResponse> for Response {
 }
 
 pub mod dummy {
-    use matrix_sdk::identifiers::{DeviceId, UserId};
-    use matrix_sdk::{
-        api::r0::{account::register::Response as RegisterResponse, uiaa::UiaaResponse},
-        ruma_api,
+    use matrix_sdk::api::r0::{
+        account::register::Response as RegisterResponse, uiaa::UiaaResponse,
     };
+    use matrix_sdk::identifiers::{DeviceId, UserId};
 
     #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
     pub struct Dummy {

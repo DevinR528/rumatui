@@ -328,7 +328,7 @@ impl MessageWidget {
                     user: self.me.as_ref().unwrap().clone(),
                     timestamp,
                     name,
-                    event_id: EventId::new(ServerName::try_from(domain).unwrap().as_ref()),
+                    event_id: EventId::try_from("$fake:rumatui.event").unwrap(),
                     uuid,
                     read: true,
                     reactions: vec![],
@@ -384,7 +384,7 @@ impl MessageWidget {
         last_interaction: SystemTime,
         room_id: &RoomId,
     ) -> Option<EventId> {
-        if last_interaction.elapsed().ok()? < Duration::from_secs(5) {
+        if last_interaction.elapsed().ok()? < Duration::from_secs(2) {
             if let Some(messages) = self.messages.get_mut(room_id) {
                 messages.sort_by(|msg, msg2| msg.timestamp.cmp(&msg2.timestamp));
 

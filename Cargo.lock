@@ -39,7 +39,7 @@ version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee49baf6cb617b853aa8d93bf420db2383fab46d314482ca2803b40d5fde979b"
 dependencies = [
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -48,7 +48,7 @@ version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
 dependencies = [
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -169,7 +169,7 @@ checksum = "d9b39be18770d11421cdb1b9947a45dd3f37e93092cbf377614828a319d5fee8"
 dependencies = [
  "hermit-abi",
  "libc",
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -200,9 +200,9 @@ checksum = "b41b7ea54a0c9d92199de89e20e58d49f02f8e699814ef3fdf266f6f748d15c7"
 
 [[package]]
 name = "base64"
-version = "0.12.2"
+version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e223af0dc48c96d4f8342ec01a4974f139df863896b316681efd36742f22cc67"
+checksum = "3441f0f7b02788e948e47f457ca01f1d7e6d92c693bc132c22b087d3141c03ff"
 
 [[package]]
 name = "bincode"
@@ -308,9 +308,9 @@ checksum = "df8670b8c7b9dae1793364eafadf7239c40d669904660c5960d74cfd80b46a53"
 
 [[package]]
 name = "cc"
-version = "1.0.54"
+version = "1.0.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7bbb73db36c1246e9034e307d0fba23f9a2e251faa47ade70c1bd252220c8311"
+checksum = "b1be3409f94d7bdceeb5f5fac551039d9b3f00e25da7a74fc4d33400a0d96368"
 
 [[package]]
 name = "cfg-if"
@@ -537,7 +537,7 @@ checksum = "8e93d7f5705de3e49895a2b5e0b8855a1c27f080192ae9c32a6432d50741a57a"
 dependencies = [
  "libc",
  "redox_users",
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -813,7 +813,7 @@ dependencies = [
  "libc",
  "log",
  "rustc_version",
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -832,7 +832,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e692e296bfac1d2533ef168d0b60ff5897b8b70a4009276834014dd8924cc028"
 dependencies = [
  "libc",
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -1174,12 +1174,13 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 [[package]]
 name = "matrix-sdk"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#7761c3d36fbf509bf8e7583042e5058ab60f3216"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#20c07507b991ec26cf7aa01add826ecd5049d523"
 dependencies = [
  "futures-timer",
  "http",
  "matrix-sdk-base",
  "matrix-sdk-common",
+ "matrix-sdk-common-macros",
  "reqwest",
  "serde_json",
  "thiserror",
@@ -1191,10 +1192,11 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-base"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#7761c3d36fbf509bf8e7583042e5058ab60f3216"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#20c07507b991ec26cf7aa01add826ecd5049d523"
 dependencies = [
  "async-trait",
  "matrix-sdk-common",
+ "matrix-sdk-common-macros",
  "matrix-sdk-crypto",
  "serde",
  "serde_json",
@@ -1206,7 +1208,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-common"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#7761c3d36fbf509bf8e7583042e5058ab60f3216"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#20c07507b991ec26cf7aa01add826ecd5049d523"
 dependencies = [
  "futures-locks",
  "instant",
@@ -1217,15 +1219,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "matrix-sdk-common-macros"
+version = "0.1.0"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#20c07507b991ec26cf7aa01add826ecd5049d523"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "matrix-sdk-crypto"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#7761c3d36fbf509bf8e7583042e5058ab60f3216"
+source = "git+https://github.com/DevinR528/matrix-rust-sdk?branch=ruma22#20c07507b991ec26cf7aa01add826ecd5049d523"
 dependencies = [
  "async-trait",
  "atomic",
  "cjson",
  "dashmap",
  "matrix-sdk-common",
+ "matrix-sdk-common-macros",
  "olm-rs",
  "serde",
  "serde_json",
@@ -1251,7 +1263,7 @@ checksum = "14fff01d1a4aa5bb1c3824a6e1e509e5757a8403059122088da6f095e49ff5a0"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
- "base64 0.12.2",
+ "base64 0.12.3",
  "clap",
  "fehler",
  "gethostname",
@@ -1367,7 +1379,7 @@ checksum = "2ba7c918ac76704fb42afcbbb43891e72731f3dcca3bef2a19786297baf14af7"
 dependencies = [
  "cfg-if",
  "libc",
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -1466,9 +1478,9 @@ checksum = "2839e79665f131bdb5782e51f2c6c9599c133c6098982a54c794358bf432529c"
 
 [[package]]
 name = "openssl"
-version = "0.10.29"
+version = "0.10.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cee6d85f4cb4c4f59a6a85d5b68a233d280c82e29e822913b9c8b129fbf20bdd"
+checksum = "8d575eff3665419f9b83678ff2815858ad9d11567e082f5ac1814baba4e2bcb4"
 dependencies = [
  "bitflags",
  "cfg-if",
@@ -1590,7 +1602,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b336d94e8e4ce29bf15bba393164629764744c567e8ad306cc1fdd0119967fd"
 dependencies = [
- "base64 0.12.2",
+ "base64 0.12.3",
  "chrono",
  "indexmap",
  "line-wrap",
@@ -1773,7 +1785,7 @@ version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3acd125665422973a33ac9d3dd2df85edad0f4ae9b00dafb1a05e43a9f5ef8e7"
 dependencies = [
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -1783,7 +1795,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b82c9238b305f26f53443e3a4bc8528d64b8d0bee408ec949eb7bf5635ec680"
 dependencies = [
  "async-compression",
- "base64 0.12.2",
+ "base64 0.12.3",
  "bytes",
  "encoding_rs",
  "futures-core",
@@ -1814,7 +1826,7 @@ dependencies = [
 [[package]]
 name = "ruma"
 version = "0.1.0"
-source = "git+https://github.com/DevinR528/ruma?branch=export-ruma_api!#b02638491ba0554a2ffb2a08b505f11b209c670d"
+source = "git+https://github.com/DevinR528/ruma?branch=field-access#f1d10ef684d536d664cc699573df28170f580c8e"
 dependencies = [
  "ruma-api",
  "ruma-client-api",
@@ -1826,7 +1838,7 @@ dependencies = [
 [[package]]
 name = "ruma-api"
 version = "0.16.1"
-source = "git+https://github.com/DevinR528/ruma?branch=export-ruma_api!#b02638491ba0554a2ffb2a08b505f11b209c670d"
+source = "git+https://github.com/DevinR528/ruma?branch=field-access#f1d10ef684d536d664cc699573df28170f580c8e"
 dependencies = [
  "http",
  "percent-encoding",
@@ -1841,7 +1853,7 @@ dependencies = [
 [[package]]
 name = "ruma-api-macros"
 version = "0.16.1"
-source = "git+https://github.com/DevinR528/ruma?branch=export-ruma_api!#b02638491ba0554a2ffb2a08b505f11b209c670d"
+source = "git+https://github.com/DevinR528/ruma?branch=field-access#f1d10ef684d536d664cc699573df28170f580c8e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1851,7 +1863,7 @@ dependencies = [
 [[package]]
 name = "ruma-client-api"
 version = "0.9.0"
-source = "git+https://github.com/DevinR528/ruma?branch=export-ruma_api!#b02638491ba0554a2ffb2a08b505f11b209c670d"
+source = "git+https://github.com/DevinR528/ruma?branch=field-access#f1d10ef684d536d664cc699573df28170f580c8e"
 dependencies = [
  "http",
  "js_int",
@@ -1868,7 +1880,7 @@ dependencies = [
 [[package]]
 name = "ruma-common"
 version = "0.1.3"
-source = "git+https://github.com/DevinR528/ruma?branch=export-ruma_api!#b02638491ba0554a2ffb2a08b505f11b209c670d"
+source = "git+https://github.com/DevinR528/ruma?branch=field-access#f1d10ef684d536d664cc699573df28170f580c8e"
 dependencies = [
  "js_int",
  "matches",
@@ -1881,7 +1893,7 @@ dependencies = [
 [[package]]
 name = "ruma-events"
 version = "0.21.3"
-source = "git+https://github.com/DevinR528/ruma?branch=export-ruma_api!#b02638491ba0554a2ffb2a08b505f11b209c670d"
+source = "git+https://github.com/DevinR528/ruma?branch=field-access#f1d10ef684d536d664cc699573df28170f580c8e"
 dependencies = [
  "js_int",
  "ruma-common",
@@ -1896,7 +1908,7 @@ dependencies = [
 [[package]]
 name = "ruma-events-macros"
 version = "0.21.3"
-source = "git+https://github.com/DevinR528/ruma?branch=export-ruma_api!#b02638491ba0554a2ffb2a08b505f11b209c670d"
+source = "git+https://github.com/DevinR528/ruma?branch=field-access#f1d10ef684d536d664cc699573df28170f580c8e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1906,9 +1918,8 @@ dependencies = [
 [[package]]
 name = "ruma-identifiers"
 version = "0.16.2"
-source = "git+https://github.com/DevinR528/ruma?branch=export-ruma_api!#b02638491ba0554a2ffb2a08b505f11b209c670d"
+source = "git+https://github.com/DevinR528/ruma?branch=field-access#f1d10ef684d536d664cc699573df28170f580c8e"
 dependencies = [
- "rand",
  "serde",
  "strum",
 ]
@@ -1916,7 +1927,7 @@ dependencies = [
 [[package]]
 name = "ruma-serde"
 version = "0.2.2"
-source = "git+https://github.com/DevinR528/ruma?branch=export-ruma_api!#b02638491ba0554a2ffb2a08b505f11b209c670d"
+source = "git+https://github.com/DevinR528/ruma?branch=field-access#f1d10ef684d536d664cc699573df28170f580c8e"
 dependencies = [
  "form_urlencoded",
  "itoa",
@@ -1944,7 +1955,7 @@ dependencies = [
  "pulldown-cmark",
  "regex",
  "ruma-api",
- "rumatui-tui",
+ "rumatui-tui 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "serde_json",
  "syntect",
@@ -1965,6 +1976,21 @@ dependencies = [
  "either",
  "itertools",
  "rand",
+ "termion",
+ "unicode-segmentation",
+ "unicode-width",
+]
+
+[[package]]
+name = "rumatui-tui"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "321431661dcf65148a9405f094d81d862102b3d84b012670c1779dbd1279082e"
+dependencies = [
+ "bitflags",
+ "cassowary",
+ "either",
+ "itertools",
  "termion",
  "unicode-segmentation",
  "unicode-width",
@@ -2025,7 +2051,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f05ba609c234e60bee0d547fe94a4c7e9da733d1c962cf6e59efa4cd9c8bc75"
 dependencies = [
  "lazy_static",
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -2160,7 +2186,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "redox_syscall",
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -2310,7 +2336,7 @@ dependencies = [
  "rand",
  "redox_syscall",
  "remove_dir_all",
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -2320,7 +2346,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e4129646ca0ed8f45d09b929036bafad5377103edd06e50bf574b353d2b08d9"
 dependencies = [
  "libc",
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -2392,7 +2418,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
 dependencies = [
  "libc",
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -2638,7 +2664,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "777182bc735b6424e1a57516d35ed72cb8019d85c8c9bf536dccb3445c1a2f7d"
 dependencies = [
  "same-file",
- "winapi 0.3.8",
+ "winapi 0.3.9",
  "winapi-util",
 ]
 
@@ -2743,7 +2769,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a83a4b8838569b89d2a3e7353995088e3b80c420a1269cd3d92ba8196875fc16"
 dependencies = [
  "widestring",
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -2760,9 +2786,9 @@ checksum = "167dc9d6949a9b857f3451275e911c3f44255842c1f7a76f33c55103a909087a"
 
 [[package]]
 name = "winapi"
-version = "0.3.8"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8093091eeb260906a183e6ae1abdba2ef5ef2257a21801128899c3fc699229c6"
+checksum = "5c839a674fcd7a98952e593242ea400abe93992746761e38641405d28b00f419"
 dependencies = [
  "winapi-i686-pc-windows-gnu",
  "winapi-x86_64-pc-windows-gnu",
@@ -2786,7 +2812,7 @@ version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "70ec6ce85bb158151cae5e5c87f95a8e97d2c0c4b001223f33a334e3ce5de178"
 dependencies = [
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -2801,7 +2827,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0120db82e8a1e0b9fb3345a539c478767c0048d842860994d96113d5b667bd69"
 dependencies = [
- "winapi 0.3.8",
+ "winapi 0.3.9",
 ]
 
 [[package]]
