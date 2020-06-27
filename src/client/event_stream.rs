@@ -114,13 +114,7 @@ impl EventEmitter for EventStream {
     /// Send a membership change event to the ui thread.
     async fn on_room_member(&self, room: SyncRoom, event: &MemberEvent) {
         match room {
-            SyncRoom::Invited(room) => {
-                self.handle_room_member(room, event).await;
-            }
-            SyncRoom::Left(room) => {
-                self.handle_room_member(room, event).await;
-            }
-            SyncRoom::Joined(room) => {
+            SyncRoom::Invited(room) | SyncRoom::Left(room) | SyncRoom::Joined(room) => {
                 self.handle_room_member(room, event).await;
             }
         }
@@ -160,7 +154,7 @@ impl EventEmitter for EventStream {
                 ..
             } = event;
 
-            let name = if let Some(mem) = room.read().await.members.get(&sender) {
+            let name = if let Some(mem) = room.read().await.joined_members.get(&sender) {
                 mem.name.clone()
             } else {
                 sender.localpart().into()
@@ -323,7 +317,7 @@ impl EventEmitter for EventStream {
             }
         }
     }
-    // TODO make the StateResult::Typing variants a list of typing users and make messages in app
+    // TODO make the StateResult::Typing variants a list of typing users and make the app.rs work
     // like every other StateResult. Use Room::compute_display_name or whatever when PR is done
     /// Fires when `AsyncClient` receives a `NonRoomEvent::Typing` event.
     async fn on_non_room_typing(&self, room: SyncRoom, event: &TypingEvent) {
@@ -331,10 +325,10 @@ impl EventEmitter for EventStream {
             let typing = room
                 .read()
                 .await
-                .members
+                .joined_members
                 .iter()
                 .filter(|(id, _)| event.content.user_ids.contains(id))
-                .map(|(_, mem)| mem.name.to_string())
+                .map(|(_, mem)| mem.name())
                 .collect::<Vec<String>>();
             let room_id = room.read().await.room_id.clone();
             let notice = if typing.is_empty() {

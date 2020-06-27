@@ -1,3 +1,8 @@
+# [0.1.17]
+
+* Ignore all `widgets::ctrl_chars` tests for Nix packaging
+* Use matrix-org/master for matrix-rust-sdk
+
 # [0.1.16]
 
 * Add help output `rumatui [-h/--help]`

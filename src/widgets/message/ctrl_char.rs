@@ -521,6 +521,7 @@ fn main() {
     }
 
     #[test]
+    #[ignore]
     fn reply_formatter() {
         let input = "> In reply to blah blah
 

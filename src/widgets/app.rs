@@ -436,11 +436,11 @@ impl AppWidget {
                         // find the room the message was just sent to
                         let local_message = if let Some(room) = self.chat.rooms().get(&room_id) {
                             let r = room.read().await;
-                            let matrix_sdk::Room { members, .. } = r.deref();
+                            let matrix_sdk::Room { joined_members, .. } = r.deref();
                             let name = if let Some(mem) =
-                                members.get(self.chat.as_current_user().unwrap())
+                                joined_members.get(self.chat.as_current_user().unwrap())
                             {
-                                mem.name.clone()
+                                mem.name()
                             } else {
                                 self.chat.as_current_user().unwrap().localpart().into()
                             };
@@ -821,10 +821,10 @@ impl AppWidget {
                         } = msg;
 
                         let name = {
-                            let m = room.read().await;
-                            m.members
+                            let room = room.read().await;
+                            room.joined_members
                                 .get(&sender)
-                                .map(|m| m.name.to_string())
+                                .map(|m| m.name())
                                 .unwrap_or(sender.localpart().to_string())
                         };
 

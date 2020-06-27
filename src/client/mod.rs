@@ -14,7 +14,8 @@ use matrix_sdk::{
     },
     events::room::message::MessageEventContent,
     identifiers::{DeviceId, EventId, RoomId, UserId},
-    Client, ClientConfig, JsonStore, RegistrationBuilder, Room, RoomSearchBuilder, SyncSettings,
+    Client, ClientConfig, JsonStore, RegistrationBuilder, Room, RoomListFilterBuilder,
+    SyncSettings,
 };
 use tokio::sync::RwLock;
 use url::Url;
@@ -277,7 +278,7 @@ impl MatrixClient {
         } else {
             Some(filter.to_string())
         };
-        let mut request = RoomSearchBuilder::new();
+        let mut request = RoomListFilterBuilder::new();
         request
             .filter(Filter {
                 generic_search_term: filter,
@@ -289,7 +290,7 @@ impl MatrixClient {
         }
 
         self.inner
-            .get_public_rooms_filtered(request)
+            .public_rooms_filtered(request)
             .await
             .map_err(Into::into)
     }

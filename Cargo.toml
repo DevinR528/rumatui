@@ -1,6 +1,6 @@
 [package]
 name = "rumatui"
-version = "0.1.16"
+version = "0.1.17"
 authors = ["Devin R <devin.ragotzy@gmail.com>"]
 license = "MIT/Apache-2.0"
 description = "A click-able command-line Matrix client."
@@ -26,7 +26,7 @@ lazy_static = "1.4.0"
 # matrix-sdk = "0.1.0"
 # matrix-sdk-base = { version = "0.1.0", features = ["messages"] }
 
-matrix-sdk = { git = "https://github.com/DevinR528/matrix-rust-sdk", branch = "rumatui" }
+matrix-sdk = { git = "https://github.com/matrix-org/matrix-rust-sdk" }
 
 mdcat = "0.18.2"
 muncher = "0.6.1"
