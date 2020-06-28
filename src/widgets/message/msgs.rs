@@ -187,10 +187,9 @@ impl MessageWidget {
 
     pub fn edit_message(&mut self, room: &RoomId, event_id: &EventId, msg: String) {
         if let Some(messages) = self.messages.get_mut(room) {
-            // remove the message echo when user sends a message and we display the text before
-            // the server responds
             if let Some(idx) = messages.iter().position(|m| &m.event_id == event_id) {
-                messages[idx].text = msg;
+                messages[idx].text =
+                    crate::widgets::utils::markdown_to_terminal(&msg).unwrap_or(msg);
             }
         }
     }
@@ -367,7 +366,7 @@ impl MessageWidget {
         last_interaction: SystemTime,
         room_id: &RoomId,
     ) -> Option<EventId> {
-        if last_interaction.elapsed().ok()? < Duration::from_secs(2) {
+        if last_interaction.elapsed().ok()? < Duration::from_secs(5) {
             if let Some(messages) = self.messages.get_mut(room_id) {
                 messages.sort_by(|msg, msg2| msg.timestamp.cmp(&msg2.timestamp));
 

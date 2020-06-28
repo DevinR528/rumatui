@@ -156,6 +156,7 @@ impl AppWidget {
         }
     }
 
+    // TODO flatten out some
     pub async fn on_scroll_up(&mut self, x: u16, y: u16) {
         if self.chat.is_main_screen() {
             if self.chat.msgs_on_scroll_up(x, y) {

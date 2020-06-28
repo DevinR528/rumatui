@@ -101,6 +101,8 @@ impl From<MatrixError> for Error {
             MatrixError::RumaResponse(http) => match http {
                 RumaResponseError::Http(server) => match server {
                     // This should be the most common error kind and some should be recoverable.
+                    // TODO there are numerous ErrorKind's for `match kind { ... } deal with them
+                    // fix the LOGIN_MSG it is not always accurate
                     ServerError::Known(RumaApiError { kind, message, .. }) => match kind {
                         ErrorKind::Forbidden => Error::RumaResponse(LOGIN_MSG.to_string()),
                         ErrorKind::UserInUse => Error::RumaResponse(format!("{}", message)),
