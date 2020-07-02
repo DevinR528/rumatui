@@ -303,8 +303,10 @@ impl AppWidget {
                                 .send(UserRequest::Login(username.into(), password.into()))
                                 .await
                             {
+                                tracing::warn!("Login failed {:?}", &e);
                                 self.set_error(Error::from(e));
                             } else {
+                                tracing::info!("Login succeeded");
                                 self.login_w.clear_login();
                             }
                             return;
@@ -560,8 +562,14 @@ impl AppWidget {
                 },
                 // TODO this has the EventId which we need to keep
                 RequestResult::SendMessage(res) => match res {
-                    Err(e) => self.set_error(e),
-                    Ok(_res) => self.chat.set_sending_message(false),
+                    Err(e) => {
+                        tracing::warn!("Sending message failed {:?}", &e);
+                        self.set_error(e)
+                    }
+                    Ok(_res) => {
+                        tracing::info!("Message sent");
+                        self.chat.set_sending_message(false)
+                    }
                 },
                 RequestResult::RoomMsgs(res) => match res {
                     Err(e) => self.set_error(e),

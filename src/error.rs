@@ -171,3 +171,12 @@ impl From<io::Error> for Error {
         Self::RumaRequest(text)
     }
 }
+
+// This impl satisfies the conversion of the ".rumatui" folder path
+// lazy_static from Result<PathBuf> -> &Path as the error is Err(&io::Error)
+impl From<&io::Error> for Error {
+    fn from(error: &io::Error) -> Self {
+        let text = format!("{}", error);
+        Self::RumaRequest(text)
+    }
+}

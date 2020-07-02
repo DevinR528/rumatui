@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt, path::PathBuf, sync::Arc, time::Duration};
+use std::{collections::HashMap, fmt, path::Path, sync::Arc, time::Duration};
 
 use matrix_sdk::{
     self,
@@ -62,14 +62,8 @@ impl fmt::Debug for MatrixClient {
 impl MatrixClient {
     pub fn new(homeserver: &str) -> Result<Self> {
         let homeserver = Url::parse(&homeserver)?;
-        let path: Result<PathBuf> = dirs::home_dir()
-            .ok_or(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "no home directory found",
-            ))
-            .map_err(Into::into);
-        let mut path = path?;
-        path.push(".rumatui");
+        let res: Result<_> = crate::RUMATUI_DIR.as_ref().map_err(Into::into);
+        let path: &Path = res?;
 
         let store: Result<JsonStore> = JsonStore::open(path).map_err(Into::into);
         // reset the client with the state store with username as part of the store path
@@ -156,17 +150,6 @@ impl MatrixClient {
         req.password(&password)
             .username(&username)
             .kind(RegistrationKind::User);
-
-        // auth types for uiaa
-        // m.login.password
-        // m.login.recaptcha
-        // m.login.oauth2
-        // m.login.email.identity
-        // m.login.msisdn
-        // m.login.token
-        // m.login.dummy
-
-        // fallback site
 
         self.inner.register_user(req).await.map_err(Into::into)
     }

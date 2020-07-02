@@ -17,6 +17,7 @@ use rumatui_tui::{backend::TermionBackend, Terminal};
 
 mod client;
 mod error;
+mod log;
 mod ui_loop;
 mod widgets;
 
@@ -24,6 +25,18 @@ use ui_loop::{Config, Event, UiEventHandle};
 use widgets::{app::AppWidget, DrawWidget};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+lazy_static::lazy_static! {
+    pub static ref RUMATUI_DIR: std::io::Result<std::path::PathBuf> = {
+        let mut path = dirs::home_dir()
+            .ok_or(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "no home directory found",
+            ))?;
+        path.push(".rumatui");
+        Ok(path)
+    };
+}
 
 fn main() -> Result<(), failure::Error> {
     // when this is "" empty matrix.org is used
@@ -46,8 +59,24 @@ fn main() -> Result<(), failure::Error> {
         .build()
         .unwrap();
 
-    let executor = runtime.handle().clone();
+    let path: &std::path::Path = RUMATUI_DIR
+        .as_ref()
+        .map_err(|e| failure::format_err!("home dir not found: {}", e))?;
+    let mut path = std::path::PathBuf::from(path);
+    path.push("logs.json");
 
+    let exec = runtime.handle().clone();
+    let (logger, _log_handle) = log::Logger::spawn_logger(&path, exec)?;
+
+    tracing_subscriber::fmt()
+        .with_writer(logger)
+        .json()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
+    // .try_init()
+    // .unwrap(); // they return `<dyn Error + Send + Sync + 'static>`
+
+    let executor = runtime.handle().clone();
     runtime.block_on(async {
         let mut app = AppWidget::new(executor, &server).await;
         let events = UiEventHandle::with_config(Config {
