@@ -27,7 +27,9 @@ cargo install rumatui --version 0.1.13-alpha
 rumatui [HOMESERVER | OPTIONS]
 ```
 
-Options are limited to `-h/--help` for now.
+### Options
+  * -h or --help Prints help information
+  * -v or -verbose Will create a log of the session at '~/.rumatui/logs.json'
 
 If no `homeserver` is specified, matrix.org is used.
 

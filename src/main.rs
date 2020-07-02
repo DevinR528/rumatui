@@ -7,13 +7,13 @@
 
 use std::{env, io, process, time::Duration};
 
+use rumatui_tui::{backend::TermionBackend, Terminal};
 use termion::{
     event::{Event as TermEvent, Key, MouseButton, MouseEvent},
     input::MouseTerminal,
     raw::IntoRawMode,
 };
-
-use rumatui_tui::{backend::TermionBackend, Terminal};
+use tracing_subscriber::{self as tracer, EnvFilter};
 
 mod client;
 mod error;
@@ -38,18 +38,39 @@ lazy_static::lazy_static! {
     };
 }
 
+fn parse_args(mut args: env::Args) -> (String, bool) {
+    if args
+        .find(|arg| arg.contains("help") || arg.contains("-h"))
+        .is_some()
+    {
+        print_help();
+        process::exit(0)
+    }
+    // skip binary
+    let s = args.skip(1).collect::<Vec<String>>();
+    // TODO avoid all this somehow. The `match` below needs &str and no auto deref'ing happens
+    // so find a way to make this all a bit neater??
+    let args: Vec<&str> = s.iter().map(|s| &**s).collect();
+
+    match args.as_slice() {
+        [] => (String::new(), false),
+        [arg] if *arg == "-v" || *arg == "--verbose" => (String::new(), true),
+        [arg] => (arg.to_string(), false),
+        [a, b, c @ ..] => {
+            let verbose =
+                *b == "-v" || *b == "--verbose" || c.contains(&"-v") || c.contains(&"--verbose");
+            (a.to_string(), verbose)
+        }
+    }
+}
+
 fn main() -> Result<(), failure::Error> {
     // when this is "" empty matrix.org is used
-    let server = if let Some(arg) = env::args().nth(1) {
-        if arg.contains("help") || arg == "-h" {
-            print_help();
-            process::exit(0)
-        } else {
-            // we assume this is a server address
-            arg
-        }
+    let (server, verbose) = parse_args(env::args());
+    let log_level = if verbose {
+        "info"
     } else {
-        String::new()
+        EnvFilter::DEFAULT_ENV
     };
 
     let mut runtime = tokio::runtime::Builder::new()
@@ -67,11 +88,10 @@ fn main() -> Result<(), failure::Error> {
 
     let exec = runtime.handle().clone();
     let (logger, _log_handle) = log::Logger::spawn_logger(&path, exec)?;
-
-    tracing_subscriber::fmt()
+    tracer::fmt()
         .with_writer(logger)
         .json()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(log_level)
         .init();
     // .try_init()
     // .unwrap(); // they return `<dyn Error + Send + Sync + 'static>`
@@ -152,12 +172,13 @@ fn main() -> Result<(), failure::Error> {
 #[allow(clippy::print_literal)]
 fn print_help() {
     println!(
-        "rumatui {} \n\n{}{}{}{}{}{}",
+        "rumatui {} \n\n{}{}{}{}{}{}{}",
         VERSION,
         "USAGE:\n",
         "   rumatui [HOMESERVER]\n\n",
         "OPTIONS:\n",
-        "   -h, --help      Prints help information\n\n",
+        "   -h, --help      Prints help information\n",
+        "   -v, --verbose   Will create a log of the session at '~/.rumatui/logs.json'\n\n",
         "KEY-BINDINGS:",
 r#"
     * Esc will exit `rumatui`

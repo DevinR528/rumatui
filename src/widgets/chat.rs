@@ -153,6 +153,7 @@ impl ChatWidget {
         &mut self,
         rooms: Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
     ) {
+        tracing::info!("setting room state");
         self.messages_widget
             .populate_initial_msgs(rooms.read().await.deref())
             .await;
@@ -163,6 +164,7 @@ impl ChatWidget {
     }
 
     pub(crate) fn set_current_room_id(&mut self, room: &RoomId) {
+        tracing::trace!("setting room id {}", &room);
         self.rooms_widget.set_room_selected(room);
         *self.current_room.borrow_mut() = Some(room.clone());
     }
@@ -189,6 +191,7 @@ impl ChatWidget {
     }
 
     pub(crate) fn update_room(&mut self, name: &str, room: &RoomId) {
+        tracing::info!("update room state {}", &room);
         self.rooms_widget.update_room(name, room)
     }
 
@@ -217,15 +220,18 @@ impl ChatWidget {
     }
 
     pub(crate) async fn add_room(&mut self, room: Arc<RwLock<Room>>) {
+        tracing::info!("adding room to room list");
         self.messages_widget.add_room(Arc::clone(&room)).await;
         self.rooms_widget.add_room(room).await
     }
 
     pub(crate) fn remove_room(&mut self, room: &RoomId) {
+        tracing::info!("removing room to room list");
         self.rooms_widget.remove_room(room)
     }
 
     pub(crate) async fn invited(&mut self, sender: UserId, room: Arc<RwLock<Room>>) {
+        tracing::info!("{} was invited to a room", sender);
         self.rooms_widget.invited(sender, room).await
     }
 
@@ -264,11 +270,13 @@ impl ChatWidget {
         event_id: &EventId,
         reaction: &str,
     ) {
+        tracing::info!("setting reaction");
         self.messages_widget
             .set_reaction_event(room, relates_to, event_id, reaction)
     }
 
     pub(crate) fn add_message(&mut self, msg: Message, room: &RoomId) {
+        tracing::info!("adding message in room {}", &room);
         self.messages_widget.add_message(msg, room)
     }
 
@@ -279,14 +287,17 @@ impl ChatWidget {
         uuid: Uuid,
         content: MessageEventContent,
     ) {
+        tracing::info!("echoing sent message");
         self.messages_widget.echo_sent_msg(id, name, uuid, content)
     }
 
     pub(crate) fn edit_message(&mut self, room: &RoomId, event: &EventId, new_msg: String) {
+        tracing::info!("message edit in {}", &room);
         self.messages_widget.edit_message(room, event, new_msg)
     }
 
     pub(crate) fn redaction_event(&mut self, room: &RoomId, event: &EventId) {
+        tracing::info!("redaction event in {}", &room);
         self.messages_widget.redaction_event(room, event)
     }
 

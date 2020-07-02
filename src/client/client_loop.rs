@@ -152,6 +152,8 @@ impl MatrixEventHandle {
                         let res = client.register_user(u, p, None).await;
                         if let Err(e) = to_app.send(RequestResult::Register(res)).await {
                             panic!("client event handler crashed {}", e)
+                        } else {
+                            tracing::info!("start UIAA cycle");
                         }
                     }
                     UserRequest::UiaaPing(sess) => {
@@ -161,6 +163,8 @@ impl MatrixEventHandle {
                             .await
                         {
                             panic!("client event handler crashed {}", e)
+                        } else {
+                            tracing::info!("ping UIAA endpoint");
                         }
                     }
                     UserRequest::UiaaDummy(sess) => {
@@ -170,6 +174,8 @@ impl MatrixEventHandle {
                             .await
                         {
                             panic!("client event handler crashed {}", e)
+                        } else {
+                            tracing::info!("sending the dummy UIAA request");
                         }
                     }
                     UserRequest::SendMessage(room, msg, uuid) => {
@@ -255,6 +261,7 @@ impl MatrixEventHandle {
                         }
                     }
                     UserRequest::JoinRoom(room_id) => {
+                        // TODO just send the result
                         match client.join_room_by_id(&room_id).await {
                             Ok(res) => {
                                 let room_id = &res.room_id;
