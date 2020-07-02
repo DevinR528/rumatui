@@ -1,5 +1,6 @@
 # [Unreleased]
 
+* Add ability to log to a file using `RUST_LOG` env var or `-v/--verbose` cli arguments
 * Add memory for send message textbox
   * When switching rooms whatever has been typed for that room will be kept when the user returns
 
