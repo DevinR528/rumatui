@@ -194,31 +194,3 @@ r#"
 "#,
     )
 }
-
-// WTF why is the panic!("{:?}", args) empty????
-// fn parse_args(mut args: env::Args) -> (String, bool) {
-//     if args
-//         .find(|arg| arg.contains("help") || arg.contains("-h"))
-//         .is_some()
-//     {
-//         print_help();
-//         process::exit(0)
-//     }
-//     // skip binary
-//     let s = args.collect::<Vec<String>>();
-//     // TODO avoid all this somehow. The `match` below needs &str and no auto deref'ing happens
-//     // so find a way to make this all a bit neater??
-//     let args: Vec<&str> = s.iter().map(|s| &**s).collect();
-
-//     panic!("{:?}", args);
-//     match args.as_slice() {
-//         [] => (String::new(), false),
-//         [arg] if *arg == "-v" || *arg == "--verbose" => (String::new(), true),
-//         [arg] => (arg.to_string(), false),
-//         [a, b, c @ ..] => {
-//             let verbose =
-//                 *b == "-v" || *b == "--verbose" || c.contains(&"-v") || c.contains(&"--verbose");
-//             (a.to_string(), verbose)
-//         }
-//     }
-// }

@@ -13,11 +13,11 @@ use matrix_sdk::{
         typing::create_typing_event,
     },
     events::room::message::MessageEventContent,
-    identifiers::{DeviceId, EventId, RoomId, UserId},
+    identifiers::{EventId, RoomId, UserId},
     Client, ClientConfig, JsonStore, RegistrationBuilder, Room, RoomListFilterBuilder,
     SyncSettings,
 };
-use tokio::sync::RwLock;
+use tokio::{fs as async_fs, sync::RwLock};
 use url::Url;
 use uuid::Uuid;
 
@@ -112,9 +112,14 @@ impl MatrixClient {
         Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
         login::Response,
     )> {
+        // this would have caused `main()` to throw an error so unwrap here is ok
+        let mut path = crate::RUMATUI_DIR.as_ref().unwrap().to_path_buf();
+        path.push(".device-id.txt");
+        let device_id = async_fs::read_to_string(path).await.ok();
+
         let res = self
             .inner
-            .login(username, password, None, Some(RUMATUI_ID.to_string()))
+            .login(username, password, device_id, Some(RUMATUI_ID.to_string()))
             .await?;
 
         self.user = Some(res.user_id.clone());
@@ -137,17 +142,22 @@ impl MatrixClient {
         &mut self,
         username: String,
         password: String,
-        device_id: Option<DeviceId>,
     ) -> Result<register::Response> {
         let mut req = RegistrationBuilder::default();
+
+        // this would have caused `main()` to throw an error so unwrap here is ok
+        let mut path = crate::RUMATUI_DIR.as_ref().unwrap().to_path_buf();
+        path.push(".device-id.txt");
+        let device_id = async_fs::read_to_string(path).await.ok();
 
         if let Some(device) = device_id {
             req.device_id(&device);
         } else {
-            req.initial_device_display_name(RUMATUI_ID);
+            tracing::info!("No device_id file found for register request");
         }
 
-        req.password(&password)
+        req.initial_device_display_name(RUMATUI_ID)
+            .password(&password)
             .username(&username)
             .kind(RegistrationKind::User);
 

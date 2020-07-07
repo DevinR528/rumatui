@@ -21,6 +21,7 @@ use rumatui_tui::{
 };
 use termion::event::MouseButton;
 use tokio::{
+    fs as async_fs,
     runtime::Handle,
     sync::{mpsc, RwLock},
 };
@@ -485,6 +486,27 @@ impl AppWidget {
                         self.set_error(e);
                     }
                     Ok((rooms, resp)) => {
+                        // this would have caused `main()` to throw an error so unwrap here is ok
+                        let mut path = crate::RUMATUI_DIR.as_ref().unwrap().to_path_buf();
+                        path.push(".device-id.txt");
+                        if !path.exists() {
+                            let file = async_fs::OpenOptions::new()
+                                .write(true)
+                                .create(true)
+                                .open(&path)
+                                .await;
+
+                            if let Ok(mut file) = file {
+                                use tokio::io::AsyncWriteExt;
+
+                                if let Err(err) = file.write(resp.device_id.as_bytes()).await {
+                                    tracing::warn!("failed to record device_id {}", err)
+                                }
+                            } else {
+                                tracing::warn!("failed to create a device_id file {:?}", file);
+                            }
+                        }
+
                         self.login_w.logging_in = false;
                         self.login_w.logged_in = true;
                         self.chat.set_main_screen(true);
@@ -551,6 +573,31 @@ impl AppWidget {
                         }
                     },
                     Ok(resp) => {
+                        // same reason as above unwrap is ok
+                        let mut path = crate::RUMATUI_DIR.as_ref().unwrap().to_path_buf();
+                        path.push(".device-id.txt");
+                        if !path.exists() {
+                            let file = async_fs::OpenOptions::new()
+                                .write(true)
+                                .create(true)
+                                .open(&path)
+                                .await;
+
+                            if let Ok(mut file) = file {
+                                if let Some(id) = resp.device_id {
+                                    use tokio::io::AsyncWriteExt;
+
+                                    if let Err(err) = file.write(id.as_bytes()).await {
+                                        tracing::warn!("failed to record device_id {}", err)
+                                    }
+                                } else {
+                                    tracing::info!("register response with NO device id")
+                                }
+                            } else {
+                                tracing::warn!("failed to create a device_id file {:?}", file);
+                            }
+                        }
+
                         self.login_w.logging_in = false;
                         self.login_w.logged_in = true;
                         self.chat.set_main_screen(true);

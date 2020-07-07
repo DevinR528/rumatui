@@ -149,7 +149,7 @@ impl MatrixEventHandle {
                         }
                     }
                     UserRequest::Register(u, p) => {
-                        let res = client.register_user(u, p, None).await;
+                        let res = client.register_user(u, p).await;
                         if let Err(e) = to_app.send(RequestResult::Register(res)).await {
                             panic!("client event handler crashed {}", e)
                         } else {
