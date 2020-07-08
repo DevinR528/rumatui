@@ -38,6 +38,7 @@ If no `homeserver` is specified, matrix.org is used.
 Most of `rumatui` is click-able however, there are a few buttons that can be used (this is a terminal after all).
 
 * Esc will exit `rumatui`
+* Up/down arrow toggles login/register selected text box
 * Enter still works for all buttons except the decline/accept invite
 * Ctrl-s sends a message
 * Delete leaves and forgets the selected room
