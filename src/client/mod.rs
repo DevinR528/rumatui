@@ -62,8 +62,7 @@ impl fmt::Debug for MatrixClient {
 impl MatrixClient {
     pub fn new(homeserver: &str) -> Result<Self> {
         let homeserver = Url::parse(&homeserver)?;
-        let res: Result<_> = crate::RUMATUI_DIR.as_ref().map_err(Into::into);
-        let path: &Path = res?;
+        let path: &Path = crate::RUMATUI_DIR.as_ref().unwrap();
 
         let store: Result<JsonStore> = JsonStore::open(path).map_err(Into::into);
         // reset the client with the state store with username as part of the store path

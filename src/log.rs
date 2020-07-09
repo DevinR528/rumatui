@@ -6,6 +6,9 @@ use std::{
 
 use tokio::{runtime::Handle, sync::mpsc, task::JoinHandle};
 
+// TODO make the file and writer async
+//
+
 #[derive(Clone, Debug)]
 pub struct LogWriter(mpsc::UnboundedSender<Vec<u8>>);
 

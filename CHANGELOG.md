@@ -1,6 +1,8 @@
 # [Unreleased]
 
-* Add ability to log to a file using `RUST_LOG` env var or `-v/--verbose` cli arguments
+* Fix device ID generation on every login
+  * rumatui keeps track of each device's device_id
+* Add ability to log to `~/.rumatui/log.json` using `RUST_LOG` env var or `-v/--verbose` cli arguments
 * Add memory for send message textbox
   * When switching rooms whatever has been typed for that room will be kept when the user returns
 

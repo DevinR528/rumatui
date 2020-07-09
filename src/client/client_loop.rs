@@ -108,7 +108,7 @@ impl MatrixEventHandle {
         client.inner.add_event_emitter(Box::new(stream)).await;
 
         let cli = client.inner.clone();
-        // when the ui loop logs in start_sync releases and starts `sync_forever`
+        // when the ui loop logs in `start_sync` releases and starts `sync_forever`
         let start_sync = Arc::from(AtomicBool::from(false));
         let quit_flag = Arc::from(AtomicBool::from(false));
 
@@ -145,12 +145,14 @@ impl MatrixEventHandle {
                     UserRequest::Login(u, p) => {
                         let res = client.login(u, p).await;
                         if let Err(e) = to_app.send(RequestResult::Login(res)).await {
+                            tracing::error!("client event handler crashed {}", e);
                             panic!("client event handler crashed {}", e)
                         }
                     }
                     UserRequest::Register(u, p) => {
                         let res = client.register_user(u, p).await;
                         if let Err(e) = to_app.send(RequestResult::Register(res)).await {
+                            tracing::error!("client event handler crashed {}", e);
                             panic!("client event handler crashed {}", e)
                         } else {
                             tracing::info!("start UIAA cycle");
@@ -162,6 +164,7 @@ impl MatrixEventHandle {
                             .send(RequestResult::Register(res.map(Into::into)))
                             .await
                         {
+                            tracing::error!("client event handler crashed {}", e);
                             panic!("client event handler crashed {}", e)
                         } else {
                             tracing::info!("ping UIAA endpoint");
@@ -173,6 +176,7 @@ impl MatrixEventHandle {
                             .send(RequestResult::Register(res.map(Into::into)))
                             .await
                         {
+                            tracing::error!("client event handler crashed {}", e);
                             panic!("client event handler crashed {}", e)
                         } else {
                             tracing::info!("sending the dummy UIAA request");
@@ -181,6 +185,7 @@ impl MatrixEventHandle {
                     UserRequest::SendMessage(room, msg, uuid) => {
                         let res = client.send_message(&room, msg, uuid).await;
                         if let Err(e) = to_app.send(RequestResult::SendMessage(res)).await {
+                            tracing::error!("client event handler crashed {}", e);
                             panic!("client event handler crashed {}", e)
                         }
                     }
@@ -201,6 +206,7 @@ impl MatrixEventHandle {
                                 ))))
                                 .await
                             {
+                                tracing::error!("client event handler crashed {}", e);
                                 panic!("client event handler crashed {}", e)
                             } else {
                                 // store state after receiving past events incase a sync_forever call only found a few messages
@@ -211,6 +217,7 @@ impl MatrixEventHandle {
                         }
                         Err(get_msg_err) => {
                             if let Err(e) = to_app.send(RequestResult::Error(get_msg_err)).await {
+                                tracing::error!("client event handler crashed {}", e);
                                 panic!("client event handler crashed {}", e)
                             }
                         }
@@ -221,11 +228,13 @@ impl MatrixEventHandle {
                                 if let Err(e) =
                                     to_app.send(RequestResult::RoomSearch(Ok(res))).await
                                 {
+                                    tracing::error!("client event handler crashed {}", e);
                                     panic!("client event handler crashed {}", e)
                                 }
                             }
                             Err(err) => {
                                 if let Err(e) = to_app.send(RequestResult::Error(err)).await {
+                                    tracing::error!("client event handler crashed {}", e);
                                     panic!("client event handler crashed {}", e)
                                 }
                             }
@@ -234,6 +243,7 @@ impl MatrixEventHandle {
                     UserRequest::AcceptInvite(room_id) => {
                         let res = client.join_room_by_id(&room_id).await;
                         if let Err(e) = to_app.send(RequestResult::AcceptInvite(res)).await {
+                            tracing::error!("client event handler crashed {}", e);
                             panic!("client event handler crashed {}", e)
                         }
                     }
@@ -243,6 +253,7 @@ impl MatrixEventHandle {
                             .send(RequestResult::DeclineInvite(res, room_id))
                             .await
                         {
+                            tracing::error!("client event handler crashed {}", e);
                             panic!("client event handler crashed {}", e)
                         }
                     }
@@ -252,10 +263,12 @@ impl MatrixEventHandle {
                             .send(RequestResult::LeaveRoom(res, room_id.clone()))
                             .await
                         {
+                            tracing::error!("client event handler crashed {}", e);
                             panic!("client event handler crashed {}", e)
                         } else if let Err(error) = client.forget_room(&room_id).await {
                             // forget room failed so send that to the UI
                             if let Err(e) = to_app.send(RequestResult::Error(error)).await {
+                                tracing::error!("client event handler crashed {}", e);
                                 panic!("client event handler crashed {}", e)
                             }
                         }
@@ -269,12 +282,14 @@ impl MatrixEventHandle {
                                     .send(RequestResult::JoinRoom(Ok(room_id.clone())))
                                     .await
                                 {
+                                    tracing::error!("client event handler crashed {}", e);
                                     panic!("client event handler crashed {}", e)
                                 }
                             }
                             Err(err) => {
                                 if let Err(e) = to_app.send(RequestResult::JoinRoom(Err(err))).await
                                 {
+                                    tracing::error!("client event handler crashed {}", e);
                                     panic!("client event handler crashed {}", e)
                                 }
                             }
@@ -285,6 +300,7 @@ impl MatrixEventHandle {
                             .read_marker(&room_id, &event_id, Some(&event_id))
                             .await;
                         if let Err(e) = to_app.send(RequestResult::ReadReceipt(res)).await {
+                            tracing::error!("client event handler crashed {}", e);
                             panic!("client event handler crashed {}", e)
                         }
                     }
@@ -298,6 +314,7 @@ impl MatrixEventHandle {
                             )
                             .await;
                         if let Err(e) = to_app.send(RequestResult::Typing(res)).await {
+                            tracing::error!("client event handler crashed {}", e);
                             panic!("client event handler crashed {}", e)
                         }
                     }

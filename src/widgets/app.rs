@@ -520,7 +520,8 @@ impl AppWidget {
                             matrix_sdk::FromHttpResponseError::Http(
                                 matrix_sdk::ServerError::Known(UiaaResponse::AuthResponse(
                                     UiaaInfo {
-                                        params: _,
+                                        // params,
+                                        // auth_error, // TODO should this be checked every time
                                         flows,
                                         completed,
                                         session,
@@ -538,11 +539,17 @@ impl AppWidget {
 
                                 for auth in stages.iter().filter(|auth| !completed.contains(auth)) {
                                     if auth == "m.login.dummy" {
-                                        // TODO do something probably panic as the channel has closed
-                                        let _ = self
+                                        if let Err(e) = self
                                             .send_jobs
                                             .send(UserRequest::UiaaDummy(session.clone()))
-                                            .await;
+                                            .await
+                                        {
+                                            tracing::error!(
+                                                "channel closed while registering {}",
+                                                e
+                                            );
+                                            panic!("channel closed while registering")
+                                        }
                                         // we are done Yay, the next response will be a Ok(response) from register
                                         return;
                                     }

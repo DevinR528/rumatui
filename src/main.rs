@@ -5,7 +5,7 @@
     clippy::single_match
 )]
 
-use std::{env, io, process, time::Duration};
+use std::{env, fs, io, path::Path, process, time::Duration};
 
 use rumatui_tui::{backend::TermionBackend, Terminal};
 use termion::{
@@ -38,6 +38,15 @@ lazy_static::lazy_static! {
     };
 }
 
+fn create_rumatui_folder() -> Result<(), failure::Error> {
+    let path: &Path = RUMATUI_DIR.as_ref().unwrap();
+
+    if !path.exists() {
+        fs::create_dir_all(path)?;
+    }
+    Ok(())
+}
+
 fn parse_args(args: env::Args) -> (String, bool) {
     // skip binary path
     let args = args.skip(1).collect::<Vec<_>>();
@@ -67,6 +76,7 @@ fn parse_args(args: env::Args) -> (String, bool) {
 }
 
 fn main() -> Result<(), failure::Error> {
+    create_rumatui_folder()?;
     // when this is "" empty matrix.org is used
     let (server, verbose) = parse_args(env::args());
     let log_level = if verbose {
