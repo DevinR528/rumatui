@@ -98,8 +98,7 @@ fn main() -> Result<(), failure::Error> {
     let mut path = std::path::PathBuf::from(path);
     path.push("logs.json");
 
-    let exec = runtime.handle().clone();
-    let (logger, _log_handle) = log::Logger::spawn_logger(&path, exec)?;
+    let (logger, _guard) = log::LogWriter::spawn_logger(&path);
     tracer::fmt()
         .with_writer(logger)
         .json()
