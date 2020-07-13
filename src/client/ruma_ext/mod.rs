@@ -3,7 +3,6 @@ use std::time::SystemTime;
 
 use serde_json::Value as JsonValue;
 
-use matrix_sdk::events::FromRaw;
 use matrix_sdk::identifiers::{EventId, RoomId, UserId};
 
 pub mod auth;
@@ -48,15 +47,6 @@ pub struct RumaUnsupportedRoomEvent<C: serde::de::DeserializeOwned + serde::Seri
     /// Additional key-value pairs not signed by the homeserver.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub unsigned: BTreeMap<String, JsonValue>,
-}
-
-impl<C: Sized + serde::de::DeserializeOwned + serde::Serialize> FromRaw
-    for RumaUnsupportedRoomEvent<C>
-{
-    type Raw = Self;
-    fn from_raw(raw: Self) -> Self {
-        raw
-    }
 }
 
 /// Taken from ruma_serde as opposed to adding a dependency for two functions.

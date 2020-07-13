@@ -9,12 +9,17 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use js_int::UInt;
-use matrix_sdk::events::room::message::{
-    MessageEvent, MessageEventContent, TextMessageEventContent,
-};
 use matrix_sdk::{
+    events::{
+        room::message::{
+            FormattedBody, MessageEventContent, MessageFormat, RelatesTo, TextMessageEventContent,
+        },
+        AnyMessageEventContent,
+        MessageEventStub,
+        // AnyMessageEventStub // when redacted events are fixed this will be needed
+    },
     identifiers::{EventId, RoomId, UserId},
+    js_int::UInt,
     Room,
 };
 use rumatui_tui::{
@@ -108,8 +113,21 @@ impl MessageWidget {
             self.unread_notifications = room.unread_notifications.unwrap_or_default();
             self.unread_notifications += room.unread_highlight.unwrap_or_default();
 
+            // TODO handle other events
             for msg in room.messages.iter() {
-                self.add_message_event(msg, &room);
+                match &msg.content {
+                    AnyMessageEventContent::RoomMessage(content) => {
+                        let event = MessageEventStub {
+                            content: content.clone(),
+                            event_id: msg.event_id.clone(),
+                            sender: msg.sender.clone(),
+                            origin_server_ts: msg.origin_server_ts.clone(),
+                            unsigned: msg.unsigned.clone(),
+                        };
+                        self.add_message_event(&event, &room)
+                    }
+                    _ => {}
+                }
             }
         }
     }
@@ -120,8 +138,8 @@ impl MessageWidget {
     }
 
     // TODO factor out with AppWidget::process_room_events and MessageWidget::echo_sent_msg
-    fn add_message_event(&mut self, event: &MessageEvent, room: &Room) {
-        let MessageEvent {
+    fn add_message_event(&mut self, event: &MessageEventStub<MessageEventContent>, room: &Room) {
+        let MessageEventStub {
             content,
             sender,
             event_id,
@@ -136,15 +154,18 @@ impl MessageWidget {
         };
         match content {
             MessageEventContent::Text(TextMessageEventContent {
-                body: msg_body,
-                formatted_body,
-                ..
+                body, formatted, ..
             }) => {
-                let msg = if let Some(_fmted) = formatted_body {
-                    crate::widgets::utils::markdown_to_terminal(msg_body)
-                        .unwrap_or(msg_body.clone())
+                let msg = if formatted
+                    .as_ref()
+                    .map(|f| f.body.to_string())
+                    .unwrap_or(String::new())
+                    != body.to_string()
+                {
+                    crate::widgets::utils::markdown_to_terminal(body).unwrap_or(body.clone())
+                // None.unwrap_or(body.clone())
                 } else {
-                    msg_body.clone()
+                    body.clone()
                 };
                 let txn_id = unsigned
                     .transaction_id
@@ -267,10 +288,12 @@ impl MessageWidget {
                     )),
                     MsgType::FormattedText => {
                         Ok(MessageEventContent::Text(TextMessageEventContent {
-                            body: to_send.clone(),
-                            format: Some("org.matrix.custom.html".into()),
-                            formatted_body: Some(markdown_to_html(&to_send)),
-                            relates_to: None,
+                            body: to_send.to_string(),
+                            formatted: Some(FormattedBody {
+                                format: MessageFormat::Html,
+                                body: markdown_to_html(&to_send),
+                            }),
+                            relates_to: None::<RelatesTo>,
                         }))
                     }
                     _ => todo!("implement more sending messages"),
@@ -294,12 +317,16 @@ impl MessageWidget {
     ) {
         match content {
             MessageEventContent::Text(TextMessageEventContent {
-                body,
-                formatted_body,
-                ..
+                body, formatted, ..
             }) => {
-                let msg = if let Some(_fmted) = formatted_body {
+                let msg = if formatted
+                    .as_ref()
+                    .map(|f| f.body.to_string())
+                    .unwrap_or(String::new())
+                    != body.to_string()
+                {
                     crate::widgets::utils::markdown_to_terminal(&body).unwrap_or(body.clone())
+                // None.unwrap_or(body.clone())
                 } else {
                     body
                 };

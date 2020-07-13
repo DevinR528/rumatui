@@ -240,7 +240,7 @@ impl MatrixClient {
             from,
             to: None,
             dir: get_message_events::Direction::Backward,
-            limit: js_int::UInt::new(30),
+            limit: js_int::UInt::new(30).unwrap(),
             filter: None,
             // filter: Some(RoomEventFilter {
             //     lazy_load_options: LazyLoadOptions::Enabled { include_redundant_members: false, },
