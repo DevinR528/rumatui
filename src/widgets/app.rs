@@ -89,7 +89,7 @@ pub struct AppWidget {
 impl AppWidget {
     pub async fn new(rt: Handle, homeserver: &str) -> Self {
         let homeserver = if homeserver.is_empty() {
-            "http://matrix.org"
+            "https://matrix.org"
         } else {
             homeserver
         };
