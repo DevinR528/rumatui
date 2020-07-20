@@ -27,7 +27,7 @@ ruma_api::ruma_api! {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub access_token: Option<String>,
         pub user_id: UserId,
-        pub device_id: Option<DeviceId>,
+        pub device_id: Option<Box<DeviceId>>,
     }
 
     error: UiaaResponse
@@ -74,7 +74,7 @@ pub mod dummy {
             #[serde(skip_serializing_if = "Option::is_none")]
             pub access_token: Option<String>,
             pub user_id: UserId,
-            pub device_id: Option<DeviceId>,
+            pub device_id: Option<Box<DeviceId>>,
         }
 
         error: UiaaResponse

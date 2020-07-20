@@ -14,9 +14,7 @@ use matrix_sdk::{
         room::message::{
             FormattedBody, MessageEventContent, MessageFormat, RelatesTo, TextMessageEventContent,
         },
-        AnyMessageEventContent,
-        MessageEventStub,
-        // AnyMessageEventStub // when redacted events are fixed this will be needed
+        AnyPossiblyRedactedSyncMessageEvent, AnySyncMessageEvent, SyncMessageEvent,
     },
     identifiers::{EventId, RoomId, UserId},
     js_int::UInt,
@@ -115,17 +113,10 @@ impl MessageWidget {
 
             // TODO handle other events
             for msg in room.messages.iter() {
-                match &msg.content {
-                    AnyMessageEventContent::RoomMessage(content) => {
-                        let event = MessageEventStub {
-                            content: content.clone(),
-                            event_id: msg.event_id.clone(),
-                            sender: msg.sender.clone(),
-                            origin_server_ts: msg.origin_server_ts.clone(),
-                            unsigned: msg.unsigned.clone(),
-                        };
-                        self.add_message_event(&event, &room)
-                    }
+                match msg.deref() {
+                    AnyPossiblyRedactedSyncMessageEvent::Regular(
+                        AnySyncMessageEvent::RoomMessage(ev),
+                    ) => self.add_message_event(ev, &room),
                     _ => {}
                 }
             }
@@ -138,8 +129,8 @@ impl MessageWidget {
     }
 
     // TODO factor out with AppWidget::process_room_events and MessageWidget::echo_sent_msg
-    fn add_message_event(&mut self, event: &MessageEventStub<MessageEventContent>, room: &Room) {
-        let MessageEventStub {
+    fn add_message_event(&mut self, event: &SyncMessageEvent<MessageEventContent>, room: &Room) {
+        let SyncMessageEvent {
             content,
             sender,
             event_id,
@@ -259,7 +250,6 @@ impl MessageWidget {
     }
 
     // TODO Im sure there is an actual way to do this like Riot
-    // TODO fix message text box hashmap
     fn process_message(&self) -> Result<MsgType> {
         if let Some(room_id) = self.current_room.borrow().deref() {
             if let Some(msg) = self.send_msgs.get(room_id) {
@@ -278,7 +268,6 @@ impl MessageWidget {
         }
     }
 
-    // TODO fix message text box hashmap
     pub fn get_sending_message(&self) -> Result<MessageEventContent> {
         if let Some(room_id) = self.current_room.borrow().deref() {
             if let Some(to_send) = self.send_msgs.get(room_id) {

@@ -11,7 +11,7 @@ use matrix_sdk::{
             member::MembershipChange,
             message::{MessageEventContent, TextMessageEventContent},
         },
-        AnyMessageEventStub, AnyRoomEventStub, MessageEventStub,
+        AnySyncMessageEvent, AnySyncRoomEvent, SyncMessageEvent,
     },
     identifiers::{RoomId, UserId},
     Error as MatrixError, Room,
@@ -854,15 +854,15 @@ impl AppWidget {
         room: Arc<RwLock<Room>>,
     ) {
         for ev in events.chunk {
-            if let Ok(ref e) = serde_json::from_str::<AnyRoomEventStub>(ev.json().get()) {
+            if let Ok(ref e) = serde_json::from_str::<AnySyncRoomEvent>(ev.json().get()) {
                 // matrix-sdk does not mutate the room on past events
                 // rooms are only mutated for present events, so we must handle the past
                 // events so when saved to the database the room is accurate with the current state
                 room.write().await.receive_timeline_event(&e);
 
                 match e {
-                    AnyRoomEventStub::Message(AnyMessageEventStub::RoomMessage(msg)) => {
-                        let MessageEventStub {
+                    AnySyncRoomEvent::Message(AnySyncMessageEvent::RoomMessage(msg)) => {
+                        let SyncMessageEvent {
                             content,
                             sender,
                             event_id,

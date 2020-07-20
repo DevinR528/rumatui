@@ -150,7 +150,7 @@ impl MatrixClient {
         let device_id = async_fs::read_to_string(path).await.ok();
 
         if let Some(device) = device_id {
-            req.device_id(&device);
+            req.device_id(device);
         } else {
             tracing::info!("No device_id file found for register request");
         }
