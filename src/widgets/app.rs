@@ -1,16 +1,20 @@
 use std::{io, ops::Deref, sync::Arc, time::SystemTime};
 
 use matrix_sdk::{
-    api::r0::{directory::get_public_rooms_filtered::RoomNetwork, message::get_message_events},
+    api::r0::{
+        directory::get_public_rooms_filtered::RoomNetwork,
+        message::get_message_events,
+        uiaa::{UiaaInfo, UiaaResponse},
+    },
     events::{
-        collections::all::RoomEvent,
         room::{
             member::MembershipChange,
-            message::{MessageEvent, MessageEventContent, TextMessageEventContent},
+            message::{MessageEventContent, TextMessageEventContent},
         },
+        AnySyncMessageEvent, AnySyncRoomEvent, SyncMessageEvent,
     },
     identifiers::{RoomId, UserId},
-    Room,
+    Error as MatrixError, Room,
 };
 use rumatui_tui::{
     backend::Backend,
@@ -474,8 +478,6 @@ impl AppWidget {
             self.sync_started = true;
             self.ev_loop.start_sync();
         }
-        use matrix_sdk::Error as MatrixError;
-        use ruma_client_api::r0::uiaa::{UiaaInfo, UiaaResponse};
 
         // this will login, send messages, and any other user initiated requests
         match self.ev_msgs.try_recv() {
@@ -852,15 +854,15 @@ impl AppWidget {
         room: Arc<RwLock<Room>>,
     ) {
         for ev in events.chunk {
-            if let Ok(e) = ev.deserialize() {
+            if let Ok(ref e) = serde_json::from_str::<AnySyncRoomEvent>(ev.json().get()) {
                 // matrix-sdk does not mutate the room on past events
                 // rooms are only mutated for present events, so we must handle the past
                 // events so when saved to the database the room is accurate with the current state
                 room.write().await.receive_timeline_event(&e);
 
                 match e {
-                    RoomEvent::RoomMessage(msg) => {
-                        let MessageEvent {
+                    AnySyncRoomEvent::Message(AnySyncMessageEvent::RoomMessage(msg)) => {
+                        let SyncMessageEvent {
                             content,
                             sender,
                             event_id,
@@ -870,8 +872,8 @@ impl AppWidget {
                         } = msg;
 
                         let name = {
-                            let room = room.read().await;
-                            room.joined_members
+                            let m = room.read().await;
+                            m.joined_members
                                 .get(&sender)
                                 .map(|m| m.name())
                                 .unwrap_or(sender.localpart().to_string())
@@ -879,15 +881,21 @@ impl AppWidget {
 
                         match content {
                             MessageEventContent::Text(TextMessageEventContent {
-                                body: msg_body,
-                                formatted_body,
+                                body,
+                                formatted,
                                 ..
                             }) => {
-                                let msg = if formatted_body.is_some() {
-                                    crate::widgets::utils::markdown_to_terminal(&msg_body)
-                                        .unwrap_or(msg_body.clone())
+                                let msg = if formatted
+                                    .as_ref()
+                                    .map(|f| f.body.to_string())
+                                    .unwrap_or(String::new())
+                                    != body.to_string()
+                                {
+                                    crate::widgets::utils::markdown_to_terminal(&body)
+                                        .unwrap_or(body.clone())
+                                // None.unwrap_or(body.clone())
                                 } else {
-                                    msg_body.clone()
+                                    body.clone()
                                 };
                                 let txn_id = unsigned
                                     .transaction_id
@@ -900,7 +908,7 @@ impl AppWidget {
                                     user: sender.clone(),
                                     text: msg,
                                     event_id: event_id.clone(),
-                                    timestamp: origin_server_ts,
+                                    timestamp: *origin_server_ts,
                                     uuid: Uuid::parse_str(&txn_id).unwrap_or(Uuid::new_v4()),
                                     read: false,
                                     reactions: vec![],
@@ -933,7 +941,7 @@ impl AppWidget {
             "the room".to_string()
         };
         match membership {
-            MembershipChange::ProfileChanged => self
+            MembershipChange::ProfileChanged { .. } => self
                 .chat
                 .add_notify(&format!("{} updated their profile", receiver.localpart())),
             MembershipChange::Joined => {

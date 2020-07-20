@@ -1,5 +1,7 @@
-# [Unreleased]
+# [0.1.18]
 
+* Update matrix-rust-sdk to a version (rev 037d62b) that uses ruma mono repo (rev 848b225)
+* Default to `https` over `http`
 * Fix device ID generation on every login
   * rumatui keeps track of each device's device_id
 * Add ability to log to `~/.rumatui/log.json` using `RUST_LOG` env var or `-v/--verbose` cli arguments

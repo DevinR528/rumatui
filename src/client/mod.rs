@@ -150,7 +150,7 @@ impl MatrixClient {
         let device_id = async_fs::read_to_string(path).await.ok();
 
         if let Some(device) = device_id {
-            req.device_id(&device);
+            req.device_id(device);
         } else {
             tracing::info!("No device_id file found for register request");
         }
@@ -240,7 +240,7 @@ impl MatrixClient {
             from,
             to: None,
             dir: get_message_events::Direction::Backward,
-            limit: js_int::UInt::new(30),
+            limit: js_int::UInt::new(30).unwrap(),
             filter: None,
             // filter: Some(RoomEventFilter {
             //     lazy_load_options: LazyLoadOptions::Enabled { include_redundant_members: false, },

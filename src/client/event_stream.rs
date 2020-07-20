@@ -1,36 +1,34 @@
 use std::{collections::BTreeMap, convert::TryFrom, sync::Arc};
 
-use matrix_sdk::events::{
-    fully_read::FullyReadEvent,
-    ignored_user_list::IgnoredUserListEvent,
-    presence::PresenceEvent,
-    push_rules::PushRulesEvent,
-    receipt::{ReceiptEvent, Receipts},
-    room::{
-        aliases::AliasesEvent,
-        avatar::AvatarEvent,
-        canonical_alias::CanonicalAliasEvent,
-        join_rules::JoinRulesEvent,
-        member::{MemberEvent, MemberEventContent, MembershipChange, MembershipState},
-        message::{
-            feedback::FeedbackEvent, MessageEvent, MessageEventContent, TextMessageEventContent,
-        },
-        name::NameEvent,
-        power_levels::PowerLevelsEvent,
-        redaction::RedactionEvent,
-        tombstone::TombstoneEvent,
-    },
-    stripped::{
-        StrippedRoomAliases, StrippedRoomAvatar, StrippedRoomCanonicalAlias, StrippedRoomJoinRules,
-        StrippedRoomMember, StrippedRoomName, StrippedRoomPowerLevels,
-    },
-    typing::TypingEvent,
-};
 use matrix_sdk::{
     self,
+    events::{
+        fully_read::FullyReadEventContent,
+        ignored_user_list::IgnoredUserListEventContent,
+        presence::PresenceEvent,
+        push_rules::PushRulesEventContent,
+        receipt::{ReceiptEventContent, Receipts},
+        room::{
+            aliases::AliasesEventContent,
+            avatar::AvatarEventContent,
+            canonical_alias::CanonicalAliasEventContent,
+            join_rules::JoinRulesEventContent,
+            member::{MemberEventContent, MembershipChange},
+            message::{
+                feedback::FeedbackEventContent, MessageEventContent, TextMessageEventContent,
+            },
+            name::NameEventContent,
+            power_levels::PowerLevelsEventContent,
+            redaction::SyncRedactionEvent,
+            tombstone::TombstoneEventContent,
+        },
+        typing::TypingEventContent,
+        BasicEvent, EphemeralRoomEvent, StrippedStateEvent, SyncMessageEvent, SyncStateEvent,
+    },
     identifiers::{EventId, RoomId, UserId},
     CustomOrRawEvent, EventEmitter, Room, SyncRoom,
 };
+
 use tokio::sync::mpsc;
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
@@ -85,8 +83,12 @@ impl EventStream {
         )
     }
 
-    async fn handle_room_member(&self, room: Arc<RwLock<Room>>, event: &MemberEvent) {
-        let MemberEvent {
+    async fn handle_room_member(
+        &self,
+        room: Arc<RwLock<Room>>,
+        event: &SyncStateEvent<MemberEventContent>,
+    ) {
+        let SyncStateEvent {
             sender, state_key, ..
         } = event;
         let receiver = UserId::try_from(state_key.as_str()).unwrap();
@@ -113,7 +115,7 @@ impl EventStream {
 #[async_trait::async_trait]
 impl EventEmitter for EventStream {
     /// Send a membership change event to the ui thread.
-    async fn on_room_member(&self, room: SyncRoom, event: &MemberEvent) {
+    async fn on_room_member(&self, room: SyncRoom, event: &SyncStateEvent<MemberEventContent>) {
         match room {
             SyncRoom::Invited(room) | SyncRoom::Left(room) | SyncRoom::Joined(room) => {
                 self.handle_room_member(room, event).await;
@@ -121,7 +123,7 @@ impl EventEmitter for EventStream {
         }
     }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomName` event.
-    async fn on_room_name(&self, room: SyncRoom, _: &NameEvent) {
+    async fn on_room_name(&self, room: SyncRoom, _: &SyncStateEvent<NameEventContent>) {
         if let SyncRoom::Joined(room) = room {
             if let Err(e) = self
                 .send
@@ -139,15 +141,20 @@ impl EventEmitter for EventStream {
         }
     }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomCanonicalAlias` event.
-    async fn on_room_canonical_alias(&self, _: SyncRoom, _: &CanonicalAliasEvent) {}
+    async fn on_room_canonical_alias(
+        &self,
+        _: SyncRoom,
+        _: &SyncStateEvent<CanonicalAliasEventContent>,
+    ) {
+    }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomAliases` event.
-    async fn on_room_aliases(&self, _: SyncRoom, _: &AliasesEvent) {}
+    async fn on_room_aliases(&self, _: SyncRoom, _: &SyncStateEvent<AliasesEventContent>) {}
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomAvatar` event.
-    async fn on_room_avatar(&self, _: SyncRoom, _: &AvatarEvent) {}
+    async fn on_room_avatar(&self, _: SyncRoom, _: &SyncStateEvent<AvatarEventContent>) {}
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomMessage` event.
-    async fn on_room_message(&self, room: SyncRoom, event: &MessageEvent) {
+    async fn on_room_message(&self, room: SyncRoom, event: &SyncMessageEvent<MessageEventContent>) {
         if let SyncRoom::Joined(room) = room {
-            let MessageEvent {
+            let SyncMessageEvent {
                 content,
                 sender,
                 event_id,
@@ -157,21 +164,24 @@ impl EventEmitter for EventStream {
             } = event;
 
             let name = if let Some(mem) = room.read().await.joined_members.get(&sender) {
-                mem.name.clone()
+                mem.name()
             } else {
                 sender.localpart().into()
             };
             match content {
                 MessageEventContent::Text(TextMessageEventContent {
-                    body: msg_body,
-                    formatted_body,
-                    ..
+                    body, formatted, ..
                 }) => {
-                    let msg = if formatted_body.is_some() {
-                        crate::widgets::utils::markdown_to_terminal(msg_body)
-                            .unwrap_or(msg_body.clone())
+                    let msg = if formatted
+                        .as_ref()
+                        .map(|f| f.body.to_string())
+                        .unwrap_or(String::new())
+                        != body.to_string()
+                    {
+                        crate::widgets::utils::markdown_to_terminal(body).unwrap_or(body.clone())
+                    // None.unwrap_or(body.clone())
                     } else {
-                        msg_body.clone()
+                        body.clone()
                     };
                     let txn_id = unsigned
                         .transaction_id
@@ -208,9 +218,14 @@ impl EventEmitter for EventStream {
         }
     }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomMessageFeedback` event.
-    async fn on_room_message_feedback(&self, _: SyncRoom, _: &FeedbackEvent) {}
+    async fn on_room_message_feedback(
+        &self,
+        _: SyncRoom,
+        _: &SyncMessageEvent<FeedbackEventContent>,
+    ) {
+    }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomRedaction` event.
-    async fn on_room_redaction(&self, room: SyncRoom, event: &RedactionEvent) {
+    async fn on_room_redaction(&self, room: SyncRoom, event: &SyncRedactionEvent) {
         if let SyncRoom::Joined(room) = room {
             if let Err(e) = self
                 .send
@@ -228,43 +243,54 @@ impl EventEmitter for EventStream {
         }
     }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomPowerLevels` event.
-    async fn on_room_power_levels(&self, _: SyncRoom, _: &PowerLevelsEvent) {}
+    async fn on_room_power_levels(&self, _: SyncRoom, _: &SyncStateEvent<PowerLevelsEventContent>) {
+    }
     /// Fires when `AsyncClient` receives a `RoomEvent::RoomTombstone` event.
-    async fn on_room_tombstone(&self, _: SyncRoom, _: &TombstoneEvent) {}
+    async fn on_room_tombstone(&self, _: SyncRoom, _: &SyncStateEvent<TombstoneEventContent>) {}
 
     // `RoomEvent`s from `IncomingState`
     /// Fires when `AsyncClient` receives a `StateEvent::RoomMember` event.
-    async fn on_state_member(&self, _: SyncRoom, _: &MemberEvent) {}
+    async fn on_state_member(&self, _: SyncRoom, _: &SyncStateEvent<MemberEventContent>) {}
     /// Fires when `AsyncClient` receives a `StateEvent::RoomName` event.
-    async fn on_state_name(&self, _: SyncRoom, _: &NameEvent) {}
+    async fn on_state_name(&self, _: SyncRoom, _: &SyncStateEvent<NameEventContent>) {}
     /// Fires when `AsyncClient` receives a `StateEvent::RoomCanonicalAlias` event.
-    async fn on_state_canonical_alias(&self, _: SyncRoom, _: &CanonicalAliasEvent) {}
+    async fn on_state_canonical_alias(
+        &self,
+        _: SyncRoom,
+        _: &SyncStateEvent<CanonicalAliasEventContent>,
+    ) {
+    }
     /// Fires when `AsyncClient` receives a `StateEvent::RoomAliases` event.
-    async fn on_state_aliases(&self, _: SyncRoom, _: &AliasesEvent) {}
+    async fn on_state_aliases(&self, _: SyncRoom, _: &SyncStateEvent<AliasesEventContent>) {}
     /// Fires when `AsyncClient` receives a `StateEvent::RoomAvatar` event.
-    async fn on_state_avatar(&self, _: SyncRoom, _: &AvatarEvent) {}
+    async fn on_state_avatar(&self, _: SyncRoom, _: &SyncStateEvent<AvatarEventContent>) {}
     /// Fires when `AsyncClient` receives a `StateEvent::RoomPowerLevels` event.
-    async fn on_state_power_levels(&self, _: SyncRoom, _: &PowerLevelsEvent) {}
+    async fn on_state_power_levels(
+        &self,
+        _: SyncRoom,
+        _: &SyncStateEvent<PowerLevelsEventContent>,
+    ) {
+    }
     /// Fires when `AsyncClient` receives a `StateEvent::RoomJoinRules` event.
-    async fn on_state_join_rules(&self, _: SyncRoom, _: &JoinRulesEvent) {}
+    async fn on_state_join_rules(&self, _: SyncRoom, _: &SyncStateEvent<JoinRulesEventContent>) {}
 
     // `AnyStrippedStateEvent`s
     /// Fires when `AsyncClient` receives a `StateEvent::RoomMember` event.
     async fn on_stripped_state_member(
         &self,
         room: SyncRoom,
-        event: &StrippedRoomMember,
-        prev_content: Option<MemberEventContent>,
+        event: &StrippedStateEvent<MemberEventContent>,
+        _prev_content: Option<MemberEventContent>,
     ) {
         // TODO only invite is handled as stripped state member
         match room {
             SyncRoom::Invited(room) | SyncRoom::Left(room) | SyncRoom::Joined(room) => {
-                let StrippedRoomMember {
+                let StrippedStateEvent {
                     sender, state_key, ..
                 } = event;
 
                 let receiver = UserId::try_from(state_key.as_str()).unwrap();
-                let membership = stripped_membership_change(prev_content, event);
+                let membership = event.membership_change();
                 if let Err(e) = self
                     .send
                     .lock()
@@ -285,28 +311,61 @@ impl EventEmitter for EventStream {
         }
     }
     /// Fires when `AsyncClient` receives a `StateEvent::RoomName` event.
-    async fn on_stripped_state_name(&self, _: SyncRoom, _: &StrippedRoomName) {}
+    async fn on_stripped_state_name(&self, _: SyncRoom, _: &StrippedStateEvent<NameEventContent>) {}
     /// Fires when `AsyncClient` receives a `StateEvent::RoomCanonicalAlias` event.
-    async fn on_stripped_state_canonical_alias(&self, _: SyncRoom, _: &StrippedRoomCanonicalAlias) {
+    async fn on_stripped_state_canonical_alias(
+        &self,
+        _: SyncRoom,
+        _: &StrippedStateEvent<CanonicalAliasEventContent>,
+    ) {
     }
     /// Fires when `AsyncClient` receives a `StateEvent::RoomAliases` event.
-    async fn on_stripped_state_aliases(&self, _: SyncRoom, _: &StrippedRoomAliases) {}
+    async fn on_stripped_state_aliases(
+        &self,
+        _: SyncRoom,
+        _: &StrippedStateEvent<AliasesEventContent>,
+    ) {
+    }
     /// Fires when `AsyncClient` receives a `StateEvent::RoomAvatar` event.
-    async fn on_stripped_state_avatar(&self, _: SyncRoom, _: &StrippedRoomAvatar) {}
+    async fn on_stripped_state_avatar(
+        &self,
+        _: SyncRoom,
+        _: &StrippedStateEvent<AvatarEventContent>,
+    ) {
+    }
     /// Fires when `AsyncClient` receives a `StateEvent::RoomPowerLevels` event.
-    async fn on_stripped_state_power_levels(&self, _: SyncRoom, _: &StrippedRoomPowerLevels) {}
+    async fn on_stripped_state_power_levels(
+        &self,
+        _: SyncRoom,
+        _: &StrippedStateEvent<PowerLevelsEventContent>,
+    ) {
+    }
     /// Fires when `AsyncClient` receives a `StateEvent::RoomJoinRules` event.
-    async fn on_stripped_state_join_rules(&self, _: SyncRoom, _: &StrippedRoomJoinRules) {}
+    async fn on_stripped_state_join_rules(
+        &self,
+        _: SyncRoom,
+        _: &StrippedStateEvent<JoinRulesEventContent>,
+    ) {
+    }
 
     // `NonRoomEvent` (this is a type alias from ruma_events) from `IncomingAccountData`
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomMember` event.
     async fn on_non_room_presence(&self, _: SyncRoom, _: &PresenceEvent) {}
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomName` event.
-    async fn on_non_room_ignored_users(&self, _: SyncRoom, _: &IgnoredUserListEvent) {}
+    async fn on_non_room_ignored_users(
+        &self,
+        _: SyncRoom,
+        _: &BasicEvent<IgnoredUserListEventContent>,
+    ) {
+    }
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomCanonicalAlias` event.
-    async fn on_non_room_push_rules(&self, _: SyncRoom, _: &PushRulesEvent) {}
+    async fn on_non_room_push_rules(&self, _: SyncRoom, _: &BasicEvent<PushRulesEventContent>) {}
     /// Fires when `AsyncClient` receives a `NonRoomEvent::RoomAliases` event.
-    async fn on_non_room_fully_read(&self, room: SyncRoom, event: &FullyReadEvent) {
+    async fn on_non_room_fully_read(
+        &self,
+        room: SyncRoom,
+        event: &EphemeralRoomEvent<FullyReadEventContent>,
+    ) {
         if let SyncRoom::Joined(room) = room {
             if let Err(e) = self
                 .send
@@ -323,10 +382,15 @@ impl EventEmitter for EventStream {
             }
         }
     }
-    // TODO make the StateResult::Typing variants a list of typing users and make the app.rs work
+
+    // TODO make the StateResult::Typing variants a list of typing users and make messages in app
     // like every other StateResult. Use Room::compute_display_name or whatever when PR is done
     /// Fires when `AsyncClient` receives a `NonRoomEvent::Typing` event.
-    async fn on_non_room_typing(&self, room: SyncRoom, event: &TypingEvent) {
+    async fn on_non_room_typing(
+        &self,
+        room: SyncRoom,
+        event: &EphemeralRoomEvent<TypingEventContent>,
+    ) {
         if let SyncRoom::Joined(room) = room {
             let typing = room
                 .read()
@@ -334,7 +398,7 @@ impl EventEmitter for EventStream {
                 .joined_members
                 .iter()
                 .filter(|(id, _)| event.content.user_ids.contains(id))
-                .map(|(_, mem)| mem.name())
+                .map(|(_, mem)| mem.name.to_string())
                 .collect::<Vec<String>>();
             let room_id = room.read().await.room_id.clone();
             let notice = if typing.is_empty() {
@@ -359,10 +423,14 @@ impl EventEmitter for EventStream {
         }
     }
 
-    async fn on_non_room_receipt(&self, room: SyncRoom, event: &ReceiptEvent) {
+    async fn on_non_room_receipt(
+        &self,
+        room: SyncRoom,
+        event: &EphemeralRoomEvent<ReceiptEventContent>,
+    ) {
         if let SyncRoom::Joined(room) = room {
             let room_id = room.read().await.room_id.clone();
-            let events = event.content.clone();
+            let events = event.content.0.clone();
             if let Err(e) = self
                 .send
                 .lock()
@@ -395,11 +463,12 @@ impl EventEmitter for EventStream {
                                         if new_content.msgtype == "m.text"
                                             && relates_to.rel_type == "m.replace"
                                         {
-                                            let new_body = if new_content.formatted_body.is_some() {
+                                            let new_body = if body.contains("`") {
                                                 crate::widgets::utils::markdown_to_terminal(&body)
                                                     // this shouldn't fail but as a back up we just use
                                                     // the unformatted message body
                                                     .unwrap_or(body.clone())
+                                            // None.unwrap_or(body.clone())
                                             } else {
                                                 body.to_string()
                                             };
@@ -427,7 +496,7 @@ impl EventEmitter for EventStream {
                             }
                         }
                     }
-                    CustomOrRawEvent::CustomRoom(room_event) => {
+                    CustomOrRawEvent::Message(room_event) => {
                         if let Ok(raw) = serde_json::value::to_raw_value(room_event) {
                             // TODO this is dumb don't deserialize then serialize but this should all
                             // be removed once ruma_events 0.22 is released
@@ -465,53 +534,14 @@ impl EventEmitter for EventStream {
                             }
                         }
                     }
-                    CustomOrRawEvent::CustomState(_state_event) => {}
-                    CustomOrRawEvent::Custom(_event) => {}
+                    CustomOrRawEvent::State(_state_event) => {}
+                    CustomOrRawEvent::Basic(_event) => {}
+                    CustomOrRawEvent::EphemeralRoom(_event) => {}
+                    CustomOrRawEvent::StrippedState(_event) => {}
                 }
             }
             SyncRoom::Left(_room) => {}
             _ => {}
         }
-    }
-}
-
-/// Helper function for membership change of StrippedRoomMember.
-///
-/// Check [the specification][spec] for details. [spec]: https://matrix.org/docs/spec/client_server/latest#m-room-member
-pub fn stripped_membership_change(
-    prev_content: Option<MemberEventContent>,
-    member: &StrippedRoomMember,
-) -> MembershipChange {
-    use MembershipState::*;
-
-    let prev_membership = if let Some(prev) = &prev_content {
-        prev.membership
-    } else {
-        Leave
-    };
-    match (prev_membership, &member.content.membership) {
-        (Invite, Invite) | (Leave, Leave) | (Ban, Ban) => MembershipChange::None,
-        (Invite, Join) | (Leave, Join) => MembershipChange::Joined,
-        (Invite, Leave) => {
-            if member.sender == member.state_key {
-                MembershipChange::InvitationRevoked
-            } else {
-                MembershipChange::InvitationRejected
-            }
-        }
-        (Invite, Ban) | (Leave, Ban) => MembershipChange::Banned,
-        (Join, Invite) | (Ban, Invite) | (Ban, Join) => MembershipChange::Error,
-        (Join, Join) => MembershipChange::ProfileChanged,
-        (Join, Leave) => {
-            if member.sender == member.state_key {
-                MembershipChange::Left
-            } else {
-                MembershipChange::Kicked
-            }
-        }
-        (Join, Ban) => MembershipChange::KickedAndBanned,
-        (Leave, Invite) => MembershipChange::Invited,
-        (Ban, Leave) => MembershipChange::Unbanned,
-        (Knock, _) | (_, Knock) => MembershipChange::NotImplemented,
     }
 }

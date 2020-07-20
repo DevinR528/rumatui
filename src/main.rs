@@ -16,6 +16,7 @@ use termion::{
 use tracing_subscriber::{self as tracer, EnvFilter};
 
 mod client;
+mod config;
 mod error;
 mod log;
 mod ui_loop;
@@ -38,6 +39,8 @@ lazy_static::lazy_static! {
     };
 }
 
+// TODO create a versioning scheme for the "DB"
+/// Check for and create if needed the `/.rumatui` folder
 fn create_rumatui_folder() -> Result<(), failure::Error> {
     let path: &Path = RUMATUI_DIR.as_ref().unwrap();
 

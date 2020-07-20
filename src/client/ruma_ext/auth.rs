@@ -1,5 +1,7 @@
-use matrix_sdk::identifiers::{DeviceId, UserId};
-use ruma_client_api::r0::{account::register::Response as RegisterResponse, uiaa::UiaaResponse};
+use matrix_sdk::{
+    api::r0::{account::register::Response as RegisterResponse, uiaa::UiaaResponse},
+    identifiers::{DeviceId, UserId},
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -8,7 +10,7 @@ pub struct SessionObj {
 }
 
 ruma_api::ruma_api! {
-    metadata {
+    metadata: {
         description: "Send session pings to the server during UIAA.",
         method: POST,
         name: "register",
@@ -17,15 +19,15 @@ ruma_api::ruma_api! {
         requires_authentication: false,
     }
 
-    request {
+    request: {
         pub auth: SessionObj,
     }
 
-    response {
+    response: {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub access_token: Option<String>,
         pub user_id: UserId,
-        pub device_id: Option<DeviceId>,
+        pub device_id: Option<Box<DeviceId>>,
     }
 
     error: UiaaResponse
@@ -42,9 +44,9 @@ impl Into<RegisterResponse> for Response {
 }
 
 pub mod dummy {
-    use matrix_sdk::identifiers::{DeviceId, UserId};
-    use ruma_client_api::r0::{
-        account::register::Response as RegisterResponse, uiaa::UiaaResponse,
+    use matrix_sdk::{
+        api::r0::{account::register::Response as RegisterResponse, uiaa::UiaaResponse},
+        identifiers::{DeviceId, UserId},
     };
 
     #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -55,7 +57,7 @@ pub mod dummy {
     }
 
     ruma_api::ruma_api! {
-        metadata {
+        metadata: {
             description: "Send session pings to the server during UIAA.",
             method: POST,
             name: "register",
@@ -64,15 +66,15 @@ pub mod dummy {
             requires_authentication: false,
         }
 
-        request {
+        request: {
             pub auth: Dummy,
         }
 
-        response {
+        response: {
             #[serde(skip_serializing_if = "Option::is_none")]
             pub access_token: Option<String>,
             pub user_id: UserId,
-            pub device_id: Option<DeviceId>,
+            pub device_id: Option<Box<DeviceId>>,
         }
 
         error: UiaaResponse
