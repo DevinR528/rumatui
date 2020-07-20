@@ -1,4 +1,4 @@
-# [0.1.18]
+# [0.1.19]
 
 * Update matrix-rust-sdk to a version (rev 037d62b) that uses ruma mono repo (rev 848b225)
 * Default to `https` over `http`
