@@ -472,18 +472,16 @@ impl MessageWidget {
         }
     }
 
-    // TODO fix message text box hashmap
     pub fn add_char(&mut self, ch: char) {
-        self.send_msgs
-            .get_mut(self.current_room.borrow().as_ref().unwrap())
-            .map(|m| m.push(ch));
+        if let Some(room) = self.current_room.borrow().as_ref() {
+            self.send_msgs.get_mut(room).map(|m| m.push(ch));
+        }
     }
 
-    // TODO fix message text box hashmap
     pub fn remove_char(&mut self) {
-        self.send_msgs
-            .get_mut(self.current_room.borrow().as_ref().unwrap())
-            .map(|m| m.pop());
+        if let Some(room) = self.current_room.borrow().as_ref() {
+            self.send_msgs.get_mut(room).map(|m| m.pop());
+        }
     }
 }
 
