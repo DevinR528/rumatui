@@ -165,6 +165,12 @@ impl From<ParseError> for Error {
     }
 }
 
+impl From<JsonError> for Error {
+    fn from(error: JsonError) -> Self {
+        Error::SerdeJson(error)
+    }
+}
+
 impl From<io::Error> for Error {
     fn from(error: io::Error) -> Self {
         let text = format!("{}", error);
