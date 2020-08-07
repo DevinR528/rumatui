@@ -361,15 +361,17 @@ impl AppWidget {
                     }
                     self.chat.push_search_text(c)
                 } else {
-                    // send typing notice to the server
-                    let room_id = self.chat.to_current_room_id();
-                    if !self.typing_notice {
-                        self.typing_notice = true;
-                        if let (Some(me), Some(room_id)) = (self.chat.to_current_user(), room_id) {
-                            if let Err(e) =
-                                self.send_jobs.send(UserRequest::Typing(room_id, me)).await
-                            {
-                                self.set_error(Error::from(e));
+                    if !self.chat.is_quick_select() {
+                        // send typing notice to the server
+                        let room_id = self.chat.to_current_room_id();
+                        if !self.typing_notice {
+                            self.typing_notice = true;
+                            if let (Some(me), Some(room_id)) = (self.chat.to_current_user(), room_id) {
+                                if let Err(e) =
+                                    self.send_jobs.send(UserRequest::Typing(room_id, me)).await
+                                {
+                                    self.set_error(Error::from(e));
+                                }
                             }
                         }
                     }
