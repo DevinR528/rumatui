@@ -285,7 +285,12 @@ impl RoomsWidget {
     pub fn quit_quick_select_room(&mut self) {
         self.filter_string = None;
         self.names = Default::default();
-        std::mem::swap(&mut self.names, &mut self.names_backup);
+        std::mem::swap(&mut self.names.items, &mut self.names_backup.items);
+
+        let id = self.current_room.borrow().clone();
+        if let Some(id) = id {
+            self.set_room_selected(&id);
+        }
     }
 
     fn apply_quick_select_filter(&mut self) {
@@ -296,11 +301,18 @@ impl RoomsWidget {
                                                          .map(|(name, id)| (name, id, best_match(needle, name)))
                                                          .filter(|(_, _, r)| r.as_ref().map_or(0, |res| res.score()) > 0)
                                                          .collect();
-                // Sort the vec by the match-score
-                vals.sort_by_cached_key(|(_name, _id, r)| r.as_ref().map_or(0, |res| res.score()));
-                let first_id = vals[0].1.clone();
-                self.names.items = vals.iter().map(|(name, id, _)| ( (*name).clone(), (*id).clone())).collect();
-                self.set_room_selected(&first_id);
+                if !vals.is_empty() {
+                    // Sort the vec by the match-score
+                    vals.sort_by_cached_key(|(_name, _id, r)| r.as_ref().map_or(0, |res| res.score()));
+                    let first_id = vals[0].1.clone();
+                    self.names.items = vals.iter().map(|(name, id, _)| ( (*name).clone(), (*id).clone())).collect();
+                    self.set_room_selected(&first_id);
+                    // If we do NOT want to view the rooms as we type, move this line to quick_quick_select_room() only
+                    *self.current_room.borrow_mut() = Some(first_id.clone());
+                } else {
+                    // No match found, display nothing
+                    self.names.items.clear();
+                }
             } else {
                 self.names = self.names_backup.clone();
             }
