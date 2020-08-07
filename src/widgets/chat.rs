@@ -178,10 +178,6 @@ impl ChatWidget {
         self.rooms_widget.start_quick_select_room();
     }
 
-    pub(crate) fn quick_select_room(&mut self, needle: &str) {
-        self.rooms_widget.quick_select_room(needle);
-    }
-
     pub(crate) fn is_quick_select(&self) -> bool {
         self.rooms_widget.is_quick_select()
     }
@@ -269,11 +265,19 @@ impl ChatWidget {
     }
 
     pub(crate) fn add_char(&mut self, ch: char) {
-        self.messages_widget.add_char(ch)
+        if self.is_quick_select() {
+            self.rooms_widget.quick_select_add_char(ch)
+        } else {
+            self.messages_widget.add_char(ch)
+        }
     }
 
     pub(crate) fn remove_char(&mut self) {
-        self.messages_widget.remove_char()
+        if self.is_quick_select() {
+            self.rooms_widget.quick_select_remove_char()
+        } else {
+            self.messages_widget.remove_char()
+        }
     }
 
     pub(crate) fn add_notify(&mut self, msg: &str) {

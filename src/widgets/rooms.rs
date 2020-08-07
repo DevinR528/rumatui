@@ -140,7 +140,7 @@ pub struct RoomsWidget {
     /// Are we filtering (if none: No. If some (even empty string): Yes)
     pub filter_string: Option<String>,
     // For restoring the original names-list after quick-select finished
-    names_backup: Option<ListState<(String, RoomId)>>,
+    names_backup: ListState<(String, RoomId)>,
 }
 
 impl RoomsWidget {
@@ -279,31 +279,50 @@ impl RoomsWidget {
 
     pub fn start_quick_select_room(&mut self) {
         self.filter_string = Some(String::new());
-        self.names_backup = Some(self.names.clone());
+        self.names_backup = self.names.clone();
     }
 
     pub fn quit_quick_select_room(&mut self) {
         self.filter_string = None;
-        if let Some(names) = self.names_backup.take() {
-            self.names = names;
+        self.names = Default::default();
+        std::mem::swap(&mut self.names, &mut self.names_backup);
+    }
+
+    fn apply_quick_select_filter(&mut self) {
+        if let Some(needle) = &mut self.filter_string {
+            if needle.len() > 0 {
+                // Matching against user input. Collecting tuples of the text + match-result
+                let mut vals : Vec<_> = self.names_backup.items.iter()
+                                                         .map(|(name, id)| (name, id, best_match(needle, name)))
+                                                         .filter(|(_, _, r)| r.as_ref().map_or(0, |res| res.score()) > 0)
+                                                         .collect();
+                // Sort the vec by the match-score
+                vals.sort_by_cached_key(|(_name, _id, r)| r.as_ref().map_or(0, |res| res.score()));
+                let first_id = vals[0].1.clone();
+                self.names.items = vals.iter().map(|(name, id, _)| ( (*name).clone(), (*id).clone())).collect();
+                self.set_room_selected(&first_id);
+            } else {
+                self.names = self.names_backup.clone();
+            }
         }
     }
 
-    pub fn quick_select_room(&mut self, needle: &str) {
-        self.filter_string = Some(needle.to_string());
-        let first_id;
-        {
-            // Matching against user input. Collecting tuples of the text + match-result
-            let mut vals : Vec<_> = self.names.items.iter()
-                                                     .map(|(name, id)| (name, id, best_match(needle, name)))
-                                                     .filter(|(_, _, r)| r.as_ref().map_or(0, |res| res.score()) > 0)
-                                                     .collect();
-            // Sort the vec by the match-score
-            vals.sort_by_cached_key(|(_name, _id, r)| r.as_ref().map_or(0, |res| res.score()));
-            first_id = vals[0].1.clone();
-            self.names.items = vals.iter().map(|(name, id, _)| ( (*name).clone(), (*id).clone())).collect();
+    pub fn quick_select_add_char(&mut self, ch: char) {
+        if let Some(needle) = &mut self.filter_string {
+            if ch != '\n' {
+                needle.push(ch);
+                self.apply_quick_select_filter();
+            } else {
+                self.quit_quick_select_room();
+            }
         }
-        self.set_room_selected(&first_id);
+    }
+
+    pub fn quick_select_remove_char(&mut self) {
+        if let Some(needle) = &mut self.filter_string {
+            needle.pop();
+            self.apply_quick_select_filter();
+        }
     }
 
     pub fn is_quick_select(&self) -> bool {
@@ -319,6 +338,10 @@ impl RenderWidget for RoomsWidget {
         let chunks = if self.invite.is_some() {
             Layout::default()
                 .constraints([Constraint::Percentage(60), Constraint::Percentage(40)].as_ref())
+                .split(area)
+        } else if self.filter_string.is_some() {
+            Layout::default()
+                .constraints([Constraint::Percentage(90), Constraint::Percentage(10)].as_ref())
                 .split(area)
         } else {
             Layout::default()
@@ -439,6 +462,27 @@ impl RenderWidget for RoomsWidget {
             )];
             let nope = Paragraph::new(t2.iter()).block(no);
             f.render_widget(nope, width_chunk2[1])
+        } else if self.filter_string.is_some() {
+            let text_field = vec![
+                Text::styled(self.filter_string.as_ref().unwrap(), Style::default().fg(Color::Blue)),
+                Text::styled(
+                    "<",
+                    Style::default()
+                        .fg(Color::LightGreen)
+                        .modifier(Modifier::RAPID_BLINK),
+                ),
+            ];
+            let text_box = Paragraph::new(text_field.iter())
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Green).modifier(Modifier::BOLD))
+                        .title("Quick select")
+                        .title_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD)),
+                )
+                .wrap(true);
+
+            f.render_widget(text_box, chunks[1]);
         }
     }
 }
