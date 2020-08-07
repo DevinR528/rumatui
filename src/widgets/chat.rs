@@ -169,6 +169,23 @@ impl ChatWidget {
         *self.current_room.borrow_mut() = Some(room.clone());
     }
 
+
+    pub(crate) fn quit_quick_select_room(&mut self) {
+        self.rooms_widget.quit_quick_select_room();
+    }
+
+    pub(crate) fn start_quick_select_room(&mut self) {
+        self.rooms_widget.start_quick_select_room();
+    }
+
+    pub(crate) fn quick_select_room(&mut self, needle: &str) {
+        self.rooms_widget.quick_select_room(needle);
+    }
+
+    pub(crate) fn is_quick_select(&self) -> bool {
+        self.rooms_widget.is_quick_select()
+    }
+
     pub(crate) fn as_current_user(&self) -> Option<&UserId> {
         self.me.as_ref()
     }

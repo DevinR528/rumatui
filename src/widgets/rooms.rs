@@ -24,6 +24,8 @@ use tokio::sync::RwLock;
 
 use crate::widgets::RenderWidget;
 
+use sublime_fuzzy::{best_match, format_simple};
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ListState<I> {
     pub items: Vec<I>,
@@ -133,8 +135,12 @@ pub struct RoomsWidget {
     /// Map of room id and matrix_sdk::Room
     pub(crate) rooms: HashMap<RoomId, Arc<RwLock<Room>>>,
     /// When a user receives an invitation an alert pops up in the `RoomsWidget` pane
-    // this signals to show that pop up.
+    /// this signals to show that pop up.
     pub(crate) invite: Option<Invitation>,
+    /// Are we filtering (if none: No. If some (even empty string): Yes)
+    pub filter_string: Option<String>,
+    // For restoring the original names-list after quick-select finished
+    names_backup: Option<ListState<(String, RoomId)>>,
 }
 
 impl RoomsWidget {
@@ -166,6 +172,9 @@ impl RoomsWidget {
     }
 
     pub(crate) async fn add_room(&mut self, room: Arc<RwLock<Room>>) {
+        if self.filter_string.is_some() {
+            return;
+        }
         let r = room.read().await;
         let name = r.display_name();
         let room_id = r.room_id.clone();
@@ -176,6 +185,9 @@ impl RoomsWidget {
     }
 
     pub(crate) fn remove_room(&mut self, room_id: &RoomId) {
+        if self.filter_string.is_some() {
+            return;
+        }
         self.rooms.remove(room_id);
         if let Some(idx) = self.names.items.iter().position(|(_, id)| room_id == id) {
             self.names.items.remove(idx);
@@ -194,6 +206,9 @@ impl RoomsWidget {
     }
 
     pub(crate) fn update_room(&mut self, name: &str, room_id: &RoomId) {
+        if self.filter_string.is_some() {
+            return;
+        }
         if let Some(idx) = self.names.items.iter().position(|(_, id)| room_id == id) {
             self.names.items[idx] = (name.to_string(), room_id.clone());
         }
@@ -260,6 +275,39 @@ impl RoomsWidget {
         if let Some(idx) = self.names.items.iter().position(|(_, id)| room_id == id) {
             self.names.selected = idx;
         }
+    }
+
+    pub fn start_quick_select_room(&mut self) {
+        self.filter_string = Some(String::new());
+        self.names_backup = Some(self.names.clone());
+    }
+
+    pub fn quit_quick_select_room(&mut self) {
+        self.filter_string = None;
+        if let Some(names) = self.names_backup.take() {
+            self.names = names;
+        }
+    }
+
+    pub fn quick_select_room(&mut self, needle: &str) {
+        self.filter_string = Some(needle.to_string());
+        let first_id;
+        {
+            // Matching against user input. Collecting tuples of the text + match-result
+            let mut vals : Vec<_> = self.names.items.iter()
+                                                     .map(|(name, id)| (name, id, best_match(needle, name)))
+                                                     .filter(|(_, _, r)| r.as_ref().map_or(0, |res| res.score()) > 0)
+                                                     .collect();
+            // Sort the vec by the match-score
+            vals.sort_by_cached_key(|(_name, _id, r)| r.as_ref().map_or(0, |res| res.score()));
+            first_id = vals[0].1.clone();
+            self.names.items = vals.iter().map(|(name, id, _)| ( (*name).clone(), (*id).clone())).collect();
+        }
+        self.set_room_selected(&first_id);
+    }
+
+    pub fn is_quick_select(&self) -> bool {
+        self.filter_string.is_some()
     }
 }
 

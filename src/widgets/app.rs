@@ -844,6 +844,18 @@ impl AppWidget {
         }
     }
 
+    /// Filter current room list for quick-access
+    pub async fn on_ctrl_k(&mut self) {
+        let do_something = !self.chat.is_room_search();
+        if do_something {
+            if self.chat.is_quick_select() {
+                self.chat.quit_quick_select_room()
+            } else {
+                self.chat.start_quick_select_room()
+            }
+        }
+    }
+
     /// When a request is made to get previous room events (by scrolling up)
     /// the underlying client does not process them so we must deal with them.
     ///
