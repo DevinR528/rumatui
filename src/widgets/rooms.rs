@@ -24,6 +24,8 @@ use tokio::sync::RwLock;
 
 use crate::widgets::RenderWidget;
 
+// TODO: Use format_simple to highlight which characters have been matched in the quick-select search
+#[allow(unused_imports)]
 use sublime_fuzzy::{best_match, format_simple};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
