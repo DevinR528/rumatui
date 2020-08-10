@@ -310,7 +310,7 @@ impl RoomsWidget {
                     self.names.items = vals.iter().map(|(name, id, _)| ( (*name).clone(), (*id).clone())).collect();
                     self.set_room_selected(&first_id);
                     // If we do NOT want to view the rooms as we type, move this line to quick_quick_select_room() only
-                    *self.current_room.borrow_mut() = Some(first_id.clone());
+                    *self.current_room.borrow_mut() = Some(first_id);
                 } else {
                     // No match found, display nothing
                     self.names.items.clear();
