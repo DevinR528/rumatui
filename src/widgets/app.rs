@@ -905,7 +905,7 @@ impl AppWidget {
                                     .as_ref()
                                     .map(|f| f.body.to_string())
                                     .unwrap_or(String::new())
-                                    != body.to_string()
+                                    != *body
                                 {
                                     crate::widgets::utils::markdown_to_terminal(&body)
                                         .unwrap_or(body.clone())

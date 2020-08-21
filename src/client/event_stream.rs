@@ -176,7 +176,7 @@ impl EventEmitter for EventStream {
                         .as_ref()
                         .map(|f| f.body.to_string())
                         .unwrap_or(String::new())
-                        != body.to_string()
+                        != *body
                     {
                         crate::widgets::utils::markdown_to_terminal(body).unwrap_or(body.clone())
                     // None.unwrap_or(body.clone())
@@ -463,7 +463,7 @@ impl EventEmitter for EventStream {
                                         if new_content.msgtype == "m.text"
                                             && relates_to.rel_type == "m.replace"
                                         {
-                                            let new_body = if body.contains("`") {
+                                            let new_body = if body.contains('`') {
                                                 crate::widgets::utils::markdown_to_terminal(&body)
                                                     // this shouldn't fail but as a back up we just use
                                                     // the unformatted message body

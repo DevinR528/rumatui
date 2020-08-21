@@ -151,7 +151,7 @@ impl MessageWidget {
                     .as_ref()
                     .map(|f| f.body.to_string())
                     .unwrap_or(String::new())
-                    != body.to_string()
+                    != *body
                 {
                     crate::widgets::utils::markdown_to_terminal(body).unwrap_or(body.clone())
                 // None.unwrap_or(body.clone())
@@ -312,7 +312,7 @@ impl MessageWidget {
                     .as_ref()
                     .map(|f| f.body.to_string())
                     .unwrap_or(String::new())
-                    != body.to_string()
+                    != body
                 {
                     crate::widgets::utils::markdown_to_terminal(&body).unwrap_or(body.clone())
                 // None.unwrap_or(body.clone())
@@ -474,13 +474,17 @@ impl MessageWidget {
 
     pub fn add_char(&mut self, ch: char) {
         if let Some(room) = self.current_room.borrow().as_ref() {
-            self.send_msgs.get_mut(room).map(|m| m.push(ch));
+            if let Some(m) = self.send_msgs.get_mut(room) {
+                m.push(ch)
+            }
         }
     }
 
     pub fn remove_char(&mut self) {
         if let Some(room) = self.current_room.borrow().as_ref() {
-            self.send_msgs.get_mut(room).map(|m| m.pop());
+            if let Some(m) = self.send_msgs.get_mut(room) {
+                m.pop();
+            }
         }
     }
 }

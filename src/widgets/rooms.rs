@@ -297,7 +297,7 @@ impl RoomsWidget {
 
     fn apply_quick_select_filter(&mut self) {
         if let Some(needle) = &mut self.filter_string {
-            if needle.len() > 0 {
+            if !needle.is_empty() {
                 // Matching against user input. Collecting tuples of the text + match-result
                 let mut vals: Vec<_> = self
                     .names_backup

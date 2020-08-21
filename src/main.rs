@@ -55,8 +55,7 @@ fn parse_args(args: env::Args) -> (String, bool) {
     let args = args.skip(1).collect::<Vec<_>>();
     if args
         .iter()
-        .find(|arg| arg.contains("help") || arg.contains("-h"))
-        .is_some()
+        .any(|arg| arg.contains("help") || arg.contains("-h"))
     {
         print_help();
         process::exit(0)
