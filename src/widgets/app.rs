@@ -366,7 +366,9 @@ impl AppWidget {
                         let room_id = self.chat.to_current_room_id();
                         if !self.typing_notice {
                             self.typing_notice = true;
-                            if let (Some(me), Some(room_id)) = (self.chat.to_current_user(), room_id) {
+                            if let (Some(me), Some(room_id)) =
+                                (self.chat.to_current_user(), room_id)
+                            {
                                 if let Err(e) =
                                     self.send_jobs.send(UserRequest::Typing(room_id, me)).await
                                 {
