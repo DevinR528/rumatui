@@ -299,15 +299,23 @@ impl RoomsWidget {
         if let Some(needle) = &mut self.filter_string {
             if needle.len() > 0 {
                 // Matching against user input. Collecting tuples of the text + match-result
-                let mut vals : Vec<_> = self.names_backup.items.iter()
-                                                         .map(|(name, id)| (name, id, best_match(needle, name)))
-                                                         .filter(|(_, _, r)| r.as_ref().map_or(0, |res| res.score()) > 0)
-                                                         .collect();
+                let mut vals: Vec<_> = self
+                    .names_backup
+                    .items
+                    .iter()
+                    .map(|(name, id)| (name, id, best_match(needle, name)))
+                    .filter(|(_, _, r)| r.as_ref().map_or(0, |res| res.score()) > 0)
+                    .collect();
                 if !vals.is_empty() {
                     // Sort the vec by the match-score
-                    vals.sort_by_cached_key(|(_name, _id, r)| r.as_ref().map_or(0, |res| res.score()));
+                    vals.sort_by_cached_key(|(_name, _id, r)| {
+                        r.as_ref().map_or(0, |res| res.score())
+                    });
                     let first_id = vals[0].1.clone();
-                    self.names.items = vals.iter().map(|(name, id, _)| ( (*name).clone(), (*id).clone())).collect();
+                    self.names.items = vals
+                        .iter()
+                        .map(|(name, id, _)| ((*name).clone(), (*id).clone()))
+                        .collect();
                     self.set_room_selected(&first_id);
                     // If we do NOT want to view the rooms as we type, move this line to quick_quick_select_room() only
                     *self.current_room.borrow_mut() = Some(first_id);
@@ -478,7 +486,10 @@ impl RenderWidget for RoomsWidget {
             f.render_widget(nope, width_chunk2[1])
         } else if self.filter_string.is_some() {
             let text_field = vec![
-                Text::styled(self.filter_string.as_ref().unwrap(), Style::default().fg(Color::Blue)),
+                Text::styled(
+                    self.filter_string.as_ref().unwrap(),
+                    Style::default().fg(Color::Blue),
+                ),
                 Text::styled(
                     "<",
                     Style::default()

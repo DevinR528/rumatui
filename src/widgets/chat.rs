@@ -169,7 +169,6 @@ impl ChatWidget {
         *self.current_room.borrow_mut() = Some(room.clone());
     }
 
-
     pub(crate) fn quit_quick_select_room(&mut self) {
         self.rooms_widget.quit_quick_select_room();
     }
