@@ -1,3 +1,8 @@
+# [Unreleased]
+
+* Ctrl-k room filtering (Thanks to [zwieberl](https://github.com/zwieberl))
+* Tab selects next text box (same as down arrow)
+
 # [0.1.19]
 
 * Update matrix-rust-sdk to a version (rev 037d62b) that uses ruma mono repo (rev 848b225)
