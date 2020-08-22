@@ -163,10 +163,7 @@ impl Buffer {
     /// Returns a Buffer with all cells initialized with the attributes of the given Cell
     pub fn filled(area: Rect, cell: &Cell) -> Buffer {
         let size = area.area() as usize;
-        let mut content = Vec::with_capacity(size);
-        for _ in 0..size {
-            content.push(cell.clone());
-        }
+        let content = vec![cell.clone(); size];
         Buffer { area, content }
     }
 
