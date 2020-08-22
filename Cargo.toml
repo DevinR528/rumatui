@@ -42,7 +42,7 @@ tracing-subscriber = { version = "0.2.7", features = ["fmt"] }
 tracing = "0.1.5"
 
 # crates.io published fork of tui
-rumatui-tui = "0.8.1"
+rumatui-tui = "0.8.2"
 webbrowser = "0.5.2"
 url = "2.1.1"
 uuid = { version = "0.8.1", features = ["v4"] }

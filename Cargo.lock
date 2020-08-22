@@ -1976,7 +1976,7 @@ dependencies = [
  "pulldown-cmark",
  "regex",
  "ruma-api",
- "rumatui-tui 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rumatui-tui 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "serde_json",
  "sublime_fuzzy",
@@ -1993,7 +1993,7 @@ dependencies = [
 
 [[package]]
 name = "rumatui-tui"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "argh",
  "bitflags",
@@ -2008,9 +2008,9 @@ dependencies = [
 
 [[package]]
 name = "rumatui-tui"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "321431661dcf65148a9405f094d81d862102b3d84b012670c1779dbd1279082e"
+checksum = "f9f5e0523ba9c28f0a54f97ac234610e2257982d60c50a9fbf4f8a10c36c4bc6"
 dependencies = [
  "bitflags",
  "cassowary",
