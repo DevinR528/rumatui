@@ -135,7 +135,7 @@ fn main() -> Result<(), failure::Error> {
                         app.on_notifications().await;
 
                         match key {
-                            Key::Ctrl(c) if c == 'c' => panic!("CTRL-c killed"),
+                            Key::Ctrl(c) if c == 'c' => app.should_quit = true,
                             Key::Ctrl(c) if c == 'q' => app.should_quit = true,
                             Key::Ctrl(c) if c == 's' => app.on_send().await,
                             Key::Ctrl(c) if c == 'd' => app.on_ctrl_d().await,
@@ -146,6 +146,7 @@ fn main() -> Result<(), failure::Error> {
                             Key::Right => app.on_right(),
                             Key::Backspace => app.on_backspace(),
                             Key::Delete => app.on_delete().await,
+                            Key::Char(c) if c == '\t' => app.on_down().await,
                             Key::Char(c) => app.on_key(c).await,
                             Key::Esc => app.should_quit = true,
                             _ => {}

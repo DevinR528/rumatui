@@ -696,11 +696,7 @@ impl AppWidget {
                     membership,
                     timeline_event,
                 } => {
-                    let invitation = if let MembershipChange::Invited = membership {
-                        true
-                    } else {
-                        false
-                    };
+                    let invitation = matches!(membership, MembershipChange::Invited);
 
                     // only display notifications for the current room
                     if self.chat.is_current_room(&room.read().await.room_id)
