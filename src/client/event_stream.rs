@@ -175,11 +175,12 @@ impl EventEmitter for EventStream {
                     let msg = if formatted
                         .as_ref()
                         .map(|f| f.body.to_string())
-                        .unwrap_or(String::new())
+                        .unwrap_or(body.to_string())
                         != *body
                     {
+                        // This is extremely expensive
+                        // TODO cache these results somehow
                         crate::widgets::utils::markdown_to_terminal(body).unwrap_or(body.clone())
-                    // None.unwrap_or(body.clone())
                     } else {
                         body.clone()
                     };

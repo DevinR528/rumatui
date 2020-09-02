@@ -1,3 +1,5 @@
 /target
 syncdata
 .vscode
+flamegraph.svg
+perf.*

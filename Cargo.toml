@@ -61,3 +61,7 @@ features = ["parsing", "assets", "dump-load"]
 
 [workspace]
 members = ["rumatui-tui"]
+
+# For flamegraph COMMENT OUT
+# [profile.release]
+# debug = true

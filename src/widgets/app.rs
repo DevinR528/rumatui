@@ -698,8 +698,10 @@ impl AppWidget {
                 } => {
                     let invitation = matches!(membership, MembershipChange::Invited);
 
+                    let room_id = room.read().await.room_id.clone();
+
                     // only display notifications for the current room
-                    if self.chat.is_current_room(&room.read().await.room_id)
+                    if self.chat.is_current_room(&room_id)
                         // unless this is an invitation
                         || invitation
                         // or it is an event directed towards the user
@@ -708,7 +710,7 @@ impl AppWidget {
                         || Some(&sender) == self.chat.as_current_user()
                     {
                         // when the event is directed at ourselves but from another room show the room name
-                        let show_room_name = !self.chat.is_current_room(&room.read().await.room_id);
+                        let show_room_name = !self.chat.is_current_room(&room_id);
 
                         self.handle_membership(
                             membership,
@@ -900,12 +902,13 @@ impl AppWidget {
                                 let msg = if formatted
                                     .as_ref()
                                     .map(|f| f.body.to_string())
-                                    .unwrap_or(String::new())
+                                    .unwrap_or(body.to_string())
                                     != *body
                                 {
+                                    // This is extremely expensive
+                                    // TODO cache these results somehow
                                     crate::widgets::utils::markdown_to_terminal(&body)
                                         .unwrap_or(body.clone())
-                                // None.unwrap_or(body.clone())
                                 } else {
                                     body.clone()
                                 };
@@ -947,6 +950,7 @@ impl AppWidget {
         show_room_name: bool,
     ) {
         let for_me = Some(&receiver) == self.chat.as_current_user();
+        let room_id = room.read().await.room_id.clone();
         let room_name = if show_room_name {
             format!("\"{}\"", room.read().await.display_name())
         } else {
@@ -958,7 +962,7 @@ impl AppWidget {
                 .add_notify(&format!("{} updated their profile", receiver.localpart())),
             MembershipChange::Joined => {
                 if for_me {
-                    self.chat.set_current_room_id(&room.read().await.room_id);
+                    self.chat.set_current_room_id(&room_id);
                     self.chat.add_room(room).await;
                 } else {
                     self.chat.add_notify(&format!(
@@ -987,7 +991,7 @@ impl AppWidget {
             }
             MembershipChange::InvitationRejected => {
                 self.notify_and_leave(
-                    &room.read().await.room_id,
+                    &room_id,
                     for_me,
                     "you rejected an invitation".to_string(),
                     format!(
@@ -999,7 +1003,7 @@ impl AppWidget {
             }
             MembershipChange::InvitationRevoked => {
                 self.notify_and_leave(
-                    &room.read().await.room_id,
+                    &room_id,
                     for_me,
                     format!("your invitation was rejected by {}", sender.localpart()),
                     format!(
@@ -1011,7 +1015,7 @@ impl AppWidget {
             }
             MembershipChange::Left => {
                 self.notify_and_leave(
-                    &room.read().await.room_id,
+                    &room_id,
                     for_me,
                     format!("you left {}", room_name),
                     format!("{} left {}", receiver.localpart(), room_name,),
@@ -1019,7 +1023,7 @@ impl AppWidget {
             }
             MembershipChange::Banned => {
                 self.notify_and_leave(
-                    &room.read().await.room_id,
+                    &room_id,
                     for_me,
                     format!("you were banned from {}", room_name),
                     format!("{} was banned from {}", receiver.localpart(), room_name,),
@@ -1027,7 +1031,7 @@ impl AppWidget {
             }
             MembershipChange::Unbanned => {
                 self.notify_and_leave(
-                    &room.read().await.room_id,
+                    &room_id,
                     for_me,
                     format!("you were unbanned from {}", room_name),
                     format!("{} was unbanned from {}", receiver.localpart(), room_name,),
@@ -1035,7 +1039,7 @@ impl AppWidget {
             }
             MembershipChange::Kicked => {
                 self.notify_and_leave(
-                    &room.read().await.room_id,
+                    &room_id,
                     for_me,
                     format!("you were kicked from {}", room_name),
                     format!("{} was kicked from {}", receiver.localpart(), room_name,),
@@ -1043,7 +1047,7 @@ impl AppWidget {
             }
             MembershipChange::KickedAndBanned => {
                 self.notify_and_leave(
-                    &room.read().await.room_id,
+                    &room_id,
                     for_me,
                     format!("you were kicked and banned from {}", room_name),
                     format!(
