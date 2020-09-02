@@ -1,5 +1,6 @@
 # [Unreleased]
 
+* Fix performance regression caused by `widgets::utils::markdown_to_terminal`
 * Ctrl-k room filtering (Thanks to [zwieberl](https://github.com/zwieberl))
 * Tab selects next text box (same as down arrow)
 
