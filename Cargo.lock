@@ -368,9 +368,9 @@ checksum = "0dbbb57365263e881e805dc77d94697c9118fd94d8da011240555aa7b23445bd"
 
 [[package]]
 name = "comrak"
-version = "0.7.0"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e17058cc536cf290563e88787d7b9e6030ce4742943017cc2ffb71f88034021c"
+checksum = "0d325e4f2ffff52ca77d995bb675494d5364aa332499d5f7c7fbb28c25e671f6"
 dependencies = [
  "clap",
  "entities",
@@ -378,9 +378,11 @@ dependencies = [
  "pest",
  "pest_derive",
  "regex",
+ "shell-words",
  "twoway",
  "typed-arena",
  "unicode_categories",
+ "xdg",
 ]
 
 [[package]]
@@ -524,11 +526,10 @@ dependencies = [
 
 [[package]]
 name = "dirs"
-version = "2.0.2"
+version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13aea89a5c93364a98e9b37b2fa237effbb694d5cfe01c5b70941f7eb087d5e3"
+checksum = "142995ed02755914747cc6ca76fc7e4583cd18578746716d0508ea6ed558b9ff"
 dependencies = [
- "cfg-if",
  "dirs-sys",
 ]
 
@@ -1256,9 +1257,9 @@ checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 
 [[package]]
 name = "mdcat"
-version = "0.18.4"
+version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14fff01d1a4aa5bb1c3824a6e1e509e5757a8403059122088da6f095e49ff5a0"
+checksum = "6a2bc701e328bec1f37343121d244a98808a3cd3c10ae1e74fb8d11e1a598b1d"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -1270,6 +1271,7 @@ dependencies = [
  "mime",
  "pulldown-cmark",
  "reqwest",
+ "shell-words",
  "syntect",
  "term_size",
  "url",
@@ -1659,9 +1661,9 @@ dependencies = [
 
 [[package]]
 name = "pulldown-cmark"
-version = "0.7.2"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca36dea94d187597e104a5c8e4b07576a8a45aa5db48a65e12940d3eb7461f55"
+checksum = "ffade02495f22453cd593159ea2f59827aae7f53fa8323f756799b670881dcf8"
 dependencies = [
  "bitflags",
  "memchr",
@@ -2176,6 +2178,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "shell-words"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6fa3938c99da4914afedd13bf3d79bcb6c277d1b2c398d23257a304d9e1b074"
+
+[[package]]
 name = "slab"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2322,9 +2330,9 @@ dependencies = [
 
 [[package]]
 name = "syntect"
-version = "4.2.0"
+version = "4.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83b43a6ca1829ccb0c933b615c9ea83ffc8793ae240cecbd15119b13d741161d"
+checksum = "4e3978df05b5850c839a6b352d3c35ce0478944a4be689be826b53cf75363e88"
 dependencies = [
  "bincode",
  "bitflags",
@@ -2909,6 +2917,12 @@ dependencies = [
  "winapi 0.2.8",
  "winapi-build",
 ]
+
+[[package]]
+name = "xdg"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d089681aa106a86fade1b0128fb5daf07d5867a509ab036d99988dec80429a57"
 
 [[package]]
 name = "xml-rs"

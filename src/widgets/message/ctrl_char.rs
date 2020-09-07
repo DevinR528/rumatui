@@ -411,7 +411,13 @@ fn main() {
             syntax_set,
         };
         let mut w = Writer::default();
-        mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
+        mdcat::push_tty(
+            &settings,
+            &mdcat::Environment::for_local_directory(&"/").unwrap(),
+            &mut w,
+            parser,
+        )
+        .expect("failed");
 
         let expected = "\u{1b}]8;;http://www.google.com/ \u{1b}[33ruma-identifiers \u{1b}[1hello\n\n\u{1b}[1\u{1b}[34┄\u{1b}[1\u{1b}[34table\n\n• one\n• two\n\n\u{1b}[32────────────────────\n\u{1b}[34fn \u{1b}[33main() {\n    \u{1b}[32println!(\"\u{1b}[36hello\");\n}\n\u{1b}[32────────────────────";
 
@@ -436,7 +442,13 @@ fn main() {
             syntax_set,
         };
         let mut w = Writer::default();
-        mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
+        mdcat::push_tty(
+            &settings,
+            &mdcat::Environment::for_local_directory(&"/").unwrap(),
+            &mut w,
+            parser,
+        )
+        .expect("failed");
 
         let ctrl = CtrlChars::parse(w.to_string());
         // println!("{:#?}", ctrl);
@@ -478,7 +490,13 @@ fn main() {
             syntax_set,
         };
         let mut w = Writer::default();
-        mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
+        mdcat::push_tty(
+            &settings,
+            &mdcat::Environment::for_local_directory(&"/").unwrap(),
+            &mut w,
+            parser,
+        )
+        .expect("failed");
 
         let text = CtrlChars::parse(w.to_string()).into_text();
 
@@ -540,7 +558,13 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
             syntax_set,
         };
         let mut w = Writer::default();
-        mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
+        mdcat::push_tty(
+            &settings,
+            &mdcat::Environment::for_local_directory(&"/").unwrap(),
+            &mut w,
+            parser,
+        )
+        .expect("failed");
 
         let expected = "    \u{1b}[3\u{1b}[32In reply to blah blah\n\nhttps://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-roomid-leave doesn\'t seem to have a body\n";
 
@@ -566,7 +590,13 @@ https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-rooms-ro
             syntax_set,
         };
         let mut w = Writer::default();
-        mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser).expect("failed");
+        mdcat::push_tty(
+            &settings,
+            &mdcat::Environment::for_local_directory(&"/").unwrap(),
+            &mut w,
+            parser,
+        )
+        .expect("failed");
 
         let expected = "TWIM: \n\n\u{1b}[1\u{1b}[34┄\u{1b}[1\u{1b}[34Docker-matrix\n\nThe docker image for synapse v1.12.4rc1 is now on ]8;;https://hub.docker.com/r/mvgorcum/docker-matrix/tags\u{7}\u{1b}[34mvgorcum/docker-matrix:v1.12.4rc1\u{1b}]8;;";
         assert_eq!(expected, CtrlChars::parse(w.to_string()).to_string());

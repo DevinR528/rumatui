@@ -38,6 +38,7 @@ pub(crate) fn markdown_to_terminal(input: &str) -> Result<String> {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TASKLISTS);
     options.insert(Options::ENABLE_STRIKETHROUGH);
+
     let parser = Parser::new_ext(&input, options);
     let syntax_set = SyntaxSet::load_defaults_nonewlines();
 
@@ -51,8 +52,13 @@ pub(crate) fn markdown_to_terminal(input: &str) -> Result<String> {
         syntax_set,
     };
     let mut w = Writer::default();
-    mdcat::push_tty(&settings, &mut w, &std::path::Path::new("/"), parser)
-        .map_err(|e| Error::from(io::Error::new(ErrorKind::Other, e.to_string())))?;
+    mdcat::push_tty(
+        &settings,
+        &mdcat::Environment::for_local_directory(&"/").unwrap(),
+        &mut w,
+        parser,
+    )
+    .map_err(|e| Error::from(io::Error::new(ErrorKind::Other, e.to_string())))?;
 
     Ok(w.to_string())
 }
