@@ -1,10 +1,8 @@
 use std::{cell::RefCell, rc::Rc};
 
 use matrix_sdk::{
-    api::r0::directory::{
-        get_public_rooms_filtered::{self, RoomNetwork},
-        PublicRoomsChunk,
-    },
+    api::r0::directory::get_public_rooms_filtered,
+    directory::{PublicRoomsChunk, RoomNetwork},
     identifiers::RoomId,
 };
 use rumatui_tui::{
@@ -105,7 +103,7 @@ impl RoomSearchWidget {
 
     /// Passes the remembered filter, room network, and since token to make
     /// the room search request again.
-    pub fn next_request(&mut self) -> Option<(String, RoomNetwork, String)> {
+    pub fn next_request(&mut self) -> Option<(String, RoomNetwork<'_>, String)> {
         if let Some(tkn) = self.next_batch_tkn() {
             Some((
                 self.search_term.to_string(),

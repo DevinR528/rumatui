@@ -1,8 +1,10 @@
-use rumatui_tui::backend::TestBackend;
-use rumatui_tui::buffer::Buffer;
-use rumatui_tui::layout::Constraint;
-use rumatui_tui::widgets::{Block, Borders, Row, Table};
-use rumatui_tui::Terminal;
+use rumatui_tui::{
+    backend::TestBackend,
+    buffer::Buffer,
+    layout::Constraint,
+    widgets::{Block, Borders, Row, Table},
+    Terminal,
+};
 
 #[test]
 fn table_column_spacing() {

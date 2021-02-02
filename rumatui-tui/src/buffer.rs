@@ -1,12 +1,12 @@
-use std::cmp::min;
-use std::fmt;
-use std::usize;
+use std::{cmp::min, fmt, usize};
 
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-use crate::layout::Rect;
-use crate::style::{Color, Modifier, Style};
+use crate::{
+    layout::Rect,
+    style::{Color, Modifier, Style},
+};
 
 /// A buffer cell
 #[derive(Debug, Clone, PartialEq)]

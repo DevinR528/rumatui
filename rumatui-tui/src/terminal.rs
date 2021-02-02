@@ -1,9 +1,11 @@
 use std::io;
 
-use crate::backend::Backend;
-use crate::buffer::Buffer;
-use crate::layout::Rect;
-use crate::widgets::{StatefulWidget, Widget};
+use crate::{
+    backend::Backend,
+    buffer::Buffer,
+    layout::Rect,
+    widgets::{StatefulWidget, Widget},
+};
 
 /// Interface to the terminal backed by Termion
 #[derive(Debug)]

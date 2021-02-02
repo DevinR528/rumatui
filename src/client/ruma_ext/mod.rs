@@ -1,9 +1,8 @@
-use std::collections::BTreeMap;
-use std::time::SystemTime;
-
-use serde_json::Value as JsonValue;
+use std::{collections::BTreeMap, time::SystemTime};
 
 use matrix_sdk::identifiers::{EventId, RoomId, UserId};
+pub use ruma_api::exports::ruma_serde;
+use serde_json::Value as JsonValue;
 
 pub mod auth;
 pub mod message;
@@ -59,7 +58,7 @@ mod ms_since_unix_epoch {
         time::{Duration, SystemTime, UNIX_EPOCH},
     };
 
-    use js_int::UInt;
+    use matrix_sdk::UInt;
     use serde::{
         de::{Deserialize, Deserializer},
         ser::{Error, Serialize, Serializer},
@@ -96,9 +95,9 @@ mod ms_since_unix_epoch {
 
 #[test]
 fn test_message_edit_event() {
-    use matrix_sdk::events::EventJson;
+    use matrix_sdk::Raw;
 
-    let ev = serde_json::from_str::<EventJson<RumaUnsupportedEvent>>(include_str!(
+    let ev = serde_json::from_str::<Raw<RumaUnsupportedEvent>>(include_str!(
         "../../../test_data/message_edit.json"
     ))
     .unwrap()
@@ -108,7 +107,7 @@ fn test_message_edit_event() {
     let json = serde_json::to_string_pretty(&ev).unwrap();
     assert_eq!(
         ev,
-        serde_json::from_str::<EventJson<RumaUnsupportedEvent>>(&json)
+        serde_json::from_str::<Raw<RumaUnsupportedEvent>>(&json)
             .unwrap()
             .deserialize()
             .unwrap()
@@ -117,9 +116,9 @@ fn test_message_edit_event() {
 
 #[test]
 fn test_reaction_event() {
-    use matrix_sdk::events::EventJson;
+    use matrix_sdk::Raw;
 
-    let ev = serde_json::from_str::<EventJson<RumaUnsupportedEvent>>(include_str!(
+    let ev = serde_json::from_str::<Raw<RumaUnsupportedEvent>>(include_str!(
         "../../../test_data/reaction.json"
     ))
     .unwrap()
@@ -129,7 +128,7 @@ fn test_reaction_event() {
     let json = serde_json::to_string_pretty(&ev).unwrap();
     assert_eq!(
         ev,
-        serde_json::from_str::<EventJson<RumaUnsupportedEvent>>(&json)
+        serde_json::from_str::<Raw<RumaUnsupportedEvent>>(&json)
             .unwrap()
             .deserialize()
             .unwrap()

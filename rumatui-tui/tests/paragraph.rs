@@ -1,8 +1,10 @@
-use rumatui_tui::backend::TestBackend;
-use rumatui_tui::buffer::Buffer;
-use rumatui_tui::layout::Alignment;
-use rumatui_tui::widgets::{Block, Borders, Paragraph, Text};
-use rumatui_tui::Terminal;
+use rumatui_tui::{
+    backend::TestBackend,
+    buffer::Buffer,
+    layout::Alignment,
+    widgets::{Block, Borders, Paragraph, Text},
+    Terminal,
+};
 
 const SAMPLE_STRING: &str = "The library is based on the principle of immediate rendering with \
      intermediate buffers. This means that at each new frame you should build all widgets that are \

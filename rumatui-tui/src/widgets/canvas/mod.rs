@@ -4,10 +4,12 @@ mod points;
 mod rectangle;
 mod world;
 
-pub use self::line::Line;
-pub use self::map::{Map, MapResolution};
-pub use self::points::Points;
-pub use self::rectangle::Rectangle;
+pub use self::{
+    line::Line,
+    map::{Map, MapResolution},
+    points::Points,
+    rectangle::Rectangle,
+};
 
 use crate::{
     buffer::Buffer,

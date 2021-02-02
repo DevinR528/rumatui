@@ -13,9 +13,13 @@ use crossterm::{
     terminal::{self, Clear, ClearType},
 };
 
-use crate::backend::Backend;
-use crate::style::{Color, Modifier};
-use crate::{buffer::Cell, layout::Rect, style};
+use crate::{
+    backend::Backend,
+    buffer::Cell,
+    layout::Rect,
+    style,
+    style::{Color, Modifier},
+};
 
 pub struct CrosstermBackend<W: Write> {
     buffer: W,

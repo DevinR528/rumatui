@@ -1,9 +1,11 @@
-use rumatui_tui::backend::TestBackend;
-use rumatui_tui::buffer::Buffer;
-use rumatui_tui::layout::Rect;
-use rumatui_tui::style::{Color, Style};
-use rumatui_tui::widgets::{Block, Borders};
-use rumatui_tui::Terminal;
+use rumatui_tui::{
+    backend::TestBackend,
+    buffer::Buffer,
+    layout::Rect,
+    style::{Color, Style},
+    widgets::{Block, Borders},
+    Terminal,
+};
 
 #[test]
 fn it_draws_a_block() {

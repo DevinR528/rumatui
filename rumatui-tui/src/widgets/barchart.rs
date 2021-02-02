@@ -2,11 +2,13 @@ use std::cmp::{max, min};
 
 use unicode_width::UnicodeWidthStr;
 
-use crate::buffer::Buffer;
-use crate::layout::Rect;
-use crate::style::Style;
-use crate::symbols::bar;
-use crate::widgets::{Block, Widget};
+use crate::{
+    buffer::Buffer,
+    layout::Rect,
+    style::Style,
+    symbols::bar,
+    widgets::{Block, Widget},
+};
 
 /// Display multiple bars in a single widgets
 ///

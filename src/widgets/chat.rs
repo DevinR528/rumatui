@@ -1,17 +1,16 @@
 use std::{
     cell::{Ref, RefCell},
     collections::HashMap,
-    ops::Deref,
     rc::Rc,
-    sync::Arc,
     time::SystemTime,
 };
 
 use matrix_sdk::{
-    api::r0::directory::get_public_rooms_filtered::{self, RoomNetwork},
-    events::room::message::MessageEventContent,
+    api::r0::directory::get_public_rooms_filtered,
+    directory::RoomNetwork,
+    events::AnyMessageEventContent,
     identifiers::{EventId, RoomId, UserId},
-    Room,
+    RoomState,
 };
 use rumatui_tui::{
     backend::Backend,
@@ -19,7 +18,6 @@ use rumatui_tui::{
     Frame,
 };
 use termion::event::MouseButton;
-use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::{
@@ -149,15 +147,10 @@ impl ChatWidget {
         self.current_room.borrow().clone()
     }
 
-    pub(crate) async fn set_room_state(
-        &mut self,
-        rooms: Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
-    ) {
+    pub(crate) async fn set_room_state(&mut self, rooms: HashMap<RoomId, RoomState>) {
         tracing::info!("setting room state");
-        self.messages_widget
-            .populate_initial_msgs(rooms.read().await.deref())
-            .await;
-        self.rooms_widget.populate_rooms(rooms).await;
+        self.messages_widget.populate_initial_msgs(&rooms).await;
+        self.rooms_widget.populate_rooms(&rooms).await;
         self.messages_widget.current_room = Rc::clone(&self.rooms_widget.current_room);
         self.current_room = Rc::clone(&self.rooms_widget.current_room);
         self.room_search_widget.current_room = Rc::clone(&self.rooms_widget.current_room);
@@ -198,7 +191,7 @@ impl ChatWidget {
         self.rooms_widget.invite.as_ref()
     }
 
-    pub(crate) fn rooms(&self) -> &HashMap<RoomId, Arc<RwLock<Room>>> {
+    pub(crate) fn rooms(&self) -> &HashMap<RoomId, RoomState> {
         &self.rooms_widget.rooms
     }
 
@@ -231,10 +224,12 @@ impl ChatWidget {
         self.rooms_widget.remove_invite()
     }
 
-    pub(crate) async fn add_room(&mut self, room: Arc<RwLock<Room>>) {
+    pub(crate) async fn add_room(&mut self, room: &RoomState) {
         tracing::info!("adding room to room list");
-        self.messages_widget.add_room(Arc::clone(&room)).await;
-        self.rooms_widget.add_room(room).await
+        if let RoomState::Joined(joined) = &room {
+            self.messages_widget.add_room(joined.clone()).await;
+        }
+        self.rooms_widget.add_room(&room).await
     }
 
     pub(crate) fn remove_room(&mut self, room: &RoomId) {
@@ -242,7 +237,7 @@ impl ChatWidget {
         self.rooms_widget.remove_room(room)
     }
 
-    pub(crate) async fn invited(&mut self, sender: UserId, room: Arc<RwLock<Room>>) {
+    pub(crate) async fn invited(&mut self, sender: UserId, room: &RoomState) {
         tracing::info!("{} was invited to a room", sender);
         self.rooms_widget.invited(sender, room).await
     }
@@ -303,9 +298,9 @@ impl ChatWidget {
     pub(crate) fn echo_sent_msg(
         &mut self,
         id: &RoomId,
-        name: String,
+        name: &str,
         uuid: Uuid,
-        content: MessageEventContent,
+        content: AnyMessageEventContent,
     ) {
         tracing::info!("echoing sent message");
         self.messages_widget.echo_sent_msg(id, name, uuid, content)
@@ -325,14 +320,18 @@ impl ChatWidget {
         self.messages_widget.clear_send_msg()
     }
 
-    pub(crate) fn get_sending_message(&self) -> Result<MessageEventContent> {
+    pub(crate) fn get_sending_message(&self) -> Result<AnyMessageEventContent> {
         self.messages_widget.get_sending_message()
     }
 
     /// `check_unread` is used when the user is active in a room, we check for any messages
     /// that have not been seen and mark them as seen by sending a read marker/read receipt.
-    pub(crate) async fn check_unread(&mut self, room: Arc<RwLock<Room>>) -> Option<EventId> {
-        self.messages_widget.check_unread(room.read().await.deref())
+    pub(crate) async fn check_unread(&mut self, room: &RoomState) -> Option<EventId> {
+        if let RoomState::Joined(joined) = room {
+            self.messages_widget.check_unread(joined)
+        } else {
+            None
+        }
     }
 
     /// `read_receipt` is used when a message comes in and the user is

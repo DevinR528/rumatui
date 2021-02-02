@@ -2,10 +2,12 @@ use std::iter::{self, Iterator};
 
 use unicode_width::UnicodeWidthStr;
 
-use crate::buffer::Buffer;
-use crate::layout::{Corner, Rect};
-use crate::style::Style;
-use crate::widgets::{Block, StatefulWidget, Text, Widget};
+use crate::{
+    buffer::Buffer,
+    layout::{Corner, Rect},
+    style::Style,
+    widgets::{Block, StatefulWidget, Text, Widget},
+};
 
 #[derive(Copy, Clone, Debug)]
 pub struct ListState {

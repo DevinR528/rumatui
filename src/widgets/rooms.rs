@@ -3,13 +3,12 @@ use std::{
     collections::HashMap,
     ops::{DerefMut, Index, IndexMut},
     rc::Rc,
-    sync::Arc,
 };
 
 use itertools::Itertools;
 use matrix_sdk::{
     identifiers::{RoomId, UserId},
-    Room,
+    RoomState,
 };
 use rumatui_tui::{
     backend::Backend,
@@ -20,7 +19,6 @@ use rumatui_tui::{
 };
 use serde::{Deserialize, Serialize};
 use termion::event::MouseButton;
-use tokio::sync::RwLock;
 
 use crate::widgets::RenderWidget;
 
@@ -135,7 +133,7 @@ pub struct RoomsWidget {
     /// List of displayable room name and room id
     pub names: ListState<(String, RoomId)>,
     /// Map of room id and matrix_sdk::Room
-    pub(crate) rooms: HashMap<RoomId, Arc<RwLock<Room>>>,
+    pub(crate) rooms: HashMap<RoomId, RoomState>,
     /// When a user receives an invitation an alert pops up in the `RoomsWidget` pane
     /// this signals to show that pop up.
     pub(crate) invite: Option<Invitation>,
@@ -152,36 +150,48 @@ impl RoomsWidget {
     ///  * rooms - A `HashMap` of room_id to `Room`.
     pub(crate) async fn populate_rooms(
         &mut self,
-        rooms: Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
+        rooms: &HashMap<RoomId, RoomState>,
     ) -> Option<&RoomId> {
-        self.rooms = rooms.read().await.clone();
+        self.rooms = rooms.clone();
         let mut items: Vec<(String, RoomId)> = Vec::default();
         for (id, room) in &self.rooms {
             // filter duplicate rooms
             if items.iter().any(|(_name, rid)| id == rid) {
                 continue;
             }
-            let r = room.read().await;
             // filter tombstoned rooms
-            if r.tombstone.is_some() {
-                continue;
+            match room {
+                RoomState::Joined(joined) if joined.is_tombstoned() => continue,
+                RoomState::Left(left) if left.is_tombstoned() => continue,
+                RoomState::Invited(_) => continue,
+                RoomState::Joined(joined) => {
+                    items.push((joined.display_name().await.unwrap(), id.clone()));
+                }
+                _ => continue,
             }
-            items.push((r.display_name(), id.clone()));
         }
 
         self.names = ListState::new(items);
         self.names.items.first().map(|r| &r.1)
     }
 
-    pub(crate) async fn add_room(&mut self, room: Arc<RwLock<Room>>) {
+    pub(crate) async fn add_room(&mut self, room: &RoomState) {
         if self.filter_string.is_some() {
             return;
         }
-        let r = room.read().await;
-        let name = r.display_name();
-        let room_id = r.room_id.clone();
 
-        self.rooms.insert(room_id.clone(), Arc::clone(&room));
+        let (name, room_id) = match room {
+            RoomState::Joined(joined) if joined.is_tombstoned() => return,
+            RoomState::Left(left) if left.is_tombstoned() => return,
+            RoomState::Invited(_) => return,
+            RoomState::Joined(joined) => (
+                joined.display_name().await.unwrap(),
+                joined.room_id().clone(),
+            ),
+            _ => return,
+        };
+
+        self.rooms.insert(room_id.clone(), room.clone());
 
         self.names.add_unique(name, room_id)
     }
@@ -216,15 +226,16 @@ impl RoomsWidget {
         }
     }
 
-    pub(crate) async fn invited(&mut self, sender: UserId, room: Arc<RwLock<Room>>) {
-        let r = room.read().await;
-        let room_id = r.room_id.clone();
-        let room_name = r.display_name();
-        self.invite = Some(Invitation {
-            sender,
-            room_id,
-            room_name,
-        });
+    pub(crate) async fn invited(&mut self, sender: UserId, room: &RoomState) {
+        if let RoomState::Invited(r) = room {
+            let room_id = r.room_id().clone();
+            let room_name = r.display_name().await;
+            self.invite = Some(Invitation {
+                sender,
+                room_id,
+                room_name,
+            });
+        }
     }
 
     pub(crate) fn remove_invite(&mut self) {

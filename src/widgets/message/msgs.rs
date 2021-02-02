@@ -1,24 +1,21 @@
 use std::{
     cell::{Cell, RefCell},
     collections::{HashMap, VecDeque},
-    convert::TryFrom,
+    convert::{TryFrom, TryInto},
     fmt,
     ops::Deref,
     rc::Rc,
-    sync::Arc,
     time::{Duration, SystemTime},
 };
 
 use matrix_sdk::{
     events::{
-        room::message::{
-            FormattedBody, MessageEventContent, MessageFormat, RelatesTo, TextMessageEventContent,
-        },
-        AnyPossiblyRedactedSyncMessageEvent, AnySyncMessageEvent, SyncMessageEvent,
+        room::message::{MessageEventContent, TextMessageEventContent},
+        AnyMessageEventContent, AnyPossiblyRedactedSyncMessageEvent, AnySyncMessageEvent,
+        SyncMessageEvent,
     },
     identifiers::{EventId, RoomId, UserId},
-    js_int::UInt,
-    Room,
+    JoinedRoom, RoomState, UInt,
 };
 use rumatui_tui::{
     backend::Backend,
@@ -28,7 +25,6 @@ use rumatui_tui::{
     Frame,
 };
 use termion::event::MouseButton;
-use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::{
@@ -102,33 +98,38 @@ pub struct MessageWidget {
 }
 
 impl MessageWidget {
-    pub async fn populate_initial_msgs(&mut self, rooms: &HashMap<RoomId, Arc<RwLock<Room>>>) {
+    pub async fn populate_initial_msgs(&mut self, rooms: &HashMap<RoomId, RoomState>) {
         for room in rooms.values() {
-            let room = room.read().await;
+            if let RoomState::Joined(room) = room {
+                self.send_msgs.insert(room.room_id().clone(), String::new());
+                let notice = room.unread_notification_counts();
+                self.unread_notifications =
+                    notice.notification_count.try_into().unwrap_or_default();
+                self.unread_notifications += notice.highlight_count.try_into().unwrap_or_default();
 
-            self.send_msgs.insert(room.room_id.clone(), String::new());
-            self.unread_notifications = room.unread_notifications.unwrap_or_default();
-            self.unread_notifications += room.unread_highlight.unwrap_or_default();
-
-            // TODO handle other events
-            for msg in room.messages.iter() {
-                match msg.deref() {
-                    AnyPossiblyRedactedSyncMessageEvent::Regular(
-                        AnySyncMessageEvent::RoomMessage(ev),
-                    ) => self.add_message_event(ev, &room),
-                    _ => {}
-                }
+                // TODO handle other events
+                // for msg in room.messages.iter() {
+                //     match msg.deref() {
+                //         AnyPossiblyRedactedSyncMessageEvent::Regular(
+                //             AnySyncMessageEvent::RoomMessage(ev),
+                //         ) => self.add_message_event(&ev, &room),
+                //         _ => {}
+                //     }
+                // }
             }
         }
     }
 
-    pub async fn add_room(&mut self, room: Arc<RwLock<Room>>) {
-        self.send_msgs
-            .insert(room.read().await.room_id.clone(), String::new());
+    pub async fn add_room(&mut self, room: JoinedRoom) {
+        self.send_msgs.insert(room.room_id().clone(), String::new());
     }
 
     // TODO factor out with AppWidget::process_room_events and MessageWidget::echo_sent_msg
-    fn add_message_event(&mut self, event: &SyncMessageEvent<MessageEventContent>, room: &Room) {
+    async fn add_message_event(
+        &mut self,
+        event: &SyncMessageEvent<MessageEventContent>,
+        room: &JoinedRoom,
+    ) {
         let SyncMessageEvent {
             content,
             sender,
@@ -137,8 +138,14 @@ impl MessageWidget {
             unsigned,
             ..
         } = event;
-        let name = if let Some(mem) = room.joined_members.get(&sender) {
-            mem.name()
+        let name = if let Some(mem) = room
+            .joined_members()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|mem| mem.user_id() == sender)
+        {
+            mem.name().to_owned()
         } else {
             sender.localpart().into()
         };
@@ -175,7 +182,7 @@ impl MessageWidget {
                         reactions: vec![],
                         sent_receipt: false,
                     },
-                    &room.room_id,
+                    room.room_id(),
                 );
             }
             _ => {}
@@ -267,23 +274,19 @@ impl MessageWidget {
         }
     }
 
-    pub fn get_sending_message(&self) -> Result<MessageEventContent> {
+    pub fn get_sending_message(&self) -> Result<AnyMessageEventContent> {
         if let Some(room_id) = self.current_room.borrow().deref() {
             if let Some(to_send) = self.send_msgs.get(room_id) {
                 match self.process_message()? {
-                    MsgType::PlainText => Ok(MessageEventContent::Text(
-                        TextMessageEventContent::new_plain(to_send.as_str()),
+                    MsgType::PlainText => Ok(AnyMessageEventContent::RoomMessage(
+                        MessageEventContent::Text(TextMessageEventContent::plain(to_send)),
                     )),
-                    MsgType::FormattedText => {
-                        Ok(MessageEventContent::Text(TextMessageEventContent {
-                            body: to_send.to_string(),
-                            formatted: Some(FormattedBody {
-                                format: MessageFormat::Html,
-                                body: markdown_to_html(&to_send),
-                            }),
-                            relates_to: None::<RelatesTo>,
-                        }))
-                    }
+                    MsgType::FormattedText => Ok(AnyMessageEventContent::RoomMessage(
+                        MessageEventContent::Text(TextMessageEventContent::html(
+                            to_send,
+                            markdown_to_html(&to_send),
+                        )),
+                    )),
                     _ => todo!("implement more sending messages"),
                 }
             } else {
@@ -299,14 +302,16 @@ impl MessageWidget {
     pub fn echo_sent_msg(
         &mut self,
         id: &RoomId,
-        name: String,
+        name: &str,
         uuid: Uuid,
-        content: MessageEventContent,
+        content: AnyMessageEventContent,
     ) {
         match content {
-            MessageEventContent::Text(TextMessageEventContent {
-                body, formatted, ..
-            }) => {
+            AnyMessageEventContent::RoomMessage(MessageEventContent::Text(
+                TextMessageEventContent {
+                    body, formatted, ..
+                },
+            )) => {
                 let msg = if formatted
                     .as_ref()
                     .map(|f| f.body.to_string())
@@ -325,7 +330,7 @@ impl MessageWidget {
                     text: msg,
                     user: self.me.as_ref().unwrap().clone(),
                     timestamp,
-                    name,
+                    name: name.to_string(),
                     event_id: EventId::try_from("$fakeeventid:rumatui.client").unwrap(),
                     uuid,
                     read: true,
@@ -348,7 +353,7 @@ impl MessageWidget {
 
     pub(crate) fn last_3_msg_event_ids(&self, room: &RoomId) -> Vec<&EventId> {
         if let Some(messages) = self.messages.get(room) {
-            messages[self.messages.len() - 4..]
+            messages[self.messages.len().saturating_sub(4)..]
                 .iter()
                 .map(|msg| &msg.event_id)
                 .collect()
@@ -407,11 +412,12 @@ impl MessageWidget {
         }
     }
 
-    pub fn check_unread(&mut self, room: &Room) -> Option<EventId> {
-        self.unread_notifications = room.unread_notifications.unwrap_or_default();
-        self.unread_notifications += room.unread_highlight.unwrap_or_default();
+    pub fn check_unread(&mut self, room: &JoinedRoom) -> Option<EventId> {
+        let notice = room.unread_notification_counts();
+        self.unread_notifications = notice.notification_count.try_into().unwrap_or_default();
+        self.unread_notifications += notice.highlight_count.try_into().unwrap_or_default();
 
-        if let Some(messages) = self.messages.get_mut(&room.room_id) {
+        if let Some(messages) = self.messages.get_mut(room.room_id()) {
             messages.sort_by(|msg, msg2| msg.timestamp.cmp(&msg2.timestamp));
 
             for msg in messages.iter_mut().rev() {

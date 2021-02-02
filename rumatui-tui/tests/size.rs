@@ -1,5 +1,7 @@
-use rumatui_tui::backend::{Backend, TestBackend};
-use rumatui_tui::Terminal;
+use rumatui_tui::{
+    backend::{Backend, TestBackend},
+    Terminal,
+};
 
 #[test]
 fn buffer_size_limited() {

@@ -1,8 +1,10 @@
-use rumatui_tui::backend::TestBackend;
-use rumatui_tui::layout::Rect;
-use rumatui_tui::style::{Color, Style};
-use rumatui_tui::widgets::{Axis, Block, Borders, Chart, Dataset, Marker};
-use rumatui_tui::Terminal;
+use rumatui_tui::{
+    backend::TestBackend,
+    layout::Rect,
+    style::{Color, Style},
+    widgets::{Axis, Block, Borders, Chart, Dataset, Marker},
+    Terminal,
+};
 
 #[test]
 fn zero_axes_ok() {

@@ -1,11 +1,11 @@
-use std::{io, ops::Deref, sync::Arc, time::SystemTime};
+use std::{io, ops::Deref, time::SystemTime};
 
 use matrix_sdk::{
     api::r0::{
-        directory::get_public_rooms_filtered::RoomNetwork,
         message::get_message_events,
         uiaa::{UiaaInfo, UiaaResponse},
     },
+    directory::RoomNetwork,
     events::{
         room::{
             member::MembershipChange,
@@ -14,7 +14,7 @@ use matrix_sdk::{
         AnySyncMessageEvent, AnySyncRoomEvent, SyncMessageEvent,
     },
     identifiers::{RoomId, UserId},
-    Error as MatrixError, Room,
+    Error as MatrixError, JoinedRoom, RoomState,
 };
 use rumatui_tui::{
     backend::Backend,
@@ -24,11 +24,7 @@ use rumatui_tui::{
     Terminal,
 };
 use termion::event::MouseButton;
-use tokio::{
-    fs as async_fs,
-    runtime::Handle,
-    sync::{mpsc, RwLock},
-};
+use tokio::{fs as async_fs, runtime::Handle, sync::mpsc};
 use uuid::Uuid;
 
 use crate::{
@@ -190,7 +186,19 @@ impl AppWidget {
                     {
                         if let Err(e) = self
                             .send_jobs
-                            .send(UserRequest::RoomSearch(filter, network, Some(next_tkn)))
+                            .send(UserRequest::RoomSearch(
+                                filter,
+                                match network {
+                                    RoomNetwork::All => "all",
+                                    RoomNetwork::Matrix => "matrix",
+                                    RoomNetwork::ThirdParty(s) => s,
+                                    _ => {
+                                        unreachable!("Time to implement more RoomNetwork variants.")
+                                    }
+                                }
+                                .to_string(),
+                                Some(next_tkn),
+                            ))
                             .await
                         {
                             self.set_error(e.into())
@@ -350,7 +358,7 @@ impl AppWidget {
                         let filter = self.chat.search_term().to_string();
                         if let Err(e) = self
                             .send_jobs
-                            .send(UserRequest::RoomSearch(filter, RoomNetwork::Matrix, None))
+                            .send(UserRequest::RoomSearch(filter, "matrix".into(), None))
                             .await
                         {
                             self.set_error(Error::from(e));
@@ -366,11 +374,9 @@ impl AppWidget {
                         let room_id = self.chat.to_current_room_id();
                         if !self.typing_notice {
                             self.typing_notice = true;
-                            if let (Some(me), Some(room_id)) =
-                                (self.chat.to_current_user(), room_id)
-                            {
+                            if let Some(room_id) = room_id {
                                 if let Err(e) =
-                                    self.send_jobs.send(UserRequest::Typing(room_id, me)).await
+                                    self.send_jobs.send(UserRequest::Typing(room_id)).await
                                 {
                                     self.set_error(Error::from(e));
                                 }
@@ -445,23 +451,28 @@ impl AppWidget {
                     } else {
                         // find the room the message was just sent to
                         let local_message = if let Some(room) = self.chat.rooms().get(&room_id) {
-                            let r = room.read().await;
-                            let matrix_sdk::Room { joined_members, .. } = r.deref();
-                            let name = if let Some(mem) =
-                                joined_members.get(self.chat.as_current_user().unwrap())
-                            {
-                                mem.name()
+                            if let RoomState::Joined(joined_room) = room.deref() {
+                                let name = if let Some(mem) = joined_room
+                                    .get_member(self.chat.as_current_user().unwrap())
+                                    .await
+                                    .unwrap()
+                                {
+                                    mem.name().to_string()
+                                } else {
+                                    self.chat.as_current_user().unwrap().localpart().into()
+                                };
+                                Some(name)
                             } else {
-                                self.chat.as_current_user().unwrap().localpart().into()
-                            };
-                            Some(name)
+                                None
+                            }
                         } else {
                             None
                         };
 
                         if let Some(name) = local_message {
-                            self.chat.echo_sent_msg(&room_id, name, uuid, message);
+                            self.chat.echo_sent_msg(&room_id, &name, uuid, message);
                         }
+
                         self.chat.clear_send_msg();
                         Ok(())
                     }
@@ -483,9 +494,14 @@ impl AppWidget {
             self.ev_loop.start_sync();
         }
 
-        // this will login, send messages, and any other user initiated requests
-        match self.ev_msgs.try_recv() {
-            Ok(res) => match res {
+        let sleep = tokio::time::sleep(std::time::Duration::from_millis(20));
+        tokio::pin!(sleep);
+
+        tokio::select! {
+            _ = &mut sleep => {
+                return;
+            }
+            Some(res) = self.ev_msgs.recv() => match res {
                 RequestResult::Login(res) => match res {
                     Err(e) => {
                         self.login_w.logging_in = false;
@@ -682,13 +698,7 @@ impl AppWidget {
                 // sync error
                 RequestResult::Error(err) => self.set_error(err),
             },
-            _ => {}
-        }
-
-        // this updates the state of the UI based on events from the server
-        // non user initiated events.
-        match self.emitter_msgs.try_recv() {
-            Ok(res) => match res {
+            Some(res) = self.emitter_msgs.recv() => match res {
                 StateResult::Member {
                     sender,
                     receiver,
@@ -698,7 +708,11 @@ impl AppWidget {
                 } => {
                     let invitation = matches!(membership, MembershipChange::Invited);
 
-                    let room_id = room.read().await.room_id.clone();
+                    let room_id = match &room {
+                        RoomState::Joined(r) => r.room_id().clone(),
+                        RoomState::Invited(r) => r.room_id().clone(),
+                        RoomState::Left(r) => r.room_id().clone(),
+                    };
 
                     // only display notifications for the current room
                     if self.chat.is_current_room(&room_id)
@@ -716,7 +730,7 @@ impl AppWidget {
                             membership,
                             receiver,
                             sender,
-                            room,
+                            &room,
                             timeline_event,
                             show_room_name,
                         )
@@ -789,7 +803,6 @@ impl AppWidget {
                 }
                 _ => {}
             },
-            _ => {}
         }
     }
 
@@ -805,7 +818,7 @@ impl AppWidget {
         let room_id = self.chat.to_current_room_id();
         if let Some(id) = room_id {
             let room = if let Some(room) = self.chat.rooms().get(&id) {
-                Some(Arc::clone(room))
+                Some(room.clone())
             } else {
                 None
             };
@@ -813,7 +826,7 @@ impl AppWidget {
                 // the user has interacted with the app
                 self.last_interaction = SystemTime::now();
 
-                if let Some(event_id) = self.chat.check_unread(room).await {
+                if let Some(event_id) = self.chat.check_unread(&room).await {
                     self.send_jobs
                         .send(UserRequest::ReadReceipt(id.clone(), event_id))
                         .await
@@ -865,14 +878,14 @@ impl AppWidget {
     async fn process_room_events(
         &mut self,
         events: get_message_events::Response,
-        room: Arc<RwLock<Room>>,
+        room: JoinedRoom,
     ) {
         for ev in events.chunk {
             if let Ok(ref e) = serde_json::from_str::<AnySyncRoomEvent>(ev.json().get()) {
                 // matrix-sdk does not mutate the room on past events
                 // rooms are only mutated for present events, so we must handle the past
                 // events so when saved to the database the room is accurate with the current state
-                room.write().await.receive_timeline_event(&e);
+                // room.write().await.receive_timeline_event(&e);
 
                 match e {
                     AnySyncRoomEvent::Message(AnySyncMessageEvent::RoomMessage(msg)) => {
@@ -885,13 +898,15 @@ impl AppWidget {
                             ..
                         } = msg;
 
-                        let name = {
-                            let m = room.read().await;
-                            m.joined_members
-                                .get(&sender)
-                                .map(|m| m.name())
-                                .unwrap_or(sender.localpart().to_string())
-                        };
+                        let name = room
+                            .joined_members()
+                            .await
+                            .unwrap()
+                            .iter()
+                            .find(|mem| mem.user_id() == sender)
+                            .map(|mem| mem.display_name().map(|s| s.to_string()))
+                            .flatten()
+                            .unwrap_or(sender.localpart().to_string());
 
                         match content {
                             MessageEventContent::Text(TextMessageEventContent {
@@ -929,11 +944,12 @@ impl AppWidget {
                                     reactions: vec![],
                                     sent_receipt: false,
                                 };
-                                self.chat.add_message(msg, &room.read().await.room_id)
+                                self.chat.add_message(msg, room.room_id())
                             }
                             _ => {}
                         }
                     }
+                    AnySyncRoomEvent::State(_) => {}
                     _ => {}
                 }
             }
@@ -945,16 +961,15 @@ impl AppWidget {
         membership: MembershipChange,
         receiver: UserId,
         sender: UserId,
-        room: Arc<RwLock<Room>>,
+        room: &RoomState,
         timeline_event: bool,
-        show_room_name: bool,
+        _show_room_name: bool,
     ) {
         let for_me = Some(&receiver) == self.chat.as_current_user();
-        let room_id = room.read().await.room_id.clone();
-        let room_name = if show_room_name {
-            format!("\"{}\"", room.read().await.display_name())
-        } else {
-            "the room".to_string()
+        let (room_id, room_name) = match room {
+            RoomState::Joined(r) => (r.room_id().clone(), r.display_name().await.unwrap()),
+            RoomState::Left(r) => (r.room_id().clone(), r.display_name().await.unwrap()),
+            RoomState::Invited(r) => (r.room_id().clone(), r.display_name().await),
         };
         match membership {
             MembershipChange::ProfileChanged { .. } => self

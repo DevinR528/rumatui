@@ -10,24 +10,24 @@ use std::{
 use matrix_sdk::{
     api::r0::{
         account::register,
-        directory::get_public_rooms_filtered::{self, RoomNetwork},
+        directory::get_public_rooms_filtered,
         membership::{join_room_by_id, leave_room},
-        message::{create_message_event, get_message_events},
-        // receipt::create_receipt,
+        message::{get_message_events, send_message_event},
         read_marker::set_read_marker,
         session::login,
         typing::create_typing_event,
     },
-    events::room::message::MessageEventContent,
+    deserialized_responses::SyncResponse,
+    events::{
+        room::message::MessageEventContent, AnyMessageEventContent, AnySyncMessageEvent,
+        AnySyncRoomEvent, AnyToDeviceEvent,
+    },
     identifiers::{EventId, RoomId, UserId},
-    Room,
+    Client, JoinedRoom, LoopCtrl, RoomState, Sas, SyncSettings,
 };
 use tokio::{
     runtime::Handle,
-    sync::{
-        mpsc::{self, Sender},
-        RwLock,
-    },
+    sync::mpsc::{self, Sender},
     task::JoinHandle,
 };
 use uuid::Uuid;
@@ -37,6 +37,51 @@ use crate::{
     error::{Error, Result},
 };
 
+async fn wait_for_confirmation(client: Client, sas: Sas) {
+    println!("Does the emoji match: {:?}", sas.emoji());
+
+    let mut input = String::new();
+    std::io::stdin()
+        .read_line(&mut input)
+        .expect("error: unable to read user input");
+
+    match input.trim().to_lowercase().as_ref() {
+        "yes" | "true" | "ok" => {
+            sas.confirm().await.unwrap();
+
+            if sas.is_done() {
+                print_result(&sas);
+                print_devices(sas.other_device().user_id(), &client).await;
+            }
+        }
+        _ => sas.cancel().await.unwrap(),
+    }
+}
+
+fn print_result(sas: &Sas) {
+    let device = sas.other_device();
+
+    println!(
+        "Successfully verified device {} {} {:?}",
+        device.user_id(),
+        device.device_id(),
+        device.local_trust_state()
+    );
+}
+
+async fn print_devices(user_id: &UserId, client: &Client) {
+    println!("Devices of user {}", user_id);
+
+    for device in client.get_user_devices(user_id).await.unwrap().devices() {
+        println!(
+            "   {:<10} {:<30} {:<}",
+            device.device_id(),
+            device.display_name().as_deref().unwrap_or_default(),
+            device.is_trusted()
+        );
+    }
+}
+
 /// Requests sent from the UI portion of the app.
 ///
 /// Each request is sent in response to some user input.
@@ -45,15 +90,15 @@ use crate::{
 pub enum UserRequest {
     Login(String, String),
     Register(String, String),
-    SendMessage(RoomId, MessageEventContent, Uuid),
+    SendMessage(RoomId, AnyMessageEventContent, Uuid),
     RoomMsgs(RoomId),
     AcceptInvite(RoomId),
     DeclineInvite(RoomId),
     JoinRoom(RoomId),
     LeaveRoom(RoomId),
-    Typing(RoomId, UserId),
+    Typing(RoomId),
     ReadReceipt(RoomId, EventId),
-    RoomSearch(String, RoomNetwork, Option<String>),
+    RoomSearch(String, String, Option<String>),
     UiaaPing(String),
     UiaaDummy(String),
     Quit,
@@ -63,15 +108,10 @@ unsafe impl Send for UserRequest {}
 /// Either a `UserRequest` succeeds or fails with the given result.
 #[allow(clippy::type_complexity)]
 pub enum RequestResult {
-    Login(
-        Result<(
-            Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
-            login::Response,
-        )>,
-    ),
+    Login(Result<(HashMap<RoomId, RoomState>, login::Response)>),
     Register(Result<register::Response>),
-    SendMessage(Result<create_message_event::Response>),
-    RoomMsgs(Result<(get_message_events::Response, Arc<RwLock<Room>>)>),
+    SendMessage(Result<send_message_event::Response>),
+    RoomMsgs(Result<(get_message_events::Response, JoinedRoom)>),
     AcceptInvite(Result<join_room_by_id::Response>),
     DeclineInvite(Result<leave_room::Response>, RoomId),
     LeaveRoom(Result<leave_room::Response>, RoomId),
@@ -98,7 +138,7 @@ unsafe impl Send for MatrixEventHandle {}
 impl MatrixEventHandle {
     pub async fn new(
         stream: EventStream,
-        mut to_app: Sender<RequestResult>,
+        to_app: Sender<RequestResult>,
         exec_hndl: Handle,
         homeserver: &str,
     ) -> (Self, Sender<UserRequest>) {
@@ -121,14 +161,113 @@ impl MatrixEventHandle {
                     return Ok(());
                 }
 
-                std::sync::atomic::spin_loop_hint();
+                core::hint::spin_loop();
             }
 
             if quitting.load(Ordering::SeqCst) {
                 return Ok(());
             }
+            let client_ref = &cli;
+            let initial_sync = Arc::new(AtomicBool::from(true));
+            let initial_ref = &initial_sync;
+
             let set = matrix_sdk::SyncSettings::default();
-            cli.sync_forever(set.clone(), |_| async {}).await;
+            cli.sync_with_callback(set.clone(), |response| async move {
+                let client = &client_ref;
+                let initial = &initial_ref;
+
+                for event in &response.to_device.events {
+                    match event {
+                        AnyToDeviceEvent::KeyVerificationStart(e) => {
+                            let sas = client
+                                .get_verification(&e.content.transaction_id)
+                                .await
+                                .expect("Sas object wasn't created");
+                            println!(
+                                "Starting verification with {} {}",
+                                &sas.other_device().user_id(),
+                                &sas.other_device().device_id()
+                            );
+                            print_devices(&e.sender, &client).await;
+                            sas.accept().await.unwrap();
+                        }
+
+                        AnyToDeviceEvent::KeyVerificationKey(e) => {
+                            let sas = client
+                                .get_verification(&e.content.transaction_id)
+                                .await
+                                .expect("Sas object wasn't created");
+
+                            tokio::spawn(wait_for_confirmation((*client).clone(), sas));
+                        }
+
+                        AnyToDeviceEvent::KeyVerificationMac(e) => {
+                            let sas = client
+                                .get_verification(&e.content.transaction_id)
+                                .await
+                                .expect("Sas object wasn't created");
+
+                            if sas.is_done() {
+                                print_result(&sas);
+                                print_devices(&e.sender, &client).await;
+                            }
+                        }
+
+                        _ => (),
+                    }
+                }
+
+                if !initial.load(Ordering::SeqCst) {
+                    for (_room_id, room_info) in response.rooms.join {
+                        for event in room_info.timeline.events {
+                            if let AnySyncRoomEvent::Message(event) = event {
+                                match event {
+                                    AnySyncMessageEvent::RoomMessage(m) => {
+                                        if let MessageEventContent::VerificationRequest(_) =
+                                            &m.content
+                                        {
+                                            let request = client
+                                                .get_verification_request(&m.event_id)
+                                                .await
+                                                .expect("Request object wasn't created");
+
+                                            request
+                                                .accept()
+                                                .await
+                                                .expect("Can't accept verification request");
+                                        }
+                                    }
+                                    AnySyncMessageEvent::KeyVerificationKey(e) => {
+                                        let sas = client
+                                            .get_verification(&e.content.relation.event_id.as_str())
+                                            .await
+                                            .expect("Sas object wasn't created");
+
+                                        tokio::spawn(wait_for_confirmation((*client).clone(), sas));
+                                    }
+                                    AnySyncMessageEvent::KeyVerificationMac(e) => {
+                                        let sas = client
+                                            .get_verification(&e.content.relation.event_id.as_str())
+                                            .await
+                                            .expect("Sas object wasn't created");
+
+                                        if sas.is_done() {
+                                            print_result(&sas);
+                                            print_devices(&e.sender, &client).await;
+                                        }
+                                    }
+                                    _ => (),
+                                }
+                            }
+                        }
+                    }
+                }
+
+                initial.store(false, Ordering::SeqCst);
+
+                LoopCtrl::Continue
+            })
+            .await;
             Ok(())
         });
 
@@ -143,14 +282,14 @@ impl MatrixEventHandle {
                 match input.unwrap() {
                     UserRequest::Quit => return Ok(()),
                     UserRequest::Login(u, p) => {
-                        let res = client.login(u, p).await;
+                        let res = client.login(&u, &p).await;
                         if let Err(e) = to_app.send(RequestResult::Login(res)).await {
                             tracing::error!("client event handler crashed {}", e);
                             panic!("client event handler crashed {}", e)
                         }
                     }
                     UserRequest::Register(u, p) => {
-                        let res = client.register_user(u, p).await;
+                        let res = client.register_user(&u, &p).await;
                         if let Err(e) = to_app.send(RequestResult::Register(res)).await {
                             tracing::error!("client event handler crashed {}", e);
                             panic!("client event handler crashed {}", e)
@@ -194,15 +333,12 @@ impl MatrixEventHandle {
                             if let Err(e) = to_app
                                 .send(RequestResult::RoomMsgs(Ok((
                                     res,
-                                    Arc::clone(
-                                        client
-                                            .inner
-                                            .joined_rooms()
-                                            .read()
-                                            .await
-                                            .get(&room_id)
-                                            .unwrap(),
-                                    ),
+                                    client
+                                        .inner
+                                        .joined_rooms()
+                                        .into_iter()
+                                        .find(|r| r.room_id() == &room_id)
+                                        .unwrap(),
                                 ))))
                                 .await
                             {
@@ -210,9 +346,9 @@ impl MatrixEventHandle {
                                 panic!("client event handler crashed {}", e)
                             } else {
                                 // store state after receiving past events incase a sync_forever call only found a few messages
-                                if client.store_room_state(&room_id).await.is_err() {
-                                    // TODO log that an error happened at some point
-                                }
+                                // if client.store_room_state(&room_id).await.is_err() {
+                                // TODO log that an error happened at some point
+                                // }
                             }
                         }
                         Err(get_msg_err) => {
@@ -223,7 +359,10 @@ impl MatrixEventHandle {
                         }
                     },
                     UserRequest::RoomSearch(filter, network, tkn) => {
-                        match client.get_rooms_filtered(&filter, network, tkn).await {
+                        match client
+                            .get_rooms_filtered(&filter, &network, tkn.as_deref())
+                            .await
+                        {
                             Ok(res) => {
                                 if let Err(e) =
                                     to_app.send(RequestResult::RoomSearch(Ok(res))).await
@@ -304,14 +443,9 @@ impl MatrixEventHandle {
                             panic!("client event handler crashed {}", e)
                         }
                     }
-                    UserRequest::Typing(room_id, user_id) => {
+                    UserRequest::Typing(room_id) => {
                         let res = client
-                            .typing_notice(
-                                &room_id,
-                                &user_id,
-                                true,
-                                Some(Duration::from_millis(3000)),
-                            )
+                            .typing_notice(&room_id, true, Some(Duration::from_millis(3000)))
                             .await;
                         if let Err(e) = to_app.send(RequestResult::Typing(res)).await {
                             tracing::error!("client event handler crashed {}", e);

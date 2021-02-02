@@ -7,6 +7,7 @@
 
 use std::{env, fs, io, path::Path, process, time::Duration};
 
+pub use ruma_api::exports::ruma_serde;
 use rumatui_tui::{backend::TermionBackend, Terminal};
 use termion::{
     event::{Event as TermEvent, Key, MouseButton, MouseEvent},
@@ -87,9 +88,7 @@ fn main() -> Result<(), failure::Error> {
         EnvFilter::DEFAULT_ENV.to_string()
     };
 
-    let mut runtime = tokio::runtime::Builder::new()
-        .basic_scheduler()
-        .threaded_scheduler()
+    let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();

@@ -1,5 +1,6 @@
 use matrix_sdk::{
     api::r0::{account::register::Response as RegisterResponse, uiaa::UiaaResponse},
+    assign,
     identifiers::{DeviceId, UserId},
 };
 use serde::{Deserialize, Serialize};
@@ -16,7 +17,7 @@ ruma_api::ruma_api! {
         name: "register",
         path: "/_matrix/client/r0/register?kind=user",
         rate_limited: true,
-        requires_authentication: false,
+        authentication: None,
     }
 
     request: {
@@ -33,19 +34,19 @@ ruma_api::ruma_api! {
     error: UiaaResponse
 }
 
-impl Into<RegisterResponse> for Response {
-    fn into(self) -> RegisterResponse {
-        RegisterResponse {
-            access_token: self.access_token,
-            user_id: self.user_id,
-            device_id: self.device_id,
-        }
+impl From<Response> for RegisterResponse {
+    fn from(res: Response) -> RegisterResponse {
+        assign!(RegisterResponse::new(res.user_id), {
+            access_token: res.access_token,
+            device_id: res.device_id,
+        })
     }
 }
 
 pub mod dummy {
     use matrix_sdk::{
         api::r0::{account::register::Response as RegisterResponse, uiaa::UiaaResponse},
+        assign,
         identifiers::{DeviceId, UserId},
     };
 
@@ -63,7 +64,7 @@ pub mod dummy {
             name: "register",
             path: "/_matrix/client/r0/register?kind=user",
             rate_limited: true,
-            requires_authentication: false,
+            authentication: None,
         }
 
         request: {
@@ -80,13 +81,12 @@ pub mod dummy {
         error: UiaaResponse
     }
 
-    impl Into<RegisterResponse> for Response {
-        fn into(self) -> RegisterResponse {
-            RegisterResponse {
-                access_token: self.access_token,
-                user_id: self.user_id,
-                device_id: self.device_id,
-            }
+    impl From<Response> for RegisterResponse {
+        fn from(res: Response) -> RegisterResponse {
+            assign!(RegisterResponse::new(res.user_id), {
+                access_token: res.access_token,
+                device_id: res.device_id,
+            })
         }
     }
 }

@@ -1,10 +1,12 @@
 use std::cmp::min;
 
-use crate::buffer::Buffer;
-use crate::layout::Rect;
-use crate::style::Style;
-use crate::symbols::bar;
-use crate::widgets::{Block, Widget};
+use crate::{
+    buffer::Buffer,
+    layout::Rect,
+    style::Style,
+    symbols::bar,
+    widgets::{Block, Widget},
+};
 
 /// Widget to render a sparkline over one or more lines.
 ///

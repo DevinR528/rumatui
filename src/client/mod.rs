@@ -1,23 +1,26 @@
-use std::{collections::HashMap, fmt, path::Path, sync::Arc, time::Duration};
+use std::{collections::HashMap, fmt, path::Path, time::Duration};
 
+use create_typing_event::Typing;
 use matrix_sdk::{
     self,
     api::r0::{
         account::register::{self, RegistrationKind},
-        directory::get_public_rooms_filtered::{self, Filter, RoomNetwork},
+        directory::get_public_rooms_filtered,
         membership::{forget_room, join_room_by_id, kick_user, leave_room},
-        message::{create_message_event, get_message_events},
+        message::{get_message_events, send_message_event},
         read_marker::set_read_marker,
         receipt::create_receipt,
         session::login,
         typing::create_typing_event,
+        uiaa::AuthData,
     },
-    events::room::message::MessageEventContent,
+    assign,
+    directory::{Filter, RoomNetwork},
+    events::AnyMessageEventContent,
     identifiers::{EventId, RoomId, UserId},
-    Client, ClientConfig, JsonStore, RegistrationBuilder, Room, RoomListFilterBuilder,
-    SyncSettings,
+    Client, ClientConfig, RoomState, SyncSettings,
 };
-use tokio::{fs as async_fs, sync::RwLock};
+use tokio::fs as async_fs;
 use url::Url;
 use uuid::Uuid;
 
@@ -41,17 +44,17 @@ const RUMATUI_ID: &str = "rumatui command line client (WINDOWS)";
 const RUMATUI_ID: &str = "rumatui command line client (MAC)";
 
 #[derive(Clone)]
-pub struct MatrixClient {
+pub struct MatrixClient<'a> {
     pub inner: Client,
     homeserver: Url,
     user: Option<UserId>,
-    settings: SyncSettings,
+    settings: SyncSettings<'a>,
     next_batch: Option<String>,
     last_scroll: HashMap<RoomId, String>,
 }
-unsafe impl Send for MatrixClient {}
+unsafe impl<'a> Send for MatrixClient<'a> {}
 
-impl fmt::Debug for MatrixClient {
+impl<'a> fmt::Debug for MatrixClient<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MatrixClient")
             .field("user", &self.user)
@@ -59,17 +62,15 @@ impl fmt::Debug for MatrixClient {
     }
 }
 
-impl MatrixClient {
+impl<'a> MatrixClient<'a> {
     pub fn new(homeserver: &str) -> Result<Self> {
         let homeserver = Url::parse(&homeserver)?;
         let path: &Path = crate::RUMATUI_DIR.as_ref().unwrap();
 
-        let store: Result<JsonStore> = JsonStore::open(path).map_err(Into::into);
         // reset the client with the state store with username as part of the store path
-        let client_config = ClientConfig::default()
-            // .proxy("http://localhost:8080")? // for mitmproxy
-            // .disable_ssl_verification()
-            .state_store(Box::new(store?));
+        let client_config = ClientConfig::default().store_path(path);
+        // .proxy("http://localhost:8080")? // for mitmproxy
+        // .disable_ssl_verification();
 
         let inner: Result<Client> =
             Client::new_with_config(homeserver.clone(), client_config).map_err(Into::into);
@@ -90,27 +91,12 @@ impl MatrixClient {
         self.next_batch.clone()
     }
 
-    /// Joins the specified room.
-    ///
-    /// # Arguments
-    ///
-    /// * room_id - A valid RoomId otherwise sending will fail.
-    pub(crate) async fn store_room_state(&self, room_id: &RoomId) -> Result<()> {
-        self.inner
-            .store_room_state(room_id)
-            .await
-            .map_err(Into::into)
-    }
-
     /// Log in to as the specified user.
     pub(crate) async fn login(
         &mut self,
-        username: String,
-        password: String,
-    ) -> Result<(
-        Arc<RwLock<HashMap<RoomId, Arc<RwLock<Room>>>>>,
-        login::Response,
-    )> {
+        username: &str,
+        password: &str,
+    ) -> Result<(HashMap<RoomId, RoomState>, login::Response)> {
         // this would have caused `main()` to throw an error so unwrap here is ok
         let mut path = crate::RUMATUI_DIR.as_ref().unwrap().to_path_buf();
         path.push(".device-id.txt");
@@ -118,14 +104,14 @@ impl MatrixClient {
 
         let res = self
             .inner
-            .login(username, password, device_id, Some(RUMATUI_ID.to_string()))
+            .login(username, password, device_id.as_deref(), Some(RUMATUI_ID))
             .await?;
 
         self.user = Some(res.user_id.clone());
 
         let _response = self
             .inner
-            .sync(
+            .sync_once(
                 SyncSettings::default()
                     .timeout(SYNC_TIMEOUT)
                     .full_state(false),
@@ -133,39 +119,55 @@ impl MatrixClient {
             .await?;
 
         self.next_batch = self.inner.sync_token().await;
-        Ok((self.inner.joined_rooms(), res))
+        Ok((
+            self.inner
+                .joined_rooms()
+                .into_iter()
+                .map(|room| (room.room_id().clone(), RoomState::Joined(room)))
+                .chain(
+                    self.inner
+                        .invited_rooms()
+                        .into_iter()
+                        .map(|room| (room.room_id().clone(), RoomState::Invited(room))),
+                )
+                .chain(
+                    self.inner
+                        .left_rooms()
+                        .into_iter()
+                        .map(|room| (room.room_id().clone(), RoomState::Left(room))),
+                )
+                .collect(),
+            res,
+        ))
     }
 
     /// Create an account for the Matrix server used when starting the app.
     pub(crate) async fn register_user(
         &mut self,
-        username: String,
-        password: String,
+        username: &str,
+        password: &str,
     ) -> Result<register::Response> {
-        let mut req = RegistrationBuilder::default();
-
         // this would have caused `main()` to throw an error so unwrap here is ok
         let mut path = crate::RUMATUI_DIR.as_ref().unwrap().to_path_buf();
         path.push(".device-id.txt");
         let device_id = async_fs::read_to_string(path).await.ok();
+        let device_id = device_id.as_deref().map(Into::into);
 
-        if let Some(device) = device_id {
-            req.device_id(device);
-        } else {
-            tracing::info!("No device_id file found for register request");
-        }
+        let req = assign!(register::Request::new(), {
+            username: Some(username),
+            password: Some(password),
+            auth: Some(AuthData::FallbackAcknowledgement { session: "foobar" }),
+            device_id,
+            initial_device_display_name: Some(RUMATUI_ID),
+            kind: RegistrationKind::User,
+        });
 
-        req.initial_device_display_name(RUMATUI_ID)
-            .password(&password)
-            .username(&username)
-            .kind(RegistrationKind::User);
-
-        self.inner.register_user(req).await.map_err(Into::into)
+        self.inner.register(req).await.map_err(Into::into)
     }
 
     pub(crate) async fn send_uiaa_ping(&mut self, session: String) -> Result<auth::Response> {
         self.inner
-            .send_uiaa(auth::Request {
+            .send(auth::Request {
                 auth: SessionObj { session },
             })
             .await
@@ -174,7 +176,7 @@ impl MatrixClient {
 
     pub(crate) async fn send_uiaa_dummy(&mut self, session: String) -> Result<dummy::Response> {
         self.inner
-            .send_uiaa(dummy::Request {
+            .send(dummy::Request {
                 auth: dummy::Dummy {
                     ev_type: "m.login.dummy".to_string(),
                     session: session.to_string(),
@@ -187,13 +189,13 @@ impl MatrixClient {
     /// Manually sync state, provides a default sync token if None is given.
     ///
     /// This can be useful when joining a room, we need the state from before our sync_token.
-    pub(crate) async fn sync(&mut self, setting: Option<SyncSettings>) -> Result<()> {
+    pub(crate) async fn sync(&mut self, setting: Option<SyncSettings<'_>>) -> Result<()> {
         let settings = setting.unwrap_or(
             SyncSettings::default()
                 .timeout(SYNC_TIMEOUT)
                 .full_state(false),
         );
-        let _response = self.inner.sync(settings).await?;
+        let _response = self.inner.sync_once(settings).await;
 
         self.next_batch = self.inner.sync_token().await;
         Ok(())
@@ -209,9 +211,9 @@ impl MatrixClient {
     pub(crate) async fn send_message(
         &self,
         id: &RoomId,
-        msg: MessageEventContent,
+        msg: AnyMessageEventContent,
         uuid: Uuid,
-    ) -> Result<create_message_event::Response> {
+    ) -> Result<send_message_event::Response> {
         self.inner
             .room_send(&id, msg, Some(uuid))
             .await
@@ -235,18 +237,13 @@ impl MatrixClient {
         } else {
             self.next_batch.as_ref().unwrap().clone()
         };
-        let request = get_message_events::Request {
-            room_id: id.clone(),
-            from,
-            to: None,
-            dir: get_message_events::Direction::Backward,
-            limit: js_int::UInt::new(30).unwrap(),
-            filter: None,
-            // filter: Some(RoomEventFilter {
-            //     lazy_load_options: LazyLoadOptions::Enabled { include_redundant_members: false, },
-            //     .. Default::default()
-            // }),
-        };
+        let mut request = get_message_events::Request::backward(id, &from);
+        request.limit = matrix_sdk::uint!(30);
+        request.filter = None;
+        // Some(RoomEventFilter {
+        //     lazy_load_options: LazyLoadOptions::Enabled { include_redundant_members: false, },
+        //     .. Default::default()
+        // })
 
         match self.inner.room_messages(request).await {
             Ok(res) => {
@@ -262,24 +259,24 @@ impl MatrixClient {
     pub(crate) async fn get_rooms_filtered(
         &mut self,
         filter: &str,
-        network: RoomNetwork,
-        token: Option<String>,
+        network: &str,
+        token: Option<&str>,
     ) -> Result<get_public_rooms_filtered::Response> {
-        let filter = if filter.is_empty() {
+        let generic_search_term = if filter.is_empty() {
             None
         } else {
-            Some(filter.to_string())
+            Some(filter)
         };
-        let mut request = RoomListFilterBuilder::new();
-        request
-            .filter(Filter {
-                generic_search_term: filter,
-            })
-            .room_network(network);
-
-        if let Some(tkn) = token {
-            request.since(tkn);
-        }
+        let filter = assign!(Filter::new(), { generic_search_term });
+        let request = assign!(get_public_rooms_filtered::Request::new(), {
+            filter,
+            since: token,
+            room_network: match network {
+                "matrix" => RoomNetwork::Matrix,
+                "all" => RoomNetwork::All,
+                s => RoomNetwork::ThirdParty(s),
+            },
+        });
 
         self.inner
             .public_rooms_filtered(request)
@@ -336,7 +333,7 @@ impl MatrixClient {
         &self,
         room_id: &RoomId,
         user_id: &UserId,
-        reason: Option<String>,
+        reason: Option<&str>,
     ) -> Result<kick_user::Response> {
         self.inner
             .kick_user(room_id, user_id, reason)
@@ -360,12 +357,16 @@ impl MatrixClient {
     pub async fn typing_notice(
         &self,
         room_id: &RoomId,
-        user_id: &UserId,
         typing: bool,
         timeout: Option<Duration>,
     ) -> Result<create_typing_event::Response> {
+        let typing = if typing {
+            Typing::Yes(timeout.unwrap_or_else(|| Duration::from_secs(5)))
+        } else {
+            Typing::No
+        };
         self.inner
-            .typing_notice(room_id, user_id, typing, timeout)
+            .typing_notice(room_id, typing)
             .await
             .map_err(Into::into)
     }

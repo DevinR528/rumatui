@@ -114,7 +114,8 @@ impl From<MatrixError> for Error {
                 _ => panic!("ruma-client-api errors have changed rumatui BUG"),
             },
             MatrixError::MatrixError(err) => match err {
-                MatrixBaseError::StateStore(err) => Error::Matrix(err),
+                // TODO: There is now a state store error...
+                MatrixBaseError::StateStore(err) => Error::Matrix(err.to_string()),
                 MatrixBaseError::SerdeJson(err) => Error::SerdeJson(err),
                 MatrixBaseError::AuthenticationRequired => Error::NeedAuth(
                     "An unauthenticated request was made that requires authentication".into(),
@@ -132,7 +133,7 @@ impl From<MatrixError> for Error {
 impl From<MatrixBaseError> for Error {
     fn from(err: MatrixBaseError) -> Self {
         match err {
-            MatrixBaseError::StateStore(err) => Error::Matrix(err),
+            MatrixBaseError::StateStore(err) => Error::Matrix(err.to_string()),
             MatrixBaseError::SerdeJson(err) => Error::SerdeJson(err),
             MatrixBaseError::AuthenticationRequired => Error::NeedAuth(
                 "An unauthenticated request was made that requires authentication".into(),
@@ -151,7 +152,7 @@ impl From<IntoHttpError> for Error {
     }
 }
 
-impl From<SendError<UserRequest>> for Error {
+impl<'a> From<SendError<UserRequest>> for Error {
     fn from(error: SendError<UserRequest>) -> Self {
         let text = format!("{}", error);
         Self::RumaRequest(text)

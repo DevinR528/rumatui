@@ -14,19 +14,19 @@ mod sparkline;
 mod table;
 mod tabs;
 
-pub use self::barchart::BarChart;
-pub use self::block::{Block, BorderType};
-pub use self::chart::{Axis, Chart, Dataset, GraphType, Marker};
-pub use self::gauge::Gauge;
-pub use self::list::{List, ListState};
-pub use self::paragraph::Paragraph;
-pub use self::sparkline::Sparkline;
-pub use self::table::{Row, Table, TableState};
-pub use self::tabs::Tabs;
+pub use self::{
+    barchart::BarChart,
+    block::{Block, BorderType},
+    chart::{Axis, Chart, Dataset, GraphType, Marker},
+    gauge::Gauge,
+    list::{List, ListState},
+    paragraph::Paragraph,
+    sparkline::Sparkline,
+    table::{Row, Table, TableState},
+    tabs::Tabs,
+};
 
-use crate::buffer::Buffer;
-use crate::layout::Rect;
-use crate::style::Style;
+use crate::{buffer::Buffer, layout::Rect, style::Style};
 
 bitflags! {
     /// Bitflags that can be composed to set the visible borders essentially on the block widget.

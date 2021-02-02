@@ -1,10 +1,12 @@
 use unicode_width::UnicodeWidthStr;
 
-use crate::buffer::Buffer;
-use crate::layout::Rect;
-use crate::style::Style;
-use crate::symbols::line;
-use crate::widgets::{Block, Widget};
+use crate::{
+    buffer::Buffer,
+    layout::Rect,
+    style::Style,
+    symbols::line,
+    widgets::{Block, Widget},
+};
 
 /// A widget to display available tabs in a multiple panels context.
 ///

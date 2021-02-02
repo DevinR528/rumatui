@@ -1,8 +1,10 @@
-use crate::buffer::Buffer;
-use crate::layout::Rect;
-use crate::style::Style;
-use crate::symbols::line;
-use crate::widgets::{Borders, Widget};
+use crate::{
+    buffer::Buffer,
+    layout::Rect,
+    style::Style,
+    symbols::line,
+    widgets::{Borders, Widget},
+};
 
 #[derive(Debug, Copy, Clone)]
 pub enum BorderType {

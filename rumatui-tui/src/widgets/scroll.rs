@@ -1,8 +1,7 @@
 // All credit goes to https://github.com/clevinson/tui-rs. His fork and work
 // on scrolling is represented here with a few changes.
 
-use std::cell::Cell;
-use std::rc::Rc;
+use std::{cell::Cell, rc::Rc};
 
 use crate::widgets::reflow::{LineComposer, Styled};
 

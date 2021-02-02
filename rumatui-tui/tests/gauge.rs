@@ -1,8 +1,10 @@
-use rumatui_tui::backend::TestBackend;
-use rumatui_tui::buffer::Buffer;
-use rumatui_tui::layout::{Constraint, Direction, Layout};
-use rumatui_tui::widgets::{Block, Borders, Gauge};
-use rumatui_tui::Terminal;
+use rumatui_tui::{
+    backend::TestBackend,
+    buffer::Buffer,
+    layout::{Constraint, Direction, Layout},
+    widgets::{Block, Borders, Gauge},
+    Terminal,
+};
 
 #[test]
 fn gauge_render() {

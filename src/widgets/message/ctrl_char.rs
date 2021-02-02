@@ -1,8 +1,10 @@
 use std::fmt;
 
 use muncher::Muncher;
-use rumatui_tui::style::{Color, Modifier, Style};
-use rumatui_tui::widgets::Text;
+use rumatui_tui::{
+    style::{Color, Modifier, Style},
+    widgets::Text,
+};
 
 use super::Message;
 
@@ -321,7 +323,7 @@ impl CtrlChars {
 }
 
 /// Parses CSI codes and converts them into `Vec<tui::widgets::Text>` chunks.
-pub fn process_text<'a>(message: &'a Message) -> Vec<Text<'a>> {
+pub fn process_text(message: &Message) -> Vec<Text<'_>> {
     use itertools::Itertools;
 
     let name = format!("{}: ", message.name);
@@ -356,8 +358,10 @@ mod test {
     use super::*;
     use mdcat::{self, ResourceAccess, Settings, TerminalCapabilities, TerminalSize};
     use pulldown_cmark::{Options, Parser};
-    use std::fmt::{self, Display};
-    use std::io::{self, Write};
+    use std::{
+        fmt::{self, Display},
+        io::{self, Write},
+    };
     use syntect::parsing::SyntaxSet;
 
     #[derive(Default)]
@@ -458,10 +462,12 @@ fn main() {
         );
     }
 
-    use rumatui_tui::backend::TestBackend;
-    use rumatui_tui::layout::Alignment;
-    use rumatui_tui::widgets::{Block, Borders, Paragraph};
-    use rumatui_tui::Terminal;
+    use rumatui_tui::{
+        backend::TestBackend,
+        layout::Alignment,
+        widgets::{Block, Borders, Paragraph},
+        Terminal,
+    };
 
     #[test]
     #[ignore]

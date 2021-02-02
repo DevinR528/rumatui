@@ -1,9 +1,11 @@
 use unicode_width::UnicodeWidthStr;
 
-use crate::buffer::Buffer;
-use crate::layout::Rect;
-use crate::style::{Color, Style};
-use crate::widgets::{Block, Widget};
+use crate::{
+    buffer::Buffer,
+    layout::Rect,
+    style::{Color, Style},
+    widgets::{Block, Widget},
+};
 
 /// A widget to display a task progress.
 ///
@@ -53,7 +55,7 @@ impl<'a> Gauge<'a> {
     /// Sets ratio ([0.0, 1.0]) directly.
     pub fn ratio(mut self, ratio: f64) -> Gauge<'a> {
         assert!(
-            ratio <= 1.0 && ratio >= 0.0,
+            (0.0..1.0).contains(&ratio),
             "Ratio should be between 0 and 1 inclusively."
         );
         self.ratio = ratio;
