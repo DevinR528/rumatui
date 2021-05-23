@@ -26,7 +26,10 @@ cargo install rumatui --version 0.1.13-alpha
 ```bash
 rumatui [HOMESERVER | OPTIONS]
 ```
-
+It can be run [torified](https://gitlab.torproject.org/legacy/trac/-/wikis/doc/TorifyHOWTO) with [torsocks](https://gitlab.torproject.org/legacy/trac/-/wikis/doc/torsocks):
+```
+torsocks rumatui [HOMESERVER | OPTIONS]
+```
 ### Options
   * -h or --help Prints help information
   * -v or -verbose Will create a log of the session at '~/.rumatui/logs.json'
